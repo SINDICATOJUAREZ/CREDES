@@ -3,8 +3,10 @@
  * In development, routes fall back to better-sqlite3.
  */
 
-function getUrl() { return process.env.SUPABASE_URL || ''; }
-function getKey() { return process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || ''; }
+function getUrl() { return "https://boiajsvvylkvsgrgdmmk.supabase.co"; }
+function getKey() { 
+  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJvaWFqc3Z2eWxrdnNncmdkbW1rIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODU3NjM5MCwiZXhwIjoyMDk0MTUyMzkwfQ.DsmzO-h9PlBBJKAaZcFldEClAChqednBG2D3vEb4eO4";
+}
 
 export const isProduction = !!getUrl();
 
