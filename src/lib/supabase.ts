@@ -3,31 +3,35 @@
  * In development, routes fall back to better-sqlite3.
  */
 
-const SUPABASE_URL = process.env.SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || '';
+function getUrl() { return process.env.SUPABASE_URL || ''; }
+function getKey() { return process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || ''; }
 
-export const isProduction = !!SUPABASE_URL;
+export const isProduction = !!getUrl();
 
 // Debug helper - remove after confirmed working
 export function getDbStatus() {
+  const url = getUrl();
+  const key = getKey();
   const envVars = Object.keys(process.env).filter(k => k.startsWith('SUPABASE_'));
   return {
-    hasUrl: !!SUPABASE_URL,
-    hasKey: !!SUPABASE_KEY,
-    urlPrefix: SUPABASE_URL.substring(0, 30),
-    keyPrefix: SUPABASE_KEY.substring(0, 10),
+    hasUrl: !!url,
+    hasKey: !!key,
+    urlPrefix: url.substring(0, 30),
+    keyPrefix: key.substring(0, 10),
     foundEnvVars: envVars,
-    isProduction,
+    isProduction: !!url,
     nodeEnv: process.env.NODE_ENV
   };
 }
 
 async function rest(path: string, init: RequestInit = {}): Promise<Response> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+  const url = getUrl();
+  const key = getKey();
+  const res = await fetch(`${url}/rest/v1/${path}`, {
     ...init,
     headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'apikey': key,
+      'Authorization': `Bearer ${key}`,
       'Content-Type': 'application/json',
       ...(init.headers || {}),
     },
