@@ -66,7 +66,7 @@ export const CredentialDesignPanel: React.FC = () => {
         primaryColor: activeDesign.primary_color,
         secondaryColor: activeDesign.secondary_color,
         backgroundUrl: activeDesign.background_url,
-        showTemplate: activeDesign.show_template === 1 || activeDesign.show_template === true,
+        showTemplate: activeDesign.show_template !== false,
         elements: activeDesign.elements.map(el => ({
           id: el.id,
           label: el.label || el.campo_bd,
@@ -240,7 +240,7 @@ export const CredentialDesignPanel: React.FC = () => {
 
           <div className="flex items-center justify-between px-1">
             <Label className="text-[10px] font-bold text-gray-500 uppercase">Plantilla Base (Logo/Foto)</Label>
-            <Switch checked={activeDesign.show_template === 1 || activeDesign.show_template === true} onCheckedChange={v => setActiveDesign({ ...activeDesign, show_template: v ? 1 : 0 })} />
+            <Switch checked={activeDesign.show_template !== false} onCheckedChange={v => setActiveDesign({ ...activeDesign, show_template: v })} />
           </div>
 
           {/* Add Element */}
@@ -366,7 +366,7 @@ export const CredentialDesignPanel: React.FC = () => {
           )}
 
           {/* Static Header & Photo Reference */}
-          {(activeDesign.show_template === 1 || activeDesign.show_template === true) && (
+          {(activeDesign.show_template !== false) && (
             <>
               <div className="absolute top-0 left-0 right-0 pointer-events-none opacity-30 z-0 flex flex-col" style={{ height: `${13 * MM}px`, backgroundColor: activeDesign.primary_color || '#003366', borderBottom: `${0.5 * MM}px solid #eab308` }}>
                  <span className="m-auto text-white font-bold" style={{ fontSize: `${2.5 * MM}px`}}>ZONA DE ENCABEZADO FIJO</span>

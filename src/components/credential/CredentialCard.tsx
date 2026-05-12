@@ -33,7 +33,7 @@ export const CredentialCard: React.FC<CredentialCardProps> = ({ member, config, 
       )}
 
       {/* Header */}
-      {(config.showTemplate === 1 || config.showTemplate === true || config.showTemplate === undefined) && (
+      {(config.showTemplate !== false) && (
         <div 
           className="text-white h-[13mm] flex justify-between items-center px-[3mm] relative z-10 border-b-[0.5mm] border-yellow-500"
           style={{ backgroundColor: config.primaryColor }}
@@ -57,7 +57,7 @@ export const CredentialCard: React.FC<CredentialCardProps> = ({ member, config, 
       {/* Body Area */}
       <div className="flex flex-1 p-[3mm] bg-transparent relative z-10">
         {/* Photo Container */}
-        {(config.showTemplate === 1 || config.showTemplate === true || config.showTemplate === undefined) && (
+        {(config.showTemplate !== false) && (
         <div className="w-[26mm] flex flex-col items-center">
           <div 
             className="w-[24mm] h-[28mm] border-[0.8mm] bg-gray-50 rounded-[0.5mm] overflow-hidden flex items-center justify-center relative shadow-md"
@@ -134,7 +134,7 @@ export const CredentialCard: React.FC<CredentialCardProps> = ({ member, config, 
       })}
 
       {/* Expiry / Footer Info */}
-      {(config.showTemplate === 1 || config.showTemplate === true || config.showTemplate === undefined) && (
+      {(config.showTemplate !== false) && (
       <div className="absolute bottom-[3.5mm] left-[32mm] z-20 flex flex-col">
         <label className="text-[4.5px] text-[#003366] uppercase font-black opacity-50">Vigencia Credencial</label>
         <div className="bg-yellow-500 text-white px-1.5 py-0.5 rounded text-[5.5px] font-black w-fit">
@@ -144,7 +144,7 @@ export const CredentialCard: React.FC<CredentialCardProps> = ({ member, config, 
       )}
 
       {/* Bottom Bar */}
-      {(config.showTemplate === 1 || config.showTemplate === true || config.showTemplate === undefined) && (
+      {(config.showTemplate !== false) && (
       <div className="h-[1.5mm] w-full mt-auto flex items-center justify-center relative" style={{ backgroundColor: config.primaryColor }}>
          <div className="h-[0.5mm] w-[80%] bg-yellow-500 opacity-50"></div>
          <div className="absolute right-2 text-[4px] text-white/50 font-black tracking-tighter">VENCIMIENTO: 1 AÑO</div>
