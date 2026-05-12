@@ -4,9 +4,20 @@
  */
 
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || '';
 
 export const isProduction = !!SUPABASE_URL;
+
+// Debug helper - remove after confirmed working
+export function getDbStatus() {
+  return {
+    hasUrl: !!SUPABASE_URL,
+    hasKey: !!SUPABASE_KEY,
+    urlPrefix: SUPABASE_URL.substring(0, 30),
+    keyPrefix: SUPABASE_KEY.substring(0, 10),
+    isProduction,
+  };
+}
 
 async function rest(path: string, init: RequestInit = {}): Promise<Response> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
