@@ -103,7 +103,7 @@ export const generateVectorialCredentialPDF = async (member: Member, config: Cre
      // But wait, if it's NOT an element, it won't show.
      // In the vector generator, the photo is hardcoded.
      // Let's check if there's a 'foto' element in config.
-     const hasPhotoElement = config.elements.some(el => el.field === 'foto' || (el as any).tipo === 'imagen');
+     const hasPhotoElement = config.elements.some(el => (el.field as string) === 'foto' || (el as any).tipo === 'imagen');
      if (!hasPhotoElement) {
         const photoBase64 = await fetchImageAsBase64(member.photoUrl);
         if (photoBase64) {

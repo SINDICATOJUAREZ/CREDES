@@ -4,6 +4,7 @@ import React from 'react';
 import { CreditCard, Users, FileUp, Settings, LogOut } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+export const Navbar = () => {
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });

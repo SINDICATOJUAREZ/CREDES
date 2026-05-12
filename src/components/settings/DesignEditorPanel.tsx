@@ -142,7 +142,7 @@ export const CredentialDesignPanel: React.FC = () => {
       const data = await res.json();
       
       if (data.url) {
-        setActiveDesign({ ...activeDesign, background_url: data.url, show_template: 0 });
+        setActiveDesign({ ...activeDesign, background_url: data.url, show_template: false });
         toast.success('Imagen subida correctamente', { id: toastId });
       } else throw new Error(data.error);
     } catch (error) {
