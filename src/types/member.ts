@@ -22,11 +22,14 @@ export interface VisualElement {
   type: 'text' | 'image' | 'qr';
   x: number; // position in mm
   y: number; // position in mm
+  w?: number; // width in mm
+  h?: number; // height in mm
   fontSize: number;
   fontWeight: 'normal' | 'bold' | 'black';
   color: string;
   isVisible: boolean;
   fixedText?: string;
+  alignment?: string;
 }
 
 export interface CredentialConfig {
