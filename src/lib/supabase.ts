@@ -10,12 +10,15 @@ export const isProduction = !!SUPABASE_URL;
 
 // Debug helper - remove after confirmed working
 export function getDbStatus() {
+  const envVars = Object.keys(process.env).filter(k => k.startsWith('SUPABASE_'));
   return {
     hasUrl: !!SUPABASE_URL,
     hasKey: !!SUPABASE_KEY,
     urlPrefix: SUPABASE_URL.substring(0, 30),
     keyPrefix: SUPABASE_KEY.substring(0, 10),
+    foundEnvVars: envVars,
     isProduction,
+    nodeEnv: process.env.NODE_ENV
   };
 }
 
