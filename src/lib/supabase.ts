@@ -3,28 +3,11 @@
  * In development, routes fall back to better-sqlite3.
  */
 
-function getUrl() { return "https://boiajsvvylkvsgrgdmmk.supabase.co"; }
-function getKey() { 
-  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJvaWFqc3Z2eWxrdnNncmdkbW1rIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODU3NjM5MCwiZXhwIjoyMDk0MTUyMzkwfQ.DsmzO-h9PlBBJKAaZcFldEClAChqednBG2D3vEb4eO4";
-}
+function getUrl() { return process.env.SUPABASE_URL || ''; }
+function getKey() { return process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || ''; }
+
 
 export const isProduction = !!getUrl();
-
-// Debug helper - remove after confirmed working
-export function getDbStatus() {
-  const url = getUrl();
-  const key = getKey();
-  const envVars = Object.keys(process.env).filter(k => k.startsWith('SUPABASE_'));
-  return {
-    hasUrl: !!url,
-    hasKey: !!key,
-    urlPrefix: url.substring(0, 30),
-    keyPrefix: key.substring(0, 10),
-    foundEnvVars: envVars,
-    isProduction: !!url,
-    nodeEnv: process.env.NODE_ENV
-  };
-}
 
 async function rest(path: string, init: RequestInit = {}): Promise<Response> {
   const url = getUrl();
