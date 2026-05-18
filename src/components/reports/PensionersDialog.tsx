@@ -17,14 +17,25 @@ export function PensionersDialog({ isOpen, onClose }: Props) {
     if (isOpen) calc();
   }, [isOpen]);
 
-  const parseDate = (dateStr: string | undefined) => {
+  const parseDate = (dateStr: string | any) => {
     if (!dateStr) return null;
+    // Handle Date objects
+    if (dateStr instanceof Date) return dateStr;
+    // Handle numbers (timestamps)
+    if (typeof dateStr === 'number') return new Date(dateStr);
+    // Standard string parsing
     const d = new Date(dateStr);
     if (!isNaN(d.getTime())) return d;
-    const parts = dateStr.split(/[-/]/);
+    
+    // Manual parsing for common formats
+    const parts = dateStr.toString().split(/[-/]/);
     if (parts.length === 3) {
-      if (parts[0].length === 4) return new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
-      return new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]));
+      const p0 = parseInt(parts[0]);
+      const p1 = parseInt(parts[1]);
+      const p2 = parseInt(parts[2]);
+      
+      if (parts[0].length === 4) return new Date(p0, p1 - 1, p2);
+      if (parts[2].length === 4) return new Date(p2, p1 - 1, p0);
     }
     return null;
   };
@@ -32,20 +43,41 @@ export function PensionersDialog({ isOpen, onClose }: Props) {
   const calc = async () => {
     setIsLoading(true);
     try {
-      const r = await fetch('/api/members?limit=3000');
-      const d = await r.json();
-      const allMembers: Member[] = d.data || [];
+      // Fetch active types in parallel to get a better sample
+      const types = ['ACTIVO', 'DELEGADO', 'SECRETARIO_GENERAL'];
+      const responses = await Promise.all(
+        types.map(t => fetch(`/api/members?limit=2000&memberType=${t}`))
+      );
+      
+      const results = await Promise.all(responses.map(r => r.json()));
+      const allMembers: Member[] = results.flatMap(d => d.data || []);
+      
+      // Also fetch by status ACTIVO for good measure (some might have other memberTypes but still be active)
+      const rStatus = await fetch('/api/members?limit=2000&status=ACTIVO');
+      const dStatus = await rStatus.json();
+      const statusActive = dStatus.data || [];
+      
+      // Merge and deduplicate
+      const merged = [...allMembers, ...statusActive];
+      const uniqueIds = new Set();
+      const uniqueMembers = merged.filter(m => {
+        if (uniqueIds.has(m.id)) return false;
+        uniqueIds.add(m.id);
+        return true;
+      });
+
       const today = new Date();
-      const filtered = allMembers.filter(m => {
-        const isActive = m.memberType === 'ACTIVO' || m.memberType === 'DELEGADO' || m.memberType === 'SECRETARIO_GENERAL' || m.status === 'ACTIVO';
-        if (!isActive) return false;
+      const filtered = uniqueMembers.filter(m => {
         const bDate = parseDate(m.birthDate);
         const jDate = parseDate(m.joinDate);
         if (!bDate || !jDate) return false;
+
         let age = today.getFullYear() - bDate.getFullYear();
         if (today < new Date(today.getFullYear(), bDate.getMonth(), bDate.getDate())) age--;
+        
         let years = today.getFullYear() - jDate.getFullYear();
         if (today < new Date(today.getFullYear(), jDate.getMonth(), jDate.getDate())) years--;
+        
         return age > 50 && years >= 15;
       }).map(m => {
         const bDate = parseDate(m.birthDate)!;
@@ -56,9 +88,10 @@ export function PensionersDialog({ isOpen, onClose }: Props) {
         if (today < new Date(today.getFullYear(), jDate.getMonth(), jDate.getDate())) years--;
         return { ...m, calculatedAge: age, calculatedYears: years, pensionPct: years >= 24 ? 100 : 75 };
       }).sort((a, b) => b.calculatedYears - a.calculatedYears);
+      
       setList(filtered);
     } catch (e) {
-      console.error(e);
+      console.error('Pension Calc Error:', e);
     } finally {
       setIsLoading(false);
     }

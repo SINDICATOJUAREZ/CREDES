@@ -9,6 +9,8 @@ export async function GET(request: Request) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
     const search = searchParams.get('search') || '';
+    const memberType = searchParams.get('memberType') || '';
+    const status = searchParams.get('status') || '';
     const offset = (page - 1) * limit;
 
     if (isProduction) {
@@ -16,6 +18,12 @@ export async function GET(request: Request) {
       if (search) {
         const s = encodeURIComponent(`%${search}%`);
         query += `&or=(full_name.ilike.${s},employee_id.ilike.${s},department.ilike.${s},socio_id.ilike.${s})`;
+      }
+      if (memberType) {
+        query += `&member_type=eq.${memberType}`;
+      }
+      if (status) {
+        query += `&status=eq.${status}`;
       }
       const { data: members, count: total } = await sSelectCount('members', query);
       
@@ -46,12 +54,20 @@ export async function GET(request: Request) {
     const path = await import('path');
     const db = new Database(path.join(process.cwd(), 'database.sqlite'));
 
-    let baseQuery = 'FROM members';
+    let baseQuery = 'FROM members WHERE 1=1';
     const params: any[] = [];
     if (search) {
-      baseQuery += ' WHERE full_name LIKE ? OR employee_id LIKE ? OR department LIKE ? OR socio_id LIKE ?';
+      baseQuery += ' AND (full_name LIKE ? OR employee_id LIKE ? OR department LIKE ? OR socio_id LIKE ?)';
       const searchParam = `%${search}%`;
       params.push(searchParam, searchParam, searchParam, searchParam);
+    }
+    if (memberType) {
+      baseQuery += ' AND member_type = ?';
+      params.push(memberType);
+    }
+    if (status) {
+      baseQuery += ' AND status = ?';
+      params.push(status);
     }
 
     const totalResult = db.prepare(`SELECT COUNT(*) as total ${baseQuery}`).get(...params) as { total: number };
