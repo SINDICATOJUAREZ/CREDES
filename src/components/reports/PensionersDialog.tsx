@@ -57,8 +57,13 @@ export function PensionersDialog({ isOpen, onClose }: Props) {
       const dStatus = await rStatus.json();
       const statusActive = dStatus.data || [];
       
+      // Fetch members with INCAPACITADO status
+      const rIncap = await fetch('/api/members?limit=2000&status=INCAPACITADO');
+      const dIncap = await rIncap.json();
+      const statusIncap = dIncap.data || [];
+      
       // Merge and deduplicate
-      const merged = [...allMembers, ...statusActive];
+      const merged = [...allMembers, ...statusActive, ...statusIncap];
       const uniqueIds = new Set();
       const uniqueMembers = merged.filter(m => {
         if (uniqueIds.has(m.id)) return false;
@@ -70,23 +75,45 @@ export function PensionersDialog({ isOpen, onClose }: Props) {
       const filtered = uniqueMembers.filter(m => {
         const bDate = parseDate(m.birthDate);
         const jDate = parseDate(m.joinDate);
-        if (!bDate || !jDate) return false;
+        if (!jDate) return false;
 
-        let age = today.getFullYear() - bDate.getFullYear();
-        if (today < new Date(today.getFullYear(), bDate.getMonth(), bDate.getDate())) age--;
-        
         let years = today.getFullYear() - jDate.getFullYear();
         if (today < new Date(today.getFullYear(), jDate.getMonth(), jDate.getDate())) years--;
+
+        // Case 1: Incapacitated (10 or more years working in the municipality, age doesn't matter)
+        const isIncapacitated = m.status === 'INCAPACITADO';
+        if (isIncapacitated) {
+          return years >= 10;
+        }
+
+        // Case 2: Standard Pension (age > 50 and years >= 15)
+        if (!bDate) return false;
+        let age = today.getFullYear() - bDate.getFullYear();
+        if (today < new Date(today.getFullYear(), bDate.getMonth(), bDate.getDate())) age--;
         
         return age > 50 && years >= 15;
       }).map(m => {
-        const bDate = parseDate(m.birthDate)!;
+        const bDate = parseDate(m.birthDate);
         const jDate = parseDate(m.joinDate)!;
-        let age = today.getFullYear() - bDate.getFullYear();
-        if (today < new Date(today.getFullYear(), bDate.getMonth(), bDate.getDate())) age--;
+        
+        let age = 0;
+        if (bDate) {
+          age = today.getFullYear() - bDate.getFullYear();
+          if (today < new Date(today.getFullYear(), bDate.getMonth(), bDate.getDate())) age--;
+        }
+        
         let years = today.getFullYear() - jDate.getFullYear();
         if (today < new Date(today.getFullYear(), jDate.getMonth(), jDate.getDate())) years--;
-        return { ...m, calculatedAge: age, calculatedYears: years, pensionPct: years >= 24 ? 100 : 75 };
+        
+        const isIncapacitated = m.status === 'INCAPACITADO';
+        
+        return { 
+          ...m, 
+          calculatedAge: age, 
+          calculatedYears: years, 
+          pensionPct: isIncapacitated ? 100 : (years >= 24 ? 100 : 75),
+          pensionType: isIncapacitated ? 'INCAPACIDAD' : 'EDAD Y ANTIGÜEDAD'
+        };
       }).sort((a, b) => b.calculatedYears - a.calculatedYears);
       
       setList(filtered);
@@ -108,7 +135,7 @@ export function PensionersDialog({ isOpen, onClose }: Props) {
               Proyección de Pensiones
             </h2>
             <p className="text-[9px] md:text-[11px] text-gray-400 font-black uppercase tracking-widest md:tracking-[0.2em] italic mt-2 md:mt-1 md:ml-14 leading-tight">
-              Elegibilidad basada en edad (&gt;50 años) y antigüedad en municipio
+              Edad y Antigüedad (&gt;50 años / &gt;=15 años serv.) o por Incapacidad (&gt;=10 años serv.)
             </p>
           </div>
           <button onClick={onClose} className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-2xl bg-gray-50 flex items-center justify-center hover:bg-red-50 hover:text-red-600 transition-all active:scale-95 ml-2 md:ml-0">
@@ -141,6 +168,12 @@ export function PensionersDialog({ isOpen, onClose }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {list.map((m, i) => (
               <div key={i} className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-xl hover:border-blue-200 transition-all duration-500">
+                {m.pensionType === 'INCAPACIDAD' ? (
+                  <div className="absolute top-0 left-0 px-4 py-2 rounded-br-3xl bg-amber-500 text-white text-[9px] font-black uppercase tracking-widest shadow-sm">
+                    Incapacidad
+                  </div>
+                ) : null}
+                
                 <div className={`absolute top-0 right-0 px-6 py-2 rounded-bl-3xl text-white text-[10px] font-black uppercase tracking-widest shadow-sm ${m.pensionPct === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`}>
                   {m.pensionPct}% Pensión
                 </div>
