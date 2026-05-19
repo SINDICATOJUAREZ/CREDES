@@ -139,14 +139,21 @@ export const CredentialDesignPanel: React.FC = () => {
       formData.append('file', file);
       
       const res = await fetch('/api/upload-background', { method: 'POST', body: formData });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Error del servidor (${res.status})`);
+      }
       const data = await res.json();
       
       if (data.url) {
         setActiveDesign({ ...activeDesign, background_url: data.url, show_template: false });
         toast.success('Imagen subida correctamente', { id: toastId });
-      } else throw new Error(data.error);
-    } catch (error) {
-      toast.error('Error al subir la imagen', { id: toastId });
+      } else {
+        throw new Error(data.error || 'No se recibió la URL de la imagen');
+      }
+    } catch (error: any) {
+      console.error('Background upload error:', error);
+      toast.error(`Error al subir la imagen: ${error.message || error}`, { id: toastId });
     }
   };
 

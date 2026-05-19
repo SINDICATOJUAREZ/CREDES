@@ -311,7 +311,7 @@ export function PensionersDialog({ isOpen, onClose }: Props) {
                     <div className="w-[120px] h-[140px] border-2 border-gray-100 rounded-2xl overflow-hidden bg-gray-50 flex items-center justify-center relative shadow-sm">
                       {selectedMemberForPreview?.photoUrl ? (
                         <img 
-                          src={selectedMemberForPreview.photoUrl} 
+                          src={`${selectedMemberForPreview.photoUrl}?t=${new Date().getTime()}`} 
                           alt="Foto" 
                           className="w-full h-full object-cover"
                         />

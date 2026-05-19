@@ -64,7 +64,7 @@ export const CredentialCard: React.FC<CredentialCardProps> = ({ member, config, 
             style={{ borderColor: config.primaryColor }}
           >
             {member.photoUrl ? (
-              <img src={member.photoUrl} alt={member.fullName} className="w-full h-full object-cover" />
+              <img src={`${member.photoUrl}?t=${new Date().getTime()}`} alt={member.fullName} className="w-full h-full object-cover" />
             ) : (
               <div className="flex flex-col items-center gap-1 opacity-20">
                 <div className="w-8 h-8 rounded-full bg-gray-400"></div>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Image as ImageIcon, Trash2, Upload, Search, RefreshCw, AlertCircle, Plus, FileText, CheckCircle2 } from 'lucide-react';
+import { Image as ImageIcon, Trash2, Upload, Search, RefreshCw, AlertCircle, Plus, FileText, CheckCircle2, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,6 +22,7 @@ export const PhotosPanel: React.FC = () => {
   // Form fields
   const [employeeId, setEmployeeId] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [rotatingPhotos, setRotatingPhotos] = useState<Record<string, boolean>>({});
 
   const fetchPhotos = async () => {
     setIsLoading(true);
@@ -118,6 +119,71 @@ export const PhotosPanel: React.FC = () => {
     } catch (error: any) {
       console.error(error);
       toast.error('No se pudo eliminar la fotografía.');
+    }
+  };
+
+  const handleRotate = async (photo: PhotoItem) => {
+    setRotatingPhotos(prev => ({ ...prev, [photo.name]: true }));
+    const toastId = toast.loading(`Rotando fotografía "${photo.name}"...`);
+    
+    try {
+      const response = await fetch(photo.url);
+      const blob = await response.blob();
+      
+      const img = new Image();
+      const objectURL = URL.createObjectURL(blob);
+      img.src = objectURL;
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = img.height;
+      canvas.height = img.width;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('No se pudo inicializar el contexto de canvas.');
+      
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(90 * Math.PI / 180);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+      
+      URL.revokeObjectURL(objectURL);
+      
+      const rotatedBlob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, 'image/jpeg', 0.95);
+      });
+      
+      if (!rotatedBlob) throw new Error('Error al procesar la imagen rotada.');
+      
+      const file = new File([rotatedBlob], photo.name, { type: 'image/jpeg' });
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const empIdMatch = photo.name.match(/^(\d+)/);
+      if (empIdMatch) {
+        formData.append('employeeId', empIdMatch[1]);
+      }
+      
+      const uploadRes = await fetch('/api/photos', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!uploadRes.ok) {
+        const errData = await uploadRes.json();
+        throw new Error(errData.error || 'Error al guardar la imagen rotada.');
+      }
+      
+      toast.success('Fotografía rotada y guardada correctamente.', { id: toastId });
+      fetchPhotos();
+    } catch (error: any) {
+      console.error(error);
+      toast.error(`Error al rotar la fotografía: ${error.message || error}`, { id: toastId });
+    } finally {
+      setRotatingPhotos(prev => ({ ...prev, [photo.name]: false }));
     }
   };
 
@@ -291,7 +357,7 @@ export const PhotosPanel: React.FC = () => {
                       className="group relative aspect-[3/4] rounded-2xl border border-gray-100 overflow-hidden bg-gray-50 shadow-sm flex flex-col justify-between"
                     >
                       {/* Photo Thumbnail */}
-                      <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105" style={{ backgroundImage: `url(${photo.url})` }} />
+                      <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105" style={{ backgroundImage: `url(${photo.url}?t=${new Date(photo.updatedAt).getTime()})` }} />
                       
                       {/* Dark overlay on hover */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between p-3.5" />
@@ -308,10 +374,23 @@ export const PhotosPanel: React.FC = () => {
                       </div>
 
                       {/* Top Bar on Hover */}
-                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10">
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10 flex gap-1.5">
+                        <button
+                          onClick={() => handleRotate(photo)}
+                          disabled={rotatingPhotos[photo.name]}
+                          className="w-8 h-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition-all shadow-md shadow-blue-600/30 hover:scale-105 disabled:opacity-55"
+                          title="Rotar 90° a la derecha"
+                        >
+                          {rotatingPhotos[photo.name] ? (
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <RotateCw className="w-4 h-4" />
+                          )}
+                        </button>
                         <button
                           onClick={() => handleDelete(photo.name)}
                           className="w-8 h-8 rounded-xl bg-red-600 hover:bg-red-700 text-white flex items-center justify-center transition-all shadow-md shadow-red-600/30 hover:scale-105"
+                          title="Eliminar fotografía"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
