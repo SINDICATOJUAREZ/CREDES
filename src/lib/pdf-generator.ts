@@ -235,49 +235,44 @@ export const generateResumePDF = async (member: Member) => {
   try {
     const pdf = new jsPDF();
     
-    // Header - Centered logo2
+    // Header - Centered logo2 (wide widescreen aspect ratio)
     const logo2Base64 = await fetchImageAsBase64('/logos/logo2.png');
     if (logo2Base64) {
-      pdf.addImage(logo2Base64, 'PNG', 92.5, 10, 25, 25);
+      pdf.addImage(logo2Base64, 'PNG', 75, 10, 60, 16);
     }
     
     pdf.setTextColor(0, 51, 102);
     pdf.setFontSize(18);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('EXPEDIENTE DEL AGREMIADO', 105, 42, { align: 'center' });
-    
-    pdf.setFontSize(9);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(100, 100, 100);
-    pdf.text('SINDICATO ÚNICO DE TRABAJADORES - CIUDAD BENITO JUÁREZ', 105, 48, { align: 'center' });
+    pdf.text('EXPEDIENTE DEL AGREMIADO', 105, 38, { align: 'center' });
     
     pdf.setDrawColor(200, 200, 200);
     pdf.setLineWidth(0.3);
-    pdf.line(20, 52, 190, 52);
+    pdf.line(20, 44, 190, 44);
     
     // Section: INFORMACIÓN GENERAL
     pdf.setTextColor(0, 51, 102);
     pdf.setFontSize(13);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('INFORMACIÓN GENERAL', 20, 60);
+    pdf.text('INFORMACIÓN GENERAL', 20, 52);
     pdf.setDrawColor(0, 51, 102);
     pdf.setLineWidth(0.5);
-    pdf.line(20, 62, 190, 62);
+    pdf.line(20, 54, 190, 54);
     
     // Member Photo
     pdf.setDrawColor(200, 200, 200);
     pdf.setLineWidth(0.3);
-    pdf.rect(155, 66, 30, 35);
+    pdf.rect(155, 58, 30, 35);
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(8);
     pdf.setTextColor(150, 150, 150);
-    pdf.text('SIN FOTO', 170, 84, { align: 'center' });
+    pdf.text('SIN FOTO', 170, 76, { align: 'center' });
     
     if (member.photoUrl) {
       const photoBase64 = await fetchImageAsBase64(member.photoUrl);
       if (photoBase64) {
         const format = photoBase64.includes('image/png') ? 'PNG' : 'JPEG';
-        pdf.addImage(photoBase64, format, 155, 66, 30, 35);
+        pdf.addImage(photoBase64, format, 155, 58, 30, 35);
       }
     }
     
@@ -286,87 +281,61 @@ export const generateResumePDF = async (member: Member) => {
     pdf.setFontSize(10);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Nombre:', 20, 72);
+    pdf.text('Nombre:', 20, 64);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.fullName || '---', 55, 72);
+    pdf.text(member.fullName || '---', 55, 64);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('CURP:', 20, 79);
+    pdf.text('CURP:', 20, 71);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.curp || '---', 55, 79);
+    pdf.text(member.curp || '---', 55, 71);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('No. Nómina:', 20, 86);
+    pdf.text('No. Nómina:', 20, 78);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.employeeId || '---', 55, 86);
+    pdf.text(member.employeeId || '---', 55, 78);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('No. Socio:', 20, 93);
+    pdf.text('No. Socio:', 20, 85);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.socioId || '---', 55, 93);
+    pdf.text(member.socioId || '---', 55, 85);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Puesto Actual:', 20, 100);
+    pdf.text('Puesto Actual:', 20, 92);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.position || '---', 55, 100);
+    pdf.text(member.position || '---', 55, 92);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Departamento:', 20, 107);
+    pdf.text('Departamento:', 20, 99);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.department || '---', 55, 107);
+    pdf.text(member.department || '---', 55, 99);
     
     // Section: DATOS DE CONTACTO
     pdf.setTextColor(0, 51, 102);
     pdf.setFontSize(13);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('DATOS DE CONTACTO', 20, 120);
+    pdf.text('DATOS DE CONTACTO', 20, 112);
     pdf.setDrawColor(0, 51, 102);
     pdf.setLineWidth(0.5);
-    pdf.line(20, 122, 190, 122);
+    pdf.line(20, 114, 190, 114);
     
     pdf.setTextColor(0, 0, 0);
     pdf.setFontSize(10);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Teléfono:', 20, 130);
+    pdf.text('Teléfono:', 20, 122);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.phone || '---', 55, 130);
+    pdf.text(member.phone || '---', 55, 122);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Email:', 20, 137);
+    pdf.text('Email:', 20, 129);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.email || '---', 55, 137);
+    pdf.text(member.email || '---', 55, 129);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Domicilio:', 20, 144);
+    pdf.text('Domicilio:', 20, 136);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.address || '---', 55, 144);
-    
-    // Section: BENEFICIARIOS Y FAMILIARES
-    pdf.setTextColor(0, 51, 102);
-    pdf.setFontSize(13);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('BENEFICIARIOS Y FAMILIARES', 20, 162);
-    pdf.setDrawColor(0, 51, 102);
-    pdf.setLineWidth(0.5);
-    pdf.line(20, 164, 190, 164);
-    
-    let y = 174;
-    pdf.setTextColor(0, 0, 0);
-    pdf.setFontSize(9);
-    
-    if (member.family && member.family.length > 0) {
-      member.family.forEach((f, i) => {
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(`${i + 1}. ${f.fullName}`, 25, y);
-        pdf.setFont('helvetica', 'normal');
-        pdf.text(`(${f.relationship}) - Edad: ${f.age || '---'}`, 100, y);
-        y += 8;
-      });
-    } else {
-      pdf.setFont('helvetica', 'normal');
-      pdf.text('No se registran beneficiarios vinculados.', 25, y);
-    }
+    pdf.text(member.address || '---', 55, 136);
     
     // Footer
     pdf.setFontSize(8);

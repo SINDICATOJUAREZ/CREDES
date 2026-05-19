@@ -4,6 +4,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Users, X, Printer } from 'lucide-react';
 import { Member } from '@/types/member';
 import { generateResumePDF } from '@/lib/pdf-generator';
+import { Button } from "@/components/ui/button";
 
 interface Props {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface Props {
 export function PensionersDialog({ isOpen, onClose }: Props) {
   const [list, setList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedMemberForPreview, setSelectedMemberForPreview] = useState<any | null>(null);
 
   useEffect(() => {
     if (isOpen) calc();
@@ -212,11 +214,11 @@ export function PensionersDialog({ isOpen, onClose }: Props) {
                 </div>
 
                 <button 
-                  onClick={() => generateResumePDF(m)}
+                  onClick={() => setSelectedMemberForPreview(m)}
                   className="w-full py-3 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-2xl font-black text-[10px] uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 group-hover:bg-blue-600 group-hover:text-white shadow-sm shadow-blue-100"
                 >
                   <Printer className="w-4 h-4" />
-                  Imprimir Expediente
+                  Previsualizar Expediente
                 </button>
               </div>
             ))}
@@ -228,6 +230,150 @@ export function PensionersDialog({ isOpen, onClose }: Props) {
           </div>
         </div>
       </DialogContent>
+
+      {/* Real-time Expediente Preview Dialog */}
+      <Dialog open={selectedMemberForPreview !== null} onOpenChange={o => !o && setSelectedMemberForPreview(null)}>
+        <DialogContent className="max-w-[95vw] md:max-w-2xl max-h-[85vh] rounded-[2rem] md:rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white flex flex-col">
+          {/* Header */}
+          <div className="px-6 py-4 md:px-8 md:py-6 bg-blue-900 text-white flex justify-between items-center shrink-0">
+            <div>
+              <h3 className="text-lg md:text-xl font-black uppercase tracking-tight flex items-center gap-2">
+                <Printer className="w-5 h-5 text-cyan-400 shrink-0" />
+                Previsualización de Expediente
+              </h3>
+              <p className="text-[10px] text-blue-200 uppercase tracking-widest font-semibold">
+                Verifica la información antes de generar el documento final
+              </p>
+            </div>
+            <button 
+              onClick={() => setSelectedMemberForPreview(null)} 
+              className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center hover:bg-white/20 text-white transition-all active:scale-95"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Paper View Container */}
+          <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-gray-50 flex justify-center scrollbar-premium">
+            <div className="w-full max-w-[210mm] bg-white border border-gray-200/60 shadow-lg rounded-2xl p-8 flex flex-col font-sans text-gray-800 text-sm">
+              {/* Center Logo */}
+              <div className="mb-6 flex justify-center">
+                <img 
+                  src="/logos/logo2.png" 
+                  alt="Sindicato Logo" 
+                  className="h-16 w-auto object-contain max-w-[250px]"
+                />
+              </div>
+
+              {/* Title */}
+              <h2 className="text-xl md:text-2xl font-black text-blue-900 text-center uppercase tracking-tight">
+                EXPEDIENTE DEL AGREMIADO
+              </h2>
+              
+              <div className="w-full h-[1px] bg-gray-200 my-4" />
+
+              {/* INFORMACIÓN GENERAL */}
+              <div className="mb-6">
+                <h4 className="text-sm font-black text-blue-900 uppercase mb-2 tracking-wide">INFORMACIÓN GENERAL</h4>
+                <div className="w-full h-[2px] bg-blue-900 mb-4" />
+                
+                <div className="flex flex-col-reverse md:flex-row gap-6">
+                  {/* Left fields */}
+                  <div className="flex-1 space-y-2.5">
+                    <div className="flex border-b border-gray-100 py-1">
+                      <span className="w-32 font-bold text-gray-700">Nombre:</span>
+                      <span className="text-gray-900 font-semibold">{selectedMemberForPreview?.fullName || '---'}</span>
+                    </div>
+                    <div className="flex border-b border-gray-100 py-1">
+                      <span className="w-32 font-bold text-gray-700">CURP:</span>
+                      <span className="text-gray-900 font-semibold">{selectedMemberForPreview?.curp || '---'}</span>
+                    </div>
+                    <div className="flex border-b border-gray-100 py-1">
+                      <span className="w-32 font-bold text-gray-700">No. Nómina:</span>
+                      <span className="text-gray-900 font-semibold">{selectedMemberForPreview?.employeeId || '---'}</span>
+                    </div>
+                    <div className="flex border-b border-gray-100 py-1">
+                      <span className="w-32 font-bold text-gray-700">No. Socio:</span>
+                      <span className="text-gray-900 font-semibold">{selectedMemberForPreview?.socioId || '---'}</span>
+                    </div>
+                    <div className="flex border-b border-gray-100 py-1">
+                      <span className="w-32 font-bold text-gray-700">Puesto Actual:</span>
+                      <span className="text-gray-900 font-semibold">{selectedMemberForPreview?.position || '---'}</span>
+                    </div>
+                    <div className="flex border-b border-gray-100 py-1">
+                      <span className="w-32 font-bold text-gray-700">Departamento:</span>
+                      <span className="text-gray-900 font-semibold">{selectedMemberForPreview?.department || '---'}</span>
+                    </div>
+                  </div>
+
+                  {/* Photo area */}
+                  <div className="shrink-0 flex justify-center items-start">
+                    <div className="w-[120px] h-[140px] border-2 border-gray-100 rounded-2xl overflow-hidden bg-gray-50 flex items-center justify-center relative shadow-sm">
+                      {selectedMemberForPreview?.photoUrl ? (
+                        <img 
+                          src={selectedMemberForPreview.photoUrl} 
+                          alt="Foto" 
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-[10px] font-black text-gray-300 uppercase tracking-wider">SIN FOTO</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* DATOS DE CONTACTO */}
+              <div className="mb-6">
+                <h4 className="text-sm font-black text-blue-900 uppercase mb-2 tracking-wide">DATOS DE CONTACTO</h4>
+                <div className="w-full h-[2px] bg-blue-900 mb-4" />
+                
+                <div className="space-y-2.5">
+                  <div className="flex border-b border-gray-100 py-1">
+                    <span className="w-32 font-bold text-gray-700">Teléfono:</span>
+                    <span className="text-gray-900 font-semibold">{selectedMemberForPreview?.phone || '---'}</span>
+                  </div>
+                  <div className="flex border-b border-gray-100 py-1">
+                    <span className="w-32 font-bold text-gray-700">Email:</span>
+                    <span className="text-gray-900 font-semibold">{selectedMemberForPreview?.email || '---'}</span>
+                  </div>
+                  <div className="flex border-b border-gray-100 py-1">
+                    <span className="w-32 font-bold text-gray-700">Domicilio:</span>
+                    <span className="text-gray-900 font-semibold">{selectedMemberForPreview?.address || '---'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="mt-8 text-center text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+                Uso exclusivo del Sindicato Único de Trabajadores.
+              </div>
+            </div>
+          </div>
+
+          {/* Action Footer */}
+          <div className="px-6 py-4 md:px-8 md:py-6 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0">
+            <Button
+              onClick={() => setSelectedMemberForPreview(null)}
+              variant="outline"
+              className="h-11 px-6 rounded-xl text-gray-500 font-bold text-xs uppercase tracking-wider"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedMemberForPreview) {
+                  generateResumePDF(selectedMemberForPreview);
+                }
+              }}
+              className="h-11 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-blue-600/20"
+            >
+              <Printer className="w-4 h-4" />
+              Descargar PDF
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
