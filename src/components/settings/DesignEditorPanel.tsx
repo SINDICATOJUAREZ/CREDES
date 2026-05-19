@@ -133,10 +133,43 @@ export const CredentialDesignPanel: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file || !activeDesign) return;
     
-    const toastId = toast.loading('Subiendo imagen...');
+    const toastId = toast.loading('Optimizando y subiendo fondo de credencial...');
     try {
+      // 1. Load image into HTML Image object
+      const img = new Image();
+      const objectURL = URL.createObjectURL(file);
+      img.src = objectURL;
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+      
+      // 2. Create canvas with ideal PVC high-resolution dimensions (300 DPI: 1016 x 638)
+      const canvas = document.createElement('canvas');
+      canvas.width = 1016;
+      canvas.height = 638;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('No se pudo inicializar el contexto de canvas.');
+      
+      // Draw image covering the canvas (fill / crop if aspect ratio differs slightly)
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      
+      // Clean up object URL
+      URL.revokeObjectURL(objectURL);
+      
+      // 3. Convert to JPEG blob at high quality (0.92) for optimal print fidelity and file size
+      const optimizedBlob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, 'image/jpeg', 0.92);
+      });
+      
+      if (!optimizedBlob) throw new Error('Error al optimizar la imagen.');
+      
+      // 4. Create upload payload
+      const optimizedFile = new File([optimizedBlob], 'fondo_frente.jpg', { type: 'image/jpeg' });
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', optimizedFile);
       
       const res = await fetch('/api/upload-background', { method: 'POST', body: formData });
       if (!res.ok) {
@@ -147,7 +180,7 @@ export const CredentialDesignPanel: React.FC = () => {
       
       if (data.url) {
         setActiveDesign({ ...activeDesign, background_url: data.url, show_template: false });
-        toast.success('Imagen subida correctamente', { id: toastId });
+        toast.success('Fondo optimizado y subido correctamente', { id: toastId });
       } else {
         throw new Error(data.error || 'No se recibió la URL de la imagen');
       }
