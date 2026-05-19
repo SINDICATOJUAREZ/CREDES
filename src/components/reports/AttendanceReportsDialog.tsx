@@ -407,7 +407,7 @@ export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqued
                   <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-5 mb-5 pb-5 border-b border-gray-100">
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center text-xl font-bold text-slate-500 overflow-hidden shrink-0">
-                        {selMember.photoUrl ? <img src={selMember.photoUrl} alt="" className="w-full h-full object-cover"/> : selMember.fullName?.charAt(0)}
+                        {selMember.photoUrl ? <img src={`${selMember.photoUrl}?t=${new Date().getTime()}`} alt="" className="w-full h-full object-cover"/> : selMember.fullName?.charAt(0)}
                       </div>
                       <div className="flex-1 md:hidden">
                         <h3 className="text-lg font-bold text-slate-800 leading-tight">{selMember.fullName}</h3>
@@ -469,7 +469,7 @@ export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqued
                       <div key={m.id} onClick={()=>loadAtt(m.employeeId||m.id)} className="bg-white p-3 md:p-3.5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between cursor-pointer hover:shadow-md hover:border-blue-200 transition-all group">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold overflow-hidden shrink-0">
-                            {m.photoUrl?<img src={m.photoUrl} alt="" className="w-full h-full object-cover"/>:m.fullName.charAt(0)}
+                            {m.photoUrl?<img src={`${m.photoUrl}?t=${new Date().getTime()}`} alt="" className="w-full h-full object-cover"/>:m.fullName.charAt(0)}
                           </div>
                           <div className="min-w-0">
                             <h4 className="text-slate-800 font-bold text-xs md:text-sm group-hover:text-blue-600 transition-colors truncate">{m.fullName}</h4>
@@ -505,7 +505,7 @@ export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqued
                 {bdays.map((m,i) => (
                   <div key={m.id} className={`bg-white p-4 rounded-xl shadow-sm border ${i===0?'border-blue-300 bg-blue-50/30':'border-gray-100'} flex gap-3 items-center`}>
                     <div className="w-14 h-14 rounded-lg bg-gray-100 overflow-hidden shrink-0">
-                      {m.photoUrl?<img src={m.photoUrl} alt="" className="w-full h-full object-cover"/>:<div className="w-full h-full flex items-center justify-center text-gray-400"><UserIcon className="w-7 h-7"/></div>}
+                      {m.photoUrl?<img src={`${m.photoUrl}?t=${new Date().getTime()}`} alt="" className="w-full h-full object-cover"/>:<div className="w-full h-full flex items-center justify-center text-gray-400"><UserIcon className="w-7 h-7"/></div>}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start mb-0.5">
@@ -607,7 +607,7 @@ export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqued
                           <td className="px-3 md:px-4 py-3">
                             <div className="flex items-center gap-2">
                               <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-slate-100 flex items-center justify-center text-[8px] md:text-[10px] font-bold overflow-hidden shrink-0">
-                                {a.photo_url ? <img src={a.photo_url} className="w-full h-full object-cover"/> : a.full_name?.charAt(0)}
+                                {a.photo_url ? <img src={`${a.photo_url}?t=${new Date().getTime()}`} className="w-full h-full object-cover"/> : a.full_name?.charAt(0)}
                               </div>
                               <span className="font-semibold text-slate-800 text-[10px] md:text-sm truncate max-w-[120px] md:max-w-none">{a.full_name}</span>
                             </div>
@@ -693,7 +693,7 @@ export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqued
                     <div className="bg-gray-50/50 rounded-3xl p-6 border border-gray-100 flex flex-col md:flex-row items-center gap-8 max-w-2xl mx-auto shadow-sm">
                       <div className="w-32 h-40 rounded-2xl border-4 border-white shadow-lg overflow-hidden bg-white shrink-0">
                         {searchingMember.photoUrl ? (
-                          <img src={searchingMember.photoUrl} className="w-full h-full object-cover" />
+                          <img src={`${searchingMember.photoUrl}?t=${new Date().getTime()}`} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-300">
                             <Users className="w-12 h-12" />
