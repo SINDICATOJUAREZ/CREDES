@@ -24,6 +24,7 @@ export const useCredentialConfig = () => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        parsed.showTemplate = parsed.showTemplate !== false && parsed.showTemplate !== 0;
         // Map old field names to new ones if they exist in saved config
         parsed.elements = parsed.elements.map((el: any) => {
           if (el.field === 'payrollNumber') el.field = 'employeeId';

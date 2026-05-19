@@ -18,6 +18,8 @@ export async function GET(request: Request) {
       if (search) {
         const s = encodeURIComponent(`%${search}%`);
         query += `&or=(full_name.ilike.${s},employee_id.ilike.${s},department.ilike.${s},socio_id.ilike.${s})`;
+      } else if (!status) {
+        query += `&status=neq.BAJA`;
       }
       if (memberType) {
         query += `&member_type=eq.${memberType}`;
@@ -60,6 +62,8 @@ export async function GET(request: Request) {
       baseQuery += ' AND (full_name LIKE ? OR employee_id LIKE ? OR department LIKE ? OR socio_id LIKE ?)';
       const searchParam = `%${search}%`;
       params.push(searchParam, searchParam, searchParam, searchParam);
+    } else if (!status) {
+      baseQuery += " AND status != 'BAJA'";
     }
     if (memberType) {
       baseQuery += ' AND member_type = ?';
