@@ -5,49 +5,58 @@ import { isProduction, sUpdate } from '@/lib/supabase';
 
 const BASE_DIR = 'I:/APLICACIONES/SINDICATO/CREDENCIALES/RECURSOS/FOTOS';
 
-// Helper to make sure FOTOS dir exists
-if (!fs.existsSync(BASE_DIR)) {
-  fs.mkdirSync(BASE_DIR, { recursive: true });
+function ensureLocalDir() {
+  if (isProduction) return;
+  try {
+    if (!fs.existsSync(BASE_DIR)) {
+      fs.mkdirSync(BASE_DIR, { recursive: true });
+    }
+  } catch (err) {
+    console.error('Failed to create local photos directory:', err);
+  }
 }
 
 export async function GET() {
   try {
     if (isProduction) {
-      const url = process.env.SUPABASE_URL;
-      const key = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
-      
-      const res = await fetch(`${url}/storage/v1/object/list/photos`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${key}`,
-          'apikey': key || '',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prefix: '',
-          limit: 1000,
-          offset: 0,
-          sortBy: { column: 'name', order: 'asc' }
-        })
-      });
+      try {
+        const url = process.env.SUPABASE_URL;
+        const key = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+        
+        const res = await fetch(`${url}/storage/v1/object/list/photos`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${key}`,
+            'apikey': key || '',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prefix: '',
+            limit: 1000,
+            offset: 0,
+            sortBy: { column: 'name', order: 'asc' }
+          })
+        });
 
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`Supabase Storage listing failed: ${errText}`);
+        if (res.ok) {
+          const items = await res.json();
+          const photos = items.map((item: any) => ({
+            name: item.name,
+            url: `${url}/storage/v1/object/public/photos/${encodeURIComponent(item.name)}`,
+            size: item.metadata?.size || 0,
+            updatedAt: item.updated_at || new Date().toISOString()
+          }));
+
+          return NextResponse.json(photos);
+        }
+        console.warn(`Supabase Storage list failed (status ${res.status}), falling back to local files.`);
+      } catch (supabaseError) {
+        console.error('Supabase Storage list error, falling back to local:', supabaseError);
       }
-
-      const items = await res.json();
-      const photos = items.map((item: any) => ({
-        name: item.name,
-        url: `${url}/storage/v1/object/public/photos/${encodeURIComponent(item.name)}`,
-        size: item.metadata?.size || 0,
-        updatedAt: item.updated_at || new Date().toISOString()
-      }));
-
-      return NextResponse.json(photos);
     }
 
     // Local listing fallback
+    ensureLocalDir();
     const files = fs.readdirSync(BASE_DIR);
     const photos = files
       .filter(file => /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(file))
@@ -90,10 +99,6 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Save locally for development & backup
-    const localPath = path.join(BASE_DIR, fileName);
-    fs.writeFileSync(localPath, buffer);
-
     let publicUrl = `/api/photos/${encodeURIComponent(fileName)}`;
 
     if (isProduction) {
@@ -117,6 +122,11 @@ export async function POST(request: NextRequest) {
       }
 
       publicUrl = `${url}/storage/v1/object/public/photos/${encodeURIComponent(fileName)}`;
+    } else {
+      // Save locally only for local development
+      ensureLocalDir();
+      const localPath = path.join(BASE_DIR, fileName);
+      fs.writeFileSync(localPath, buffer);
     }
 
     // Synchronize photo URL with Database for the corresponding member
@@ -150,9 +160,11 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete local file
-    const localPath = path.join(BASE_DIR, name);
-    if (fs.existsSync(localPath)) {
-      fs.unlinkSync(localPath);
+    if (!isProduction) {
+      const localPath = path.join(BASE_DIR, name);
+      if (fs.existsSync(localPath)) {
+        fs.unlinkSync(localPath);
+      }
     }
 
     if (isProduction) {

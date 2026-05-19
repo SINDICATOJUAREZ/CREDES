@@ -176,11 +176,8 @@ export const CredentialDesignPanel: React.FC = () => {
     }
   };
 
-  const deleteDesign = async () => {
-    if (!activeDesign || activeDesign.id === 'design-default') {
-      toast.error('No se puede eliminar el diseño base');
-      return;
-    }
+   const deleteDesign = async () => {
+    if (!activeDesign) return;
     if (!confirm('¿Estás seguro de eliminar este diseño?')) return;
 
     const res = await fetch(`/api/settings/designs?id=${activeDesign.id}`, { method: 'DELETE' });
