@@ -254,7 +254,7 @@ export function PensionersDialog({ isOpen, onClose }: Props) {
           </div>
 
           {/* Paper View Container */}
-          <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-gray-50 flex justify-center scrollbar-premium">
+          <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-gray-50 flex justify-center items-start scrollbar-premium">
             <div className="w-full max-w-[210mm] bg-white border border-gray-200/60 shadow-lg rounded-2xl p-8 flex flex-col font-sans text-gray-800 text-sm">
               {/* Center Logo */}
               <div className="mb-6 flex justify-center">

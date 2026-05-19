@@ -238,7 +238,8 @@ export const generateResumePDF = async (member: Member) => {
     // Header - Centered logo2 (wide widescreen aspect ratio)
     const logo2Base64 = await fetchImageAsBase64('/logos/logo2.png');
     if (logo2Base64) {
-      pdf.addImage(logo2Base64, 'PNG', 75, 10, 60, 16);
+      // Increased width to 86mm and height to 23mm, centered horizontally (page is 210mm wide)
+      pdf.addImage(logo2Base64, 'PNG', 62, 8, 86, 23);
     }
     
     pdf.setTextColor(0, 51, 102);
