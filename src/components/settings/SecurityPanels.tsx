@@ -106,10 +106,18 @@ const UserForm: React.FC<{ user: SystemUser; roles: Role[]; onSave: (u: SystemUs
           <Input value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} className="h-12 rounded-xl mt-1" /></div>
         <div><Label className="text-xs font-bold uppercase text-gray-400">Correo Electrónico</Label>
           <Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="h-12 rounded-xl mt-1" /></div>
-        {isCreating && (
-          <div><Label className="text-xs font-bold uppercase text-gray-400">Contraseña</Label>
-            <Input type="password" value={form.password || ''} onChange={e => setForm({ ...form, password: e.target.value })} className="h-12 rounded-xl mt-1" placeholder="Mínimo 6 caracteres" /></div>
-        )}
+        <div>
+          <Label className="text-xs font-bold uppercase text-gray-400">
+            {isCreating ? 'Contraseña' : 'Cambiar Contraseña'}
+          </Label>
+          <Input 
+            type="password" 
+            value={form.password || ''} 
+            onChange={e => setForm({ ...form, password: e.target.value })} 
+            className="h-12 rounded-xl mt-1" 
+            placeholder={isCreating ? "Mínimo 6 caracteres" : "Dejar en blanco para mantener la actual"} 
+          />
+        </div>
         <div><Label className="text-xs font-bold uppercase text-gray-400">Rol Asignado</Label>
           <Select value={form.role_id} onValueChange={v => setForm({ ...form, role_id: v as string })}>
             <SelectTrigger className="h-12 rounded-xl mt-1"><SelectValue placeholder="Seleccionar rol" /></SelectTrigger>
