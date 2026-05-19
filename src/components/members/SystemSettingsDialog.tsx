@@ -3,10 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Settings, Camera, Check, Layout, Shield, Users, Key } from 'lucide-react';
+import { Settings, Camera, Check, Layout, Shield, Users, Key, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { UsersPanel, RolesPanel } from '../settings/SecurityPanels';
 import { CredentialDesignPanel } from '../settings/DesignEditorPanel';
+import { PhotosPanel } from '../settings/PhotosPanel';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface SystemSettingsDialogProps {
@@ -14,11 +15,12 @@ interface SystemSettingsDialogProps {
   onClose: () => void;
 }
 
-type SettingsTab = 'camera' | 'design' | 'users' | 'roles';
+type SettingsTab = 'camera' | 'design' | 'users' | 'roles' | 'photos';
 
 const NAV_ITEMS: { id: SettingsTab; label: string; icon: React.ElementType; description: string }[] = [
   { id: 'design', label: 'Diseño Credencial', icon: Layout, description: 'Editor visual de plantillas' },
   { id: 'camera', label: 'Cámara y Captura', icon: Camera, description: 'Dispositivos de entrada' },
+  { id: 'photos', label: 'Galería de Fotos', icon: ImageIcon, description: 'Ver y gestionar fotografías' },
   { id: 'users', label: 'Usuarios', icon: Users, description: 'Gestión de cuentas' },
   { id: 'roles', label: 'Roles y Permisos', icon: Key, description: 'Control de acceso RBAC' },
 ];
@@ -113,6 +115,11 @@ export const SystemSettingsDialog: React.FC<SystemSettingsDialogProps> = ({ isOp
               {activeTab === 'roles' && (
                 <motion.div key="roles" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 min-h-0 h-full p-10 overflow-y-auto">
                   <RolesPanel />
+                </motion.div>
+              )}
+              {activeTab === 'photos' && (
+                <motion.div key="photos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 min-h-0 h-full p-10 overflow-y-auto">
+                  <PhotosPanel />
                 </motion.div>
               )}
             </AnimatePresence>
