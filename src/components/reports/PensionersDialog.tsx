@@ -1,8 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Users, X } from 'lucide-react';
+import { Users, X, Printer } from 'lucide-react';
 import { Member } from '@/types/member';
+import { generateResumePDF } from '@/lib/pdf-generator';
 
 interface Props {
   isOpen: boolean;
@@ -199,7 +200,7 @@ export function PensionersDialog({ isOpen, onClose }: Props) {
                   </div>
                 </div>
                 
-                <div className="mt-4 pt-4 border-t border-dashed border-gray-100 flex justify-between items-center">
+                <div className="mt-4 pt-4 border-t border-dashed border-gray-100 flex justify-between items-center mb-4">
                   <div className="flex flex-col">
                     <span className="text-[9px] text-gray-400 font-black uppercase">Ingreso</span>
                     <span className="text-[11px] text-slate-700 font-bold">{m.joinDate}</span>
@@ -209,6 +210,14 @@ export function PensionersDialog({ isOpen, onClose }: Props) {
                     <span className="text-[11px] text-slate-700 font-bold">#{m.employeeId}</span>
                   </div>
                 </div>
+
+                <button 
+                  onClick={() => generateResumePDF(m)}
+                  className="w-full py-3 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-2xl font-black text-[10px] uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 group-hover:bg-blue-600 group-hover:text-white shadow-sm shadow-blue-100"
+                >
+                  <Printer className="w-4 h-4" />
+                  Imprimir Expediente
+                </button>
               </div>
             ))}
             {list.length === 0 && (
