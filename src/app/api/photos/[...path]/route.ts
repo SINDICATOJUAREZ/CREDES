@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { isProduction } from '@/lib/supabase';
 
 export async function GET(
   request: NextRequest,
@@ -11,14 +12,34 @@ export async function GET(
     const resolvedParams = await params;
     const photoPath = resolvedParams.path.join('/');
     
-    // Use absolute path for robustness
+    // Use absolute path for local development
     const baseDir = 'I:/APLICACIONES/SINDICATO/CREDENCIALES/RECURSOS/FOTOS';
     const fullPath = path.join(baseDir, photoPath);
 
-    console.log('Serving photo:', fullPath);
+    console.log('Serving photo:', photoPath);
+
+    // If in production or the local file does not exist, fetch from Supabase
+    if (isProduction || !fs.existsSync(fullPath)) {
+      const supabaseUrl = process.env.SUPABASE_URL;
+      if (supabaseUrl) {
+        const targetUrl = `${supabaseUrl}/storage/v1/object/public/photos/${encodeURIComponent(photoPath)}`;
+        console.log('Fetching photo from Supabase proxy:', targetUrl);
+        const res = await fetch(targetUrl);
+        if (res.ok) {
+          const contentType = res.headers.get('content-type') || 'image/jpeg';
+          const fileBuffer = await res.arrayBuffer();
+          return new Response(fileBuffer, {
+            headers: {
+              'Content-Type': contentType,
+              'Cache-Control': 'public, max-age=86400',
+            },
+          });
+        }
+      }
+    }
 
     if (!fs.existsSync(fullPath)) {
-      console.error('Photo not found:', fullPath);
+      console.error('Photo not found locally:', fullPath);
       return new NextResponse('Not Found', { status: 404 });
     }
 

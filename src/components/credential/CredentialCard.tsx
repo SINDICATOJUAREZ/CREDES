@@ -63,9 +63,22 @@ export const CredentialCard: React.FC<CredentialCardProps> = ({ member, config, 
             className="w-[24mm] h-[28mm] border-[0.8mm] bg-gray-50 rounded-[0.5mm] overflow-hidden flex items-center justify-center relative shadow-md"
             style={{ borderColor: config.primaryColor }}
           >
-            {member.photoUrl ? (
-              <img src={`${member.photoUrl}?t=${new Date().getTime()}`} alt={member.fullName} className="w-full h-full object-cover" />
-            ) : (
+            {(() => {
+              if (!member.photoUrl) return null;
+              let photoSrc = member.photoUrl;
+              if (photoSrc.includes('supabase.co') || photoSrc.includes('/storage/v1/object/public/photos/')) {
+                const parts = photoSrc.split('/');
+                const fileName = parts[parts.length - 1];
+                photoSrc = `/api/photos/${fileName}`;
+              }
+              return (
+                <img 
+                  src={`${photoSrc}?t=${new Date().getTime()}`} 
+                  alt={member.fullName} 
+                  className="w-full h-full object-cover" 
+                />
+              );
+            })() || (
               <div className="flex flex-col items-center gap-1 opacity-20">
                 <div className="w-8 h-8 rounded-full bg-gray-400"></div>
                 <div className="text-gray-600 text-[5px] font-black uppercase">Sin Fotografía</div>
@@ -105,6 +118,43 @@ export const CredentialCard: React.FC<CredentialCardProps> = ({ member, config, 
                 height="100%"
                 level="H"
               />
+            </div>
+          );
+        }
+
+        if ((el.field as string) === 'foto' || (el.field as string) === 'photoUrl') {
+          return (
+            <div 
+              key={el.id}
+              className="absolute bg-gray-50 border border-gray-100 rounded-sm overflow-hidden flex items-center justify-center z-30 animate-fade-in"
+              style={{ 
+                left: `${el.x}mm`, 
+                top: `${el.y}mm`,
+                width: `${el.w || 24}mm`,
+                height: `${el.h || 28}mm`
+              }}
+            >
+              {(() => {
+                if (!member.photoUrl) return null;
+                let photoSrc = member.photoUrl;
+                if (photoSrc.includes('supabase.co') || photoSrc.includes('/storage/v1/object/public/photos/')) {
+                  const parts = photoSrc.split('/');
+                  const fileName = parts[parts.length - 1];
+                  photoSrc = `/api/photos/${fileName}`;
+                }
+                return (
+                  <img 
+                    src={`${photoSrc}?t=${new Date().getTime()}`} 
+                    alt={member.fullName} 
+                    className="w-full h-full object-cover" 
+                  />
+                );
+              })() || (
+                <div className="flex flex-col items-center gap-1 opacity-20">
+                  <div className="w-8 h-8 rounded-full bg-gray-400"></div>
+                  <div className="text-gray-600 text-[5px] font-black uppercase">Sin Foto</div>
+                </div>
+              )}
             </div>
           );
         }

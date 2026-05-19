@@ -6,9 +6,18 @@ import { toast } from 'sonner';
 
 const fetchImageAsBase64 = async (url: string): Promise<string> => {
   try {
+    if (!url) return '';
     let targetUrl = url;
-    if (url.startsWith('/') && typeof window !== 'undefined') {
-      targetUrl = window.location.origin + url;
+    
+    // Proxy Supabase storage URLs through our /api/photos endpoint to bypass CORS
+    if (url.includes('supabase.co') || url.includes('/storage/v1/object/public/photos/')) {
+      const parts = url.split('/');
+      const fileName = parts[parts.length - 1];
+      targetUrl = `/api/photos/${fileName}`;
+    }
+
+    if (targetUrl.startsWith('/') && typeof window !== 'undefined') {
+      targetUrl = window.location.origin + targetUrl;
     }
     const res = await fetch(targetUrl);
     const blob = await res.blob();
@@ -110,7 +119,7 @@ export const generateVectorialCredentialPDF = async (member: Member, config: Cre
      // Let's check if there's a 'foto' element in config.
      const hasPhotoElement = config.elements.some(el => (el.field as string) === 'foto' || (el as any).tipo === 'imagen');
      if (!hasPhotoElement) {
-        const photoBase64 = await fetchImageAsBase64(member.photoUrl);
+        const photoBase64 = await fetchImageAsBase64(member.photoUrl || '');
         if (photoBase64) {
           const format = photoBase64.includes('image/png') ? 'PNG' : 'JPEG';
           pdf.addImage(photoBase64, format, 4.4, 16.4, 23.2, 27.2);
@@ -126,15 +135,22 @@ export const generateVectorialCredentialPDF = async (member: Member, config: Cre
     const y = el.y;
 
     if (el.type === 'qr') {
-      const qrData = JSON.stringify({
-        id: member.id,
-        nombre: member.fullName,
-        nomina: member.employeeId,
-        socio: member.socioId,
-        tipo: member.memberType
-      });
+      const qrData = [
+        `NOMBRE: ${member.fullName}`,
+        `NÓMINA: ${member.employeeId}`,
+        `PUESTO: ${member.position || ''}`
+      ].join('\n');
       const qrBase64 = await QRCode.toDataURL(qrData, { margin: 1, errorCorrectionLevel: 'H' });
       pdf.addImage(qrBase64, 'PNG', x, y, el.w || 20, el.h || 20);
+      continue;
+    }
+
+    if ((el.field as string) === 'foto' || (el.field as string) === 'photoUrl') {
+      const photoBase64 = await fetchImageAsBase64(member.photoUrl || '');
+      if (photoBase64) {
+        const format = photoBase64.includes('image/png') ? 'PNG' : 'JPEG';
+        pdf.addImage(photoBase64, format, x, y, el.w || 24, el.h || 28);
+      }
       continue;
     }
 

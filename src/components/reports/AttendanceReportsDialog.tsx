@@ -144,6 +144,21 @@ export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqued
   const handleQRResult = (text: string) => {
     let nomina = text.trim();
     
+    // Check if the text is a JSON string (for older credentials or compatibility)
+    try {
+      if (text.startsWith('{') && text.endsWith('}')) {
+        const parsed = JSON.parse(text);
+        if (parsed) {
+          const val = parsed.nomina || parsed.employeeId;
+          if (val) {
+            nomina = val.toString().trim();
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Failed parsing QR as JSON:", e);
+    }
+    
     // If the QR contains multiple fields (e.g. NÓMINA: 1234), extract the value
     if (text.includes('NÓMINA:')) {
       const match = text.match(/NÓMINA:\s*(.*)/i);

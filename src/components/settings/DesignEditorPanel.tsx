@@ -36,6 +36,7 @@ const mockMember: Member = {
   position: 'INTENDENTE', department: 'PARQUES Y JARDINES', memberType: 'ACTIVO',
   status: 'ACTIVO', family: [], address: 'AV. SIEMPRE VIVA #123', colonia: 'CENTRO',
   municipio: 'MONTERREY, NL', curp: 'PERL900101HNLRPN09', phone: '8112345678',
+  photoUrl: '/logos/logo2.png'
 };
 
 export const CredentialDesignPanel: React.FC = () => {
