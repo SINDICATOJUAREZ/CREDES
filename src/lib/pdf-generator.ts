@@ -156,7 +156,21 @@ export const generateVectorialCredentialPDF = async (member: Member, config: Cre
       continue;
     }
 
-    const value = el.field === 'fixed_text' ? el.fixedText : (member[el.field as keyof Member] as string);
+    let value = '';
+    if (el.field === 'fixed_text') {
+      value = el.fixedText || '';
+    } else if ((el.field as string) === 'emision') {
+      const date = new Date();
+      const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      value = `${months[date.getMonth()]} ${date.getFullYear()}`;
+    } else if ((el.field as string) === 'vigencia') {
+      const date = new Date();
+      const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      value = `${months[date.getMonth()]} ${date.getFullYear() + 1}`;
+    } else {
+      value = (member[el.field as keyof Member] as string) || '';
+    }
+
     if (!value) continue;
 
     const fontSize = el.fontSize || 7;

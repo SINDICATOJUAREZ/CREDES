@@ -18,7 +18,8 @@ export interface Delegate {
 export interface VisualElement {
   id: string;
   label: string;
-  field: keyof Member | 'fixed_text';
+  field: keyof Member | 'fixed_text' | 'emision' | 'vigencia';
+
   type: 'text' | 'image' | 'qr';
   x: number; // position in mm
   y: number; // position in mm

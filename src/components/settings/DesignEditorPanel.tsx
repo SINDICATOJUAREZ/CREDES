@@ -29,7 +29,10 @@ const FIELD_CATALOG = [
   { value: 'qr', label: 'CÓDIGO QR' },
   { value: 'foto', label: 'FOTOGRAFÍA' },
   { value: 'fixed_text', label: 'TEXTO FIJO' },
+  { value: 'emision', label: 'FECHA DE EMISIÓN (AUTO)' },
+  { value: 'vigencia', label: 'FECHA DE VIGENCIA (AUTO)' },
 ];
+
 
 const mockMember: Member = {
   id: 'preview', fullName: 'JUAN PEREZ LOPEZ', employeeId: '2196', socioId: '31',
@@ -469,10 +472,25 @@ export const CredentialDesignPanel: React.FC = () => {
                     <ImageIcon className="w-10 h-10" />
                   </div>
                 ) : (
-                  <div className="w-full h-full overflow-hidden text-ellipsis whitespace-nowrap">
-                    {el.fixed_text || (mockMember[el.campo_bd as keyof Member] as string) || `[${el.label}]`}
-                  </div>
+                   <div className="w-full h-full overflow-hidden text-ellipsis whitespace-nowrap">
+                     {(() => {
+                       if (el.fixed_text) return el.fixed_text;
+                       if (el.campo_bd === 'emision') {
+                         const date = new Date();
+                         const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                         return `${months[date.getMonth()]} ${date.getFullYear()}`;
+                       }
+                       if (el.campo_bd === 'vigencia') {
+                         const date = new Date();
+                         const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                         return `${months[date.getMonth()]} ${date.getFullYear() + 1}`;
+                       }
+                       return (mockMember[el.campo_bd as keyof Member] as string) || `[${el.label}]`;
+                     })()}
+                   </div>
                 )}
+
+
               </div>
             </Rnd>
           ))}
