@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Save, Upload, Trash2, Move, Type, GripVertical, Image as ImageIcon } from 'lucide-react';
+import { Plus, Save, Upload, Trash2, Move, Type, GripVertical, Image as ImageIcon, Download } from 'lucide-react';
+
 import { toast } from 'sonner';
 import { CredentialCard } from '../credential/CredentialCard';
 import { useCredentialConfig } from '@/hooks/useCredentialConfig';
@@ -132,6 +133,193 @@ export const CredentialDesignPanel: React.FC = () => {
     const newElements = activeDesign.elements.filter((_, i) => i !== idx);
     setActiveDesign({ ...activeDesign, elements: newElements });
   };
+
+  // Keyboard Arrow Keys Precision Positioning
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (!activeDesign || !selectedElementId) return;
+    
+    // Bypass if user is actively focused on an input, select or textarea field
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT' || activeEl.tagName === 'TEXTAREA')) {
+      return;
+    }
+
+    const idx = activeDesign.elements.findIndex(el => el.id === selectedElementId);
+    if (idx === -1) return;
+
+    const el = activeDesign.elements[idx];
+    const step = e.shiftKey ? 1.0 : 0.1; // 1mm with Shift, 0.1mm default
+    let newX = el.x;
+    let newY = el.y;
+
+    if (e.key === 'ArrowUp') {
+      newY = Number((el.y - step).toFixed(1));
+      e.preventDefault();
+    } else if (e.key === 'ArrowDown') {
+      newY = Number((el.y + step).toFixed(1));
+      e.preventDefault();
+    } else if (e.key === 'ArrowLeft') {
+      newX = Number((el.x - step).toFixed(1));
+      e.preventDefault();
+    } else if (e.key === 'ArrowRight') {
+      newX = Number((el.x + step).toFixed(1));
+      e.preventDefault();
+    } else {
+      return;
+    }
+
+    // Boundary constraints: PVC Card size is 86mm x 54mm
+    newX = Math.max(0, Math.min(86 - (el.w || 20), newX));
+    newY = Math.max(0, Math.min(54 - (el.h || 3), newY));
+
+    updateElement(idx, { x: newX, y: newY });
+  }, [activeDesign, selectedElementId]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  // Alignment Guides (Smart Guides) calculation
+  const getActiveGuides = () => {
+    if (!activeDesign || !selectedElementId) return { x: [], y: [] };
+    const selEl = activeDesign.elements.find(el => el.id === selectedElementId);
+    if (!selEl || !selEl.is_visible) return { x: [], y: [] };
+
+    const tolerance = 0.5; // snaps or draws guide when within 0.5mm
+    const activeGuidesX: number[] = [];
+    const activeGuidesY: number[] = [];
+
+    const otherElements = activeDesign.elements.filter(el => el.id !== selectedElementId && el.is_visible);
+
+    // Selected element's key X positions (left edge, center, right edge)
+    const selXPoints = [selEl.x, selEl.x + (selEl.w || 20) / 2, selEl.x + (selEl.w || 20)];
+    
+    // Snapping target points for X
+    const targetXPoints = [0, 43, 86]; // Card Left, Horizontal Center (43mm), Card Right
+    otherElements.forEach(other => {
+      targetXPoints.push(other.x, other.x + (other.w || 20) / 2, other.x + (other.w || 20));
+    });
+
+    selXPoints.forEach(sp => {
+      targetXPoints.forEach(tp => {
+        if (Math.abs(sp - tp) <= tolerance) {
+          if (!activeGuidesX.includes(tp)) activeGuidesX.push(tp);
+        }
+      });
+    });
+
+    // Selected element's key Y positions (top edge, center, bottom edge)
+    const selYPoints = [selEl.y, selEl.y + (selEl.h || 3) / 2, selEl.y + (selEl.h || 3)];
+    
+    // Snapping target points for Y
+    const targetYPoints = [0, 27, 54]; // Card Top, Vertical Center (27mm), Card Bottom
+    otherElements.forEach(other => {
+      targetYPoints.push(other.y, other.y + (other.h || 3) / 2, other.y + (other.h || 3));
+    });
+
+    selYPoints.forEach(sp => {
+      targetYPoints.forEach(tp => {
+        if (Math.abs(sp - tp) <= tolerance) {
+          if (!activeGuidesY.includes(tp)) activeGuidesY.push(tp);
+        }
+      });
+    });
+
+    return { x: activeGuidesX, y: activeGuidesY };
+  };
+
+  const { x: guidesX, y: guidesY } = getActiveGuides();
+
+  // Export Design to JSON file
+  const handleExportDesign = () => {
+    if (!activeDesign) return;
+    
+    const exportData = {
+      name: activeDesign.name,
+      section: activeDesign.section,
+      primaryColor: activeDesign.primary_color,
+      secondaryColor: activeDesign.secondary_color,
+      showTemplate: activeDesign.show_template,
+      elements: activeDesign.elements.map(el => ({
+        campo_bd: el.campo_bd,
+        label: el.label,
+        tipo: el.tipo,
+        x: el.x,
+        y: el.y,
+        w: el.w,
+        h: el.h,
+        color: el.color,
+        font_size: el.font_size,
+        font_weight: el.font_weight,
+        alignment: el.alignment,
+        is_visible: el.is_visible,
+        fixed_text: el.fixed_text,
+      }))
+    };
+
+    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+      JSON.stringify(exportData, null, 2)
+    )}`;
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', jsonString);
+    downloadAnchor.setAttribute('download', `${activeDesign.name.replace(/\s+/g, '_')}_design.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    toast.success('Diseño exportado correctamente');
+  };
+
+  // Import Design from JSON file
+  const handleImportDesign = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeDesign) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const imported = JSON.parse(event.target?.result as string);
+        
+        if (!imported.elements || !Array.isArray(imported.elements)) {
+          throw new Error('El archivo JSON no tiene un formato de diseño válido.');
+        }
+
+        const newElements = imported.elements.map((el: any, i: number) => ({
+          id: `ve-${Date.now()}-${i}`,
+          design_id: activeDesign.id,
+          campo_bd: el.campo_bd || 'fullName',
+          label: el.label || 'Campo',
+          tipo: el.tipo || 'texto',
+          x: Number(el.x) || 0,
+          y: Number(el.y) || 0,
+          w: Number(el.w) || 20,
+          h: Number(el.h) || 3,
+          color: el.color || '#000000',
+          font_size: Number(el.font_size) || 8,
+          font_weight: el.font_weight || 'normal',
+          alignment: el.alignment || 'left',
+          is_visible: el.is_visible !== false,
+          fixed_text: el.fixed_text || null,
+          sort_order: i,
+        }));
+
+        setActiveDesign({
+          ...activeDesign,
+          primary_color: imported.primaryColor || activeDesign.primary_color,
+          secondary_color: imported.secondaryColor || activeDesign.secondary_color,
+          show_template: imported.showTemplate !== undefined ? imported.showTemplate : activeDesign.show_template,
+          elements: newElements,
+        });
+
+        toast.success('Diseño importado correctamente. ¡Haz clic en "Guardar Diseño" para confirmar!');
+      } catch (err: any) {
+        toast.error(`Error al importar: ${err.message}`);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // Clear value
+  };
+
 
   const handleBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -301,6 +489,30 @@ export const CredentialDesignPanel: React.FC = () => {
             <Save className="w-4 h-4" /> Guardar Diseño
           </Button>
 
+          {/* Import / Export Buttons */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="relative">
+              <Input 
+                type="file" 
+                accept=".json" 
+                onChange={handleImportDesign}
+                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+              />
+              <Button type="button" variant="outline" className="w-full h-10 rounded-xl text-[9px] uppercase font-black tracking-wider text-gray-600 border-gray-200 flex gap-1.5 items-center justify-center hover:bg-gray-50 active:scale-95">
+                <Upload className="w-3.5 h-3.5 text-blue-600" /> Importar
+              </Button>
+            </div>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={handleExportDesign}
+              className="w-full h-10 rounded-xl text-[9px] uppercase font-black tracking-wider text-gray-600 border-gray-200 flex gap-1.5 items-center justify-center hover:bg-gray-50 active:scale-95"
+            >
+              <Download className="w-3.5 h-3.5 text-blue-600" /> Exportar
+            </Button>
+          </div>
+
+
           {/* Colors */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -431,7 +643,24 @@ export const CredentialDesignPanel: React.FC = () => {
             </>
           )}
 
+          {/* Alignment Guides */}
+          {showGuides && guidesX.map(gx => (
+            <div 
+              key={`guide-x-${gx}`} 
+              className="absolute top-0 bottom-0 border-l border-dashed border-emerald-500 z-40 pointer-events-none"
+              style={{ left: `${gx * MM}px`, opacity: 0.8 }}
+            />
+          ))}
+          {showGuides && guidesY.map(gy => (
+            <div 
+              key={`guide-y-${gy}`} 
+              className="absolute left-0 right-0 border-t border-dashed border-emerald-500 z-40 pointer-events-none"
+              style={{ top: `${gy * MM}px`, opacity: 0.8 }}
+            />
+          ))}
+
           {/* Interactive Elements */}
+
           {activeDesign.elements.map((el, idx) => el.is_visible && (
             <Rnd
               key={el.id}
