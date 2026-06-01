@@ -13,7 +13,8 @@ export async function GET(
     const photoPath = resolvedParams.path.join('/');
     
     // Use absolute path for local development
-    const baseDir = 'I:/APLICACIONES/SINDICATO/CREDENCIALES/RECURSOS/FOTOS';
+    const baseDir = 'I:/APLICACIONES/SINDICATO/RECURSOS/FOTOS';
+
     const fullPath = path.join(baseDir, photoPath);
 
     console.log('Serving photo:', photoPath);

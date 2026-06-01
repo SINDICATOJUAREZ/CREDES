@@ -3,7 +3,8 @@ import fs from 'fs';
 import path from 'path';
 import { isProduction, sUpdate } from '@/lib/supabase';
 
-const BASE_DIR = 'I:/APLICACIONES/SINDICATO/CREDENCIALES/RECURSOS/FOTOS';
+const BASE_DIR = 'I:/APLICACIONES/SINDICATO/RECURSOS/FOTOS';
+
 
 function ensureLocalDir() {
   if (isProduction) return;
