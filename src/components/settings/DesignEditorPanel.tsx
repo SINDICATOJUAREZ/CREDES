@@ -380,8 +380,21 @@ export const CredentialDesignPanel: React.FC = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                  {el.campo_bd === 'fixed_text' && (
+                    <div className="col-span-4 mt-1 border-t border-gray-100 pt-2">
+                      <Label className="text-[8px] font-bold text-gray-400 uppercase">Contenido del Texto Fijo</Label>
+                      <Input 
+                        type="text"
+                        value={el.fixed_text || ''} 
+                        onChange={e => updateElement(idx, { fixed_text: e.target.value })} 
+                        className="h-8 text-[10px] rounded-lg mt-1"
+                        placeholder="Escribe el texto aquí..."
+                      />
+                    </div>
+                  )}
                 </div>
               )}
+
             </div>
           ))}
         </div>
