@@ -54,7 +54,9 @@ export const generateVectorialCredentialPDF = async (member: Member, config: Cre
     pdf.rect(0, 0, 85.6, 54, 'F');
   }
 
-  const showTemplate = config.showTemplate !== false;
+  const showTemplate = (config.showTemplate as any) !== false && (config.showTemplate as any) !== 0 && (config.showTemplate as any) !== 'false';
+
+
 
   if (showTemplate) {
     // Header static elements (mirroring CredentialCard layout)

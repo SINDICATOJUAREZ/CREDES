@@ -7,7 +7,8 @@ function getUrl() { return process.env.SUPABASE_URL || ''; }
 function getKey() { return process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || ''; }
 
 
-export const isProduction = !!getUrl();
+export const isProduction = process.env.NODE_ENV === 'production' && !!getUrl();
+
 
 async function rest(path: string, init: RequestInit = {}): Promise<Response> {
   const url = getUrl();
