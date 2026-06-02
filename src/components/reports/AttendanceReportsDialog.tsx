@@ -44,6 +44,16 @@ export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqued
   const [showQR, setShowQR] = useState(false);
   const captureRef = useRef<any>(null);
 
+  // Quejas y Reportes states
+  const [complaintsData, setComplaintsData] = useState<any[]>([]);
+  const [complaintsLoading, setComplaintsLoading] = useState(false);
+  const [profileTab, setProfileTab] = useState<'asistencia' | 'quejas'>('asistencia');
+  const [showComplaintForm, setShowComplaintForm] = useState(false);
+  const [editingComplaint, setEditingComplaint] = useState<any | null>(null);
+  const [complaintDate, setComplaintDate] = useState('');
+  const [complaintDescription, setComplaintDescription] = useState('');
+  const [complaintFollowUp, setComplaintFollowUp] = useState('');
+
   useEffect(() => { 
     if (isOpen && tab === 'cumpleanos') {
       calcBdays();
@@ -77,6 +87,7 @@ export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqued
   const doSearch = async () => {
     setSelMember(null);
     setAttData([]);
+    setComplaintsData([]);
     if (!sq.trim()) { setResults([]); return; }
     try {
       const r = await fetch(`/api/members?search=${encodeURIComponent(sq)}`);
@@ -87,14 +98,238 @@ export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqued
     }
   };
 
+  const loadComplaints = async (nomina: string) => {
+    setComplaintsLoading(true);
+    setComplaintsData([]);
+    try {
+      const r = await fetch(`/api/complaints?employeeId=${nomina}`);
+      const d = await r.json();
+      if (d.success) {
+        setComplaintsData(d.complaints);
+      }
+    } catch {
+      toast.error('Error cargando reportes / quejas');
+    } finally {
+      setComplaintsLoading(false);
+    }
+  };
+
   const loadAtt = async (nomina: string) => {
-    setAttLoading(true); setSelMember(null); setAttData([]);
+    setAttLoading(true); setSelMember(null); setAttData([]); setComplaintsData([]); setProfileTab('asistencia');
     try {
       const r = await fetch(`/api/attendance?employeeId=${nomina}`);
       const d = await r.json();
-      if (d.success) { setSelMember(d.member || results.find((m: Member)=>m.employeeId===nomina)); setAttData(d.attendance); }
+      if (d.success) { 
+        setSelMember(d.member || results.find((m: Member)=>m.employeeId===nomina)); 
+        setAttData(d.attendance); 
+        await loadComplaints(nomina);
+      }
     } catch { toast.error('Error cargando asistencias'); }
     finally { setAttLoading(false); }
+  };
+
+  const openNewComplaintForm = () => {
+    setEditingComplaint(null);
+    setComplaintDate(new Date().toISOString().slice(0, 10));
+    setComplaintDescription('');
+    setComplaintFollowUp('');
+    setShowComplaintForm(true);
+  };
+
+  const openEditComplaintForm = (c: any) => {
+    setEditingComplaint(c);
+    setComplaintDate(c.report_date);
+    setComplaintDescription(c.description);
+    setComplaintFollowUp(c.follow_up || '');
+    setShowComplaintForm(true);
+  };
+
+  const saveComplaint = async () => {
+    if (!complaintDate.trim() || !complaintDescription.trim()) {
+      toast.error('La fecha y descripción son obligatorias.');
+      return;
+    }
+
+    try {
+      const payload = {
+        id: editingComplaint?.id,
+        employeeId: selMember.employeeId,
+        reportDate: complaintDate,
+        description: complaintDescription,
+        followUp: complaintFollowUp
+      };
+
+      const res = await fetch('/api/complaints', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const d = await res.json();
+      if (d.success) {
+        toast.success(editingComplaint ? 'Reporte actualizado con éxito' : 'Reporte guardado con éxito');
+        setShowComplaintForm(false);
+        await loadComplaints(selMember.employeeId);
+      } else {
+        toast.error('Error al guardar: ' + d.error);
+      }
+    } catch {
+      toast.error('Error guardando el reporte / queja');
+    }
+  };
+
+  const deleteComplaint = async (id: string) => {
+    if (!confirm('¿Estás seguro de eliminar este reporte?')) return;
+    try {
+      const res = await fetch(`/api/complaints?id=${id}`, { method: 'DELETE' });
+      const d = await res.json();
+      if (d.success) {
+        toast.success('Reporte eliminado con éxito');
+        await loadComplaints(selMember.employeeId);
+      } else {
+        toast.error('Error: ' + d.error);
+      }
+    } catch {
+      toast.error('Error al eliminar');
+    }
+  };
+
+  const printComplaintsReport = async () => {
+    toast.info('Generando concentrado de quejas...');
+    try {
+      const r = await fetch('/api/complaints');
+      const d = await r.json();
+      const allComplaints: any[] = d.complaints || [];
+
+      if (allComplaints.length === 0) {
+        toast.warning('No hay reportes de quejas en el sistema para imprimir.');
+        return;
+      }
+
+      const w = window.open('', '_blank');
+      if (!w) { toast.error('Popup bloqueado. Por favor permite las ventanas emergentes.'); return; }
+
+      const title = 'CONCENTRADO DE QUEJAS Y REPORTES DE AGREMIADOS';
+
+      const rows = allComplaints.map((c, idx) => `
+        <tr style="border-bottom: 1px solid #e2e8f0; font-size: 10px; vertical-align: top;">
+          <td style="padding: 10px; font-weight: bold; color: #64748b; text-align: center;">${idx + 1}</td>
+          <td style="padding: 10px; font-family: monospace; font-weight: bold; text-align: center;">${c.employee_id || 'N/A'}</td>
+          <td style="padding: 10px; font-weight: bold; text-transform: uppercase;">${c.member_name || 'N/A'}</td>
+          <td style="padding: 10px; text-transform: uppercase; font-size: 9px; color: #475569;">${c.member_department || 'N/A'}</td>
+          <td style="padding: 10px; text-align: center; font-weight: bold; color: #1e3a8a;">
+            ${new Date(c.report_date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+          </td>
+          <td style="padding: 10px; font-size: 9px; white-space: pre-wrap; max-width: 250px; line-height: 1.3;">${c.description || 'N/A'}</td>
+          <td style="padding: 10px; font-size: 9px; white-space: pre-wrap; max-width: 200px; color: #047857; font-weight: 600; line-height: 1.3; background-color: #f0fdf4;">${c.follow_up || 'PENDIENTE'}</td>
+        </tr>
+      `).join('');
+
+      w.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${title}</title>
+        <style>
+          body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 40px; color: #000; line-height: 1.4; background: #fff; }
+          .report-container { width: 100%; max-width: 1200px; margin: 0 auto; }
+          
+          .header-container { display: flex; align-items: center; justify-content: center; margin-bottom: 20px; border-bottom: 2px solid #1e3a8a; padding-bottom: 15px; }
+          .logo-box { text-align: center; width: 100%; }
+          .logo-img { height: 100px; width: auto; max-width: 100%; display: block; margin: 0 auto; }
+          
+          .page-title { text-align: center; font-size: 18px; font-weight: 900; margin: 25px 0; text-transform: uppercase; color: #1f2937; letter-spacing: 1px; }
+          
+          .report-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          .report-table th { background: #1e3a8a; color: white; padding: 12px 10px; font-size: 11px; font-weight: bold; text-transform: uppercase; border: 1px solid #1e3a8a; }
+          .report-table td { border: 1px solid #e2e8f0; }
+          
+          .summary-box { display: flex; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px 25px; margin-top: 20px; margin-bottom: 30px; }
+          .summary-item { font-size: 12px; font-weight: bold; color: #475569; }
+          .summary-item span { font-size: 14px; font-weight: 900; color: #1e3a8a; margin-left: 5px; }
+          
+          .signature-section { display: flex; justify-content: space-around; margin-top: 80px; page-break-inside: avoid; }
+          .signature-box { width: 250px; text-align: center; border-top: 1px solid #000; padding-top: 10px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+          
+          @media print { 
+            .actions-bar { display: none; }
+            body { padding: 0; }
+            .report-container { max-width: 100%; margin: 0; }
+          }
+          .actions-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 100; }
+          .btn { border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); font-size: 14px; transition: all 0.2s; }
+          .btn-print { background: #1e3a8a; color: white; }
+          .btn-download { background: #059669; color: white; }
+          .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 10px -1px rgba(0,0,0,0.15); }
+        </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+        <script>
+          function downloadPDF() {
+            const element = document.querySelector('.report-container');
+            const opt = {
+              margin: 10,
+              filename: 'Concentrado_Quejas_${new Date().toISOString().slice(0,10)}.pdf',
+              image: { type: 'jpeg', quality: 0.98 },
+              html2canvas: { scale: 2, useCORS: true },
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+            html2pdf().set(opt).from(element).save();
+          }
+        </script>
+      </head>
+      <body>
+        <div class="actions-bar">
+          <button class="btn btn-download" onclick="downloadPDF()">Descargar PDF</button>
+          <button class="btn btn-print" onclick="window.print()">Imprimir Reporte</button>
+        </div>
+        <div class="report-container">
+          <div class="header-container">
+            <div class="logo-box">
+              <img src="/logos/logo2.png" class="logo-img">
+            </div>
+          </div>
+  
+          <div class="page-title">${title}</div>
+  
+          <div class="summary-box">
+            <div class="summary-item">Total quejas / reportes: <span>${allComplaints.length}</span></div>
+            <div class="summary-item">Fecha de generación: <span>${new Date().toLocaleDateString('es-ES', {day:'2-digit', month:'2-digit', year:'numeric'})}</span></div>
+          </div>
+  
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th style="width: 40px;">No.</th>
+                <th style="width: 80px;">Nómina</th>
+                <th style="width: 180px;">Trabajador</th>
+                <th style="width: 140px;">Secretaría / Dirección</th>
+                <th style="width: 100px;">Fecha Levantamiento</th>
+                <th>Descripción Completa del Reporte</th>
+                <th style="width: 200px;">Seguimiento / Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows || '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #999;">No se encontraron registros de quejas en el sistema.</td></tr>'}
+            </tbody>
+          </table>
+  
+          <div class="signature-section">
+            <div class="signature-box">
+              <p style="margin: 0;">Elaboró</p>
+              <p style="margin: 40px 0 0 0; color: #64748b;">Firma de Conformidad</p>
+            </div>
+            <div class="signature-box">
+              <p style="margin: 0;">Autorizó</p>
+              <p style="margin: 40px 0 0 0; color: #64748b;">Secretaría General</p>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+      `);
+      w.document.close();
+    } catch (e: any) {
+      toast.error('Error al generar el concentrado: ' + e.message);
+    }
   };
 
   const loadEvents = async () => {
@@ -344,6 +579,154 @@ export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqued
     w.document.close();
   };
 
+  const printCustomReport = async (typeFilter: 'ALL' | 'ACTIVO' | 'ESPERA' | 'DELEGADO' | 'PENSIONADO') => {
+    toast.info('Generando vista previa del reporte...');
+    try {
+      const r = await fetch('/api/members?limit=3000');
+      const d = await r.json();
+      const allMembers: Member[] = d.data || [];
+      
+      let filtered = allMembers;
+      let title = 'PADRÓN GENERAL DE MIEMBROS';
+      
+      if (typeFilter !== 'ALL') {
+        filtered = allMembers.filter(m => m.memberType === typeFilter);
+        if (typeFilter === 'ACTIVO') title = 'PADRÓN GENERAL DE AGREMIADOS';
+        else if (typeFilter === 'ESPERA') title = 'PADRÓN EN LISTA DE ESPERA';
+        else if (typeFilter === 'DELEGADO') title = 'PADRÓN DE DELEGADOS SINDICALES';
+        else if (typeFilter === 'PENSIONADO') title = 'PADRÓN DE JUBILADOS Y PENSIONADOS';
+      }
+
+      // Sort by fullName
+      filtered.sort((a, b) => (a.fullName || '').localeCompare(b.fullName || ''));
+
+      const w = window.open('', '_blank');
+      if (!w) { toast.error('Popup bloqueado. Por favor permite las ventanas emergentes.'); return; }
+
+      const rows = filtered.map((m, idx) => `
+        <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
+          <td style="padding: 10px; font-weight: bold; color: #64748b; text-align: center;">${idx + 1}</td>
+          <td style="padding: 10px; font-family: monospace; font-weight: bold; text-align: center;">${m.employeeId || 'N/A'}</td>
+          <td style="padding: 10px; font-weight: bold; text-transform: uppercase;">${m.fullName || 'N/A'}</td>
+          <td style="padding: 10px; text-transform: uppercase; font-size: 10px; color: #475569;">${m.department || 'N/A'}</td>
+          <td style="padding: 10px; text-transform: uppercase; font-size: 10px; color: #475569;">${m.position || 'N/A'}</td>
+          <td style="padding: 10px; text-align: center;">
+            <span style="padding: 4px 8px; border-radius: 4px; font-size: 9px; font-weight: bold; ${
+              m.status === 'ACTIVO' 
+                ? 'background-color: #dcfce7; color: #15803d;' 
+                : 'background-color: #fee2e2; color: #b91c1c;'
+            }">${m.status || 'ACTIVO'}</span>
+          </td>
+        </tr>
+      `).join('');
+
+      w.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${title}</title>
+        <style>
+          body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 40px; color: #000; line-height: 1.4; background: #fff; }
+          .report-container { width: 100%; max-width: 1100px; margin: 0 auto; }
+          
+          .header-container { display: flex; align-items: center; justify-content: center; margin-bottom: 20px; border-bottom: 2px solid #1e3a8a; padding-bottom: 15px; }
+          .logo-box { text-align: center; width: 100%; }
+          .logo-img { height: 100px; width: auto; max-width: 100%; display: block; margin: 0 auto; }
+          
+          .page-title { text-align: center; font-size: 18px; font-weight: 900; margin: 25px 0; text-transform: uppercase; color: #1f2937; letter-spacing: 1px; }
+          
+          .report-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          .report-table th { background: #1e3a8a; color: white; padding: 12px 10px; font-size: 11px; font-weight: bold; text-transform: uppercase; border: 1px solid #1e3a8a; }
+          .report-table td { border: 1px solid #e2e8f0; }
+          
+          .summary-box { display: flex; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px 25px; margin-top: 20px; margin-bottom: 30px; }
+          .summary-item { font-size: 12px; font-weight: bold; color: #475569; }
+          .summary-item span { font-size: 14px; font-weight: 900; color: #1e3a8a; margin-left: 5px; }
+          
+          .signature-section { display: flex; justify-content: space-around; margin-top: 80px; page-break-inside: avoid; }
+          .signature-box { width: 250px; text-align: center; border-top: 1px solid #000; padding-top: 10px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+          
+          @media print { 
+            .actions-bar { display: none; }
+            body { padding: 0; }
+            .report-container { max-width: 100%; margin: 0; }
+          }
+          .actions-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 100; }
+          .btn { border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); font-size: 14px; transition: all 0.2s; }
+          .btn-print { background: #1e3a8a; color: white; }
+          .btn-download { background: #059669; color: white; }
+          .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 10px -1px rgba(0,0,0,0.15); }
+        </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+        <script>
+          function downloadPDF() {
+            const element = document.querySelector('.report-container');
+            const opt = {
+              margin: 10,
+              filename: '${title.replace(/\s+/g, "_")}.pdf',
+              image: { type: 'jpeg', quality: 0.98 },
+              html2canvas: { scale: 2, useCORS: true },
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+            html2pdf().set(opt).from(element).save();
+          }
+        </script>
+      </head>
+      <body>
+        <div class="actions-bar">
+          <button class="btn btn-download" onclick="downloadPDF()">Descargar PDF</button>
+          <button class="btn btn-print" onclick="window.print()">Imprimir Reporte</button>
+        </div>
+        <div class="report-container">
+          <div class="header-container">
+            <div class="logo-box">
+              <img src="/logos/logo2.png" class="logo-img">
+            </div>
+          </div>
+  
+          <div class="page-title">${title}</div>
+  
+          <div class="summary-box">
+            <div class="summary-item">Total registros filtrados: <span>${filtered.length}</span></div>
+            <div class="summary-item">Fecha de generación: <span>${new Date().toLocaleDateString('es-ES', {day:'2-digit', month:'2-digit', year:'numeric'})}</span></div>
+          </div>
+  
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th style="width: 50px;">No.</th>
+                <th style="width: 100px;">Nómina</th>
+                <th>Nombre del Trabajador</th>
+                <th>Secretaría / Dirección</th>
+                <th>Puesto Oficial</th>
+                <th style="width: 100px;">Estatus</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows || '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #999;">No se encontraron registros para este reporte.</td></tr>'}
+            </tbody>
+          </table>
+  
+          <div class="signature-section">
+            <div class="signature-box">
+              <p style="margin: 0;">Elaboró</p>
+              <p style="margin: 40px 0 0 0; color: #64748b;">Firma de Conformidad</p>
+            </div>
+            <div class="signature-box">
+              <p style="margin: 0;">Autorizó</p>
+              <p style="margin: 40px 0 0 0; color: #64748b;">Secretaría General</p>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+      `);
+      w.document.close();
+    } catch (e: any) {
+      toast.error('Error al generar el reporte: ' + e.message);
+    }
+  };
+
   const getAge = (bd: string) => { const t=new Date(),b=new Date(bd); let a=t.getFullYear()-b.getFullYear(); const m=t.getMonth()-b.getMonth(); if(m<0||(m===0&&t.getDate()<b.getDate()))a--; return a; };
   const getBdayText = (bd: string) => {
     const t=new Date(),yr=t.getFullYear(),[,mo,d]=bd.split('-');
@@ -351,6 +734,227 @@ export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqued
     const diff=Math.ceil((b.getTime()-t.getTime())/864e5);
     const ds=b.toLocaleDateString('es-ES',{day:'numeric',month:'long'});
     if(diff===0)return`Hoy (${ds})`; if(diff===1)return`Mañana (${ds})`; return`En ${diff} días (${ds})`;
+  };
+
+  const getAntiguedad = (dateStr?: string) => {
+    if (!dateStr) return 'N/A';
+    try {
+      let parts = dateStr.split(/[-/]/);
+      let year = 0;
+      if (parts[0].length === 4) {
+        year = parseInt(parts[0]);
+      } else if (parts[2]?.length === 4) {
+        year = parseInt(parts[2]);
+      } else {
+        return dateStr;
+      }
+      const currentYear = new Date().getFullYear();
+      const diff = currentYear - year;
+      return `${diff} años`;
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const printSingleComplaintPDF = (c: any) => {
+    if (!selMember) return;
+    toast.info('Generando ficha individual de queja...');
+
+    const w = window.open('', '_blank');
+    if (!w) { toast.error('Popup bloqueado. Por favor permite las ventanas emergentes.'); return; }
+
+    const formattedDate = new Date(c.report_date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const formattedIngreso = selMember.joinDate || selMember.altaSindicato || 'N/A';
+
+    w.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Ficha de Queja - ${selMember.employeeId}</title>
+      <style>
+        body { font-family: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif; padding: 40px; color: #000; line-height: 1.3; background: #fff; }
+        .ficha-container { width: 100%; max-width: 800px; margin: 0 auto; box-sizing: border-box; }
+        
+        /* Header section styled exactly like image */
+        .header-section { text-align: center; margin-bottom: 25px; padding-bottom: 12px; border-bottom: 2px solid #000; }
+        .logo-img-full { height: 100px; width: auto; max-width: 100%; display: block; margin: 0 auto; }
+        
+        /* Form grid system replicating Excel style precisely */
+        .excel-form { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        .excel-form td { padding: 6px 10px; font-size: 11px; vertical-align: middle; box-sizing: border-box; }
+        .lbl { color: #475569; font-weight: normal; font-size: 11px; text-align: left; width: 15%; text-transform: uppercase; }
+        .lbl-noborder { border: none; font-size: 11px; }
+        .val-box { border: 1px solid #cbd5e1; font-weight: bold; text-transform: uppercase; font-size: 11.5px; background-color: #fff; height: 26px; }
+        .val-box-inline { border: 1px solid #cbd5e1; background-color: #fff; height: 26px; display: flex; align-items: center; padding: 0 10px; font-size: 11.5px; }
+        
+        /* Large Problem & Solution Blocks next to labels */
+        .excel-form-blocks { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 25px; }
+        .excel-form-blocks td { padding: 6px 10px; font-size: 11px; box-sizing: border-box; }
+        .lbl-block { color: #475569; font-size: 11px; text-align: left; width: 15%; vertical-align: top; padding-top: 12px; text-transform: uppercase; }
+        .val-block-desc { border: 1px solid #cbd5e1; font-weight: bold; font-size: 11.5px; background-color: #fff; min-height: 110px; height: 110px; vertical-align: top; padding: 12px; line-height: 1.5; white-space: pre-wrap; }
+        .val-block-sol { border: 1px solid #cbd5e1; font-weight: bold; font-size: 11.5px; background-color: #f8fafc; min-height: 110px; height: 110px; vertical-align: top; padding: 12px; line-height: 1.5; white-space: pre-wrap; }
+        
+        .signature-section { display: flex; justify-content: space-around; margin-top: 60px; page-break-inside: avoid; }
+        .signature-box { width: 220px; text-align: center; border-top: 1px solid #000; padding-top: 8px; font-size: 10px; font-weight: bold; text-transform: uppercase; color: #000; }
+        
+        @media print { 
+          .actions-bar { display: none; }
+          body { padding: 0; }
+          .ficha-container { max-width: 100%; margin: 0; }
+        }
+        .actions-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 100; }
+        .btn { border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); font-size: 14px; transition: all 0.2s; }
+        .btn-print { background: #1e3a8a; color: white; }
+        .btn-download { background: #059669; color: white; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 10px -1px rgba(0,0,0,0.15); }
+      </style>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+      <script>
+        function downloadPDF() {
+          const element = document.querySelector('.ficha-container');
+          const opt = {
+            margin: 10,
+            filename: 'Ficha_Queja_${selMember.employeeId}_${c.id.slice(0,6)}.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+          };
+          html2pdf().set(opt).from(element).save();
+        }
+      </script>
+    </head>
+    <body>
+      <div class="actions-bar">
+        <button class="btn btn-download" onclick="downloadPDF()">Descargar PDF</button>
+        <button class="btn btn-print" onclick="window.print()">Imprimir Ficha</button>
+      </div>
+      <div class="ficha-container">
+        <div class="header-section">
+          <img src="/logos/logo2.png" class="logo-img-full">
+        </div>
+
+        <table class="excel-form">
+          <!-- Top row: Date and Status -->
+          <tr>
+            <td class="lbl-noborder" style="width: 15%; font-weight: bold;">${formattedDate}</td>
+            <td class="lbl-noborder" style="width: 30%;"></td>
+            <td class="lbl-noborder" style="width: 5%;"></td>
+            <td class="lbl" style="width: 20%; text-align: right; font-weight: bold; padding-right: 15px;">STATUS:</td>
+            <td class="val-box font-bold" style="width: 30%; text-align: center; background-color: #f8fafc; border: 1px solid #cbd5e1;">${selMember.status || 'ACTIVO'}</td>
+          </tr>
+          
+          <!-- Spacer row -->
+          <tr style="height: 15px;">
+            <td colspan="5" class="lbl-noborder"></td>
+          </tr>
+
+          <!-- Nomina & Fecha de Ingreso -->
+          <tr>
+            <td class="lbl">nomina</td>
+            <td class="val-box" style="text-align: center;">${selMember.employeeId || 'N/A'}</td>
+            <td class="lbl-noborder"></td>
+            <td class="lbl">FECHA DE INGRESO</td>
+            <td class="val-box" style="text-align: center;">${formattedIngreso}</td>
+          </tr>
+
+          <!-- Nombre -->
+          <tr>
+            <td class="lbl">nombre</td>
+            <td class="val-box" colspan="4" style="text-align: left; padding-left: 12px;">${selMember.fullName || 'N/A'}</td>
+          </tr>
+
+          <!-- Puesto -->
+          <tr>
+            <td class="lbl">puesto</td>
+            <td class="val-box" colspan="4" style="text-align: left; padding-left: 12px;">${selMember.position || 'N/A'}</td>
+          </tr>
+
+          <!-- Dirección -->
+          <tr>
+            <td class="lbl">dirección</td>
+            <td class="val-box" colspan="4" style="text-align: left; padding-left: 12px;">${selMember.department || 'N/A'}</td>
+          </tr>
+
+          <!-- Secretaria -->
+          <tr>
+            <td class="lbl">secretaria</td>
+            <td class="val-box" colspan="4" style="text-align: left; padding-left: 12px;">${selMember.secretariat || 'N/A'}</td>
+          </tr>
+
+          <!-- Antigüedad & Teléfono -->
+          <tr>
+            <td class="lbl">antigüedad</td>
+            <td class="val-box-inline">
+              <span style="font-weight: bold;">${getAntiguedad(selMember.joinDate || selMember.altaSindicato).replace(' años', '')}</span>
+              <span style="font-size: 9px; margin-left: 15px; color: #64748b; font-weight: normal; text-transform: uppercase;">Años</span>
+            </td>
+            <td class="lbl-noborder"></td>
+            <td class="lbl">teléfono</td>
+            <td class="val-box" style="text-align: center;">${selMember.phone || 'N/A'}</td>
+          </tr>
+
+          <!-- CURP & RFC -->
+          <tr>
+            <td class="lbl">CURP</td>
+            <td class="val-box" style="text-align: left; padding-left: 12px;">${selMember.curp || 'N/A'}</td>
+            <td class="lbl-noborder"></td>
+            <td class="lbl">RFC</td>
+            <td class="val-box" style="text-align: center;">${selMember.rfc || 'N/A'}</td>
+          </tr>
+
+          <!-- Domicilio & CP -->
+          <tr>
+            <td class="lbl">domicilio</td>
+            <td class="val-box" style="text-align: left; padding-left: 12px;">${selMember.address || 'N/A'}</td>
+            <td class="lbl-noborder"></td>
+            <td class="lbl">CP</td>
+            <td class="val-box" style="text-align: center;">${selMember.cp || 'N/A'}</td>
+          </tr>
+
+          <!-- Colonia & Ciudad -->
+          <tr>
+            <td class="lbl">colonia</td>
+            <td class="val-box" style="text-align: left; padding-left: 12px;">${selMember.colonia || 'N/A'}</td>
+            <td class="lbl-noborder"></td>
+            <td class="lbl">ciudad</td>
+            <td class="val-box" style="text-align: center;">${selMember.municipio || 'BENITO JUAREZ, N.L.'}</td>
+          </tr>
+        </table>
+
+        <!-- Problem and Solution Block layout matching the reference precisely -->
+        <table class="excel-form-blocks">
+          <tr>
+            <td class="lbl-block">problema</td>
+            <td class="val-block-desc" colspan="4">${c.description || 'Sin descripción detallada.'}</td>
+          </tr>
+          <tr style="height: 12px;">
+            <td colspan="5" class="lbl-noborder"></td>
+          </tr>
+          <tr>
+            <td class="lbl-block">solución</td>
+            <td class="val-block-sol" colspan="4">${c.follow_up || 'Pendiente de resolución.'}</td>
+          </tr>
+        </table>
+
+        <div class="signature-section">
+          <div class="signature-box">
+            <p style="margin: 0;">Firma del Trabajador</p>
+            <p style="margin: 45px 0 0 0; color: #94a3b8; font-weight: normal; font-size: 8px;">Nombre y Firma</p>
+          </div>
+          <div class="signature-box">
+            <p style="margin: 0;">Recibió</p>
+            <p style="margin: 45px 0 0 0; color: #94a3b8; font-weight: normal; font-size: 8px;">Secretaría de Conflictos / Organización</p>
+          </div>
+          <div class="signature-box">
+            <p style="margin: 0;">Autorizó</p>
+            <p style="margin: 45px 0 0 0; color: #94a3b8; font-weight: normal; font-size: 8px;">Secretaría General</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+    `);
+    w.document.close();
   };
 
   return (
@@ -380,6 +984,54 @@ export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqued
               </button>
             ))}
           </nav>
+
+          {/* Recuadro de Reportes Varios */}
+          <div className="hidden md:block px-3 py-4 border-t border-white/5">
+            <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 space-y-2.5">
+              <p className="text-[10px] text-blue-400 font-black uppercase tracking-wider flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5" /> Reportes Varios
+              </p>
+              <div className="space-y-1">
+                <button 
+                  onClick={() => printCustomReport('ALL')} 
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-gray-300 hover:bg-white/10 hover:text-white transition-all flex items-center gap-2 uppercase tracking-wide"
+                >
+                  <Users className="w-3.5 h-3.5 text-blue-400 shrink-0" /> Padrón Completo
+                </button>
+                <button 
+                  onClick={() => printCustomReport('ACTIVO')} 
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-gray-300 hover:bg-white/10 hover:text-white transition-all flex items-center gap-2 uppercase tracking-wide"
+                >
+                  <Users className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Agremiados Activos
+                </button>
+                <button 
+                  onClick={() => printCustomReport('ESPERA')} 
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-gray-300 hover:bg-white/10 hover:text-white transition-all flex items-center gap-2 uppercase tracking-wide"
+                >
+                  <Users className="w-3.5 h-3.5 text-amber-400 shrink-0" /> Lista de Espera
+                </button>
+                <button 
+                  onClick={() => printCustomReport('DELEGADO')} 
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-gray-300 hover:bg-white/10 hover:text-white transition-all flex items-center gap-2 uppercase tracking-wide"
+                >
+                  <Users className="w-3.5 h-3.5 text-purple-400 shrink-0" /> Delegados
+                </button>
+                <button 
+                  onClick={() => printCustomReport('PENSIONADO')} 
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-gray-300 hover:bg-white/10 hover:text-white transition-all flex items-center gap-2 uppercase tracking-wide"
+                >
+                  <Users className="w-3.5 h-3.5 text-red-400 shrink-0" /> Jubilados
+                </button>
+                <button 
+                  onClick={printComplaintsReport} 
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-gray-300 hover:bg-white/10 hover:text-white transition-all flex items-center gap-2 uppercase tracking-wide border-t border-white/5 pt-2 mt-1"
+                >
+                  <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" /> Quejas de Agremiados
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div className="hidden md:block p-6 border-t border-white/5">
             <div className="bg-white/5 p-3 rounded-xl border border-white/10">
               <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter mb-1">Versión del Sistema</p>
@@ -452,24 +1104,131 @@ export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqued
                       <FileText className="w-4 h-4"/>Generar PDF
                     </Button>
                   </div>
-                  <div className="flex justify-between items-center mb-3">
-                    <h4 className="font-bold text-slate-700 text-sm md:text-base">Historial de Eventos Asistidos</h4>
-                    <span className="text-[10px] md:text-xs font-medium text-blue-600 bg-blue-50 px-2 md:px-3 py-1 md:py-1.5 rounded-lg">Total: {attData.length}</span>
+                  {/* Pestañas de Navegación de Perfil */}
+                  <div className="flex gap-2 border-b border-gray-100 pb-3 mb-4 mt-2">
+                    <button
+                      onClick={() => setProfileTab('asistencia')}
+                      className={`px-4 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-300 ${
+                        profileTab === 'asistencia'
+                          ? 'bg-blue-50 text-blue-600 border border-blue-100 shadow-sm'
+                          : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
+                      }`}
+                    >
+                      Historial de Asistencias
+                    </button>
+                    <button
+                      onClick={() => setProfileTab('quejas')}
+                      className={`px-4 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-300 ${
+                        profileTab === 'quejas'
+                          ? 'bg-blue-50 text-blue-600 border border-blue-100 shadow-sm'
+                          : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
+                      }`}
+                    >
+                      Reportes y Quejas
+                    </button>
                   </div>
-                  {attData.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                      {attData.map((e,i) => (
-                        <div key={i} className="flex items-center gap-2.5 p-2.5 rounded-lg border border-gray-100 bg-gray-50/50 hover:bg-blue-50/50 transition-colors">
-                          <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><ClipboardCheck className="w-4 h-4"/></div>
-                          <p className="font-semibold text-slate-700 text-[10px] md:text-xs">{e.name}</p>
+
+                  {profileTab === 'asistencia' && (
+                    <>
+                      <div className="flex justify-between items-center mb-3">
+                        <h4 className="font-bold text-slate-700 text-sm md:text-base">Historial de Eventos Asistidos</h4>
+                        <span className="text-[10px] md:text-xs font-medium text-blue-600 bg-blue-50 px-2 md:px-3 py-1 md:py-1.5 rounded-lg">Total: {attData.length}</span>
+                      </div>
+                      {attData.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                          {attData.map((e,i) => (
+                            <div key={i} className="flex items-center gap-2.5 p-2.5 rounded-lg border border-gray-100 bg-gray-50/50 hover:bg-blue-50/50 transition-colors">
+                              <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><ClipboardCheck className="w-4 h-4"/></div>
+                              <p className="font-semibold text-slate-700 text-[10px] md:text-xs">{e.name}</p>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-xl">
-                      <ClipboardCheck className="w-8 h-8 md:w-10 md:h-10 text-gray-300 mx-auto mb-2"/>
-                      <p className="text-gray-400 text-xs md:text-sm">Sin registros de asistencia.</p>
-                    </div>
+                      ) : (
+                        <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-xl">
+                          <ClipboardCheck className="w-8 h-8 md:w-10 md:h-10 text-gray-300 mx-auto mb-2"/>
+                          <p className="text-gray-400 text-xs md:text-sm">Sin registros de asistencia.</p>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {profileTab === 'quejas' && (
+                    <>
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-2">
+                        <div className="flex flex-col">
+                          <h4 className="font-bold text-slate-700 text-sm md:text-base">Reportes y Quejas del Agremiado</h4>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Historial de quejas levantadas y sus estatus</p>
+                        </div>
+                        <div className="flex items-center gap-2 w-full md:w-auto">
+                          <Button
+                            onClick={openNewComplaintForm}
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase text-[10px] tracking-wider px-4 py-2.5 rounded-xl h-auto flex-1 md:flex-none"
+                          >
+                            Levantar Queja / Reporte
+                          </Button>
+                          <span className="text-[10px] md:text-xs font-medium text-blue-600 bg-blue-50 px-2.5 py-1.5 rounded-lg whitespace-nowrap">Total: {complaintsData.length}</span>
+                        </div>
+                      </div>
+
+                      {complaintsLoading ? (
+                        <div className="text-center py-8 text-gray-400 text-xs font-medium">Cargando reportes...</div>
+                      ) : complaintsData.length > 0 ? (
+                        <div className="space-y-3">
+                          {complaintsData.map((c, i) => (
+                            <div key={c.id || i} className="p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-slate-50 transition-all flex flex-col gap-2.5">
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">
+                                    {new Date(c.report_date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                  </span>
+                                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Fecha de Levantamiento</span>
+                                </div>
+                                <div className="flex gap-3 shrink-0">
+                                  <button
+                                    onClick={() => printSingleComplaintPDF(c)}
+                                    className="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 hover:underline uppercase tracking-wider"
+                                  >
+                                    Imprimir Ficha
+                                  </button>
+                                  <button
+                                    onClick={() => openEditComplaintForm(c)}
+                                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline uppercase tracking-wider"
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    onClick={() => deleteComplaint(c.id)}
+                                    className="text-[10px] font-bold text-red-500 hover:text-red-700 hover:underline uppercase tracking-wider"
+                                  >
+                                    Eliminar
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-1">
+                                <div className="flex flex-col">
+                                  <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-1">Descripción Completa:</span>
+                                  <p className="text-xs font-bold text-slate-800 bg-white p-3 rounded-lg border border-slate-100 whitespace-pre-wrap min-h-[60px] leading-relaxed shadow-sm">
+                                    {c.description || 'Sin descripción.'}
+                                  </p>
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-[9px] text-emerald-500 font-bold uppercase tracking-wider mb-1">Seguimiento / Estatus:</span>
+                                  <p className="text-xs font-bold text-emerald-800 bg-emerald-50/40 p-3 rounded-lg border border-emerald-100/60 whitespace-pre-wrap min-h-[60px] leading-relaxed shadow-sm">
+                                    {c.follow_up || 'Sin comentarios de seguimiento registrados.'}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-xl">
+                          <ClipboardCheck className="w-8 h-8 md:w-10 md:h-10 text-gray-300 mx-auto mb-2"/>
+                          <p className="text-gray-400 text-xs md:text-sm">Sin reportes o quejas registrados para este agremiado.</p>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -775,6 +1534,69 @@ export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqued
       </DialogContent>
       {showQR && (
         <QRScanner onScan={handleQRResult} onClose={() => setShowQR(false)} />
+      )}
+
+      {showComplaintForm && (
+        <Dialog open={showComplaintForm} onOpenChange={o => !o && setShowComplaintForm(false)}>
+          <DialogContent className="max-w-lg rounded-[2rem] border border-gray-200 shadow-2xl p-6 bg-white flex flex-col gap-4">
+            <div>
+              <h3 className="text-lg font-black text-blue-900 uppercase tracking-tighter">
+                {editingComplaint ? 'Editar Reporte / Queja' : 'Levantar Reporte / Queja'}
+              </h3>
+              <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">
+                Agremiado: {selMember?.fullName} (Nómina: {selMember?.employeeId})
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Fecha de Levantamiento</label>
+                <Input
+                  type="date"
+                  value={complaintDate}
+                  onChange={e => setComplaintDate(e.target.value)}
+                  className="rounded-lg h-11"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Descripción Completa del Reporte</label>
+                <textarea
+                  value={complaintDescription}
+                  onChange={e => setComplaintDescription(e.target.value)}
+                  placeholder="Detalla de forma completa la queja o reporte..."
+                  className="w-full min-h-[100px] p-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider block mb-1">Seguimiento / Observaciones</label>
+                <textarea
+                  value={complaintFollowUp}
+                  onChange={e => setComplaintFollowUp(e.target.value)}
+                  placeholder="Registra avances, resolución o notas de seguimiento..."
+                  className="w-full min-h-[100px] p-3 rounded-lg border border-emerald-100 bg-emerald-50/20 text-emerald-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end mt-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowComplaintForm(false)}
+                className="rounded-xl px-5 py-2.5 h-auto text-xs font-bold uppercase tracking-wider border-slate-200 text-slate-700"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={saveComplaint}
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-2.5 h-auto text-xs font-bold uppercase tracking-wider"
+              >
+                Guardar Reporte
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </Dialog>
   );

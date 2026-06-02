@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { isProduction, sSelect, sSelectOne, sInsert, sUpdate, sDelete } from '@/lib/supabase';
+import { MEMBER_MAPPING, mapToFrontend } from '@/lib/db-utils';
 
 export async function GET(request: Request) {
   try {
@@ -44,7 +45,7 @@ export async function GET(request: Request) {
       const totalEventsArr = await sSelect('events', 'select=id');
       return NextResponse.json({
         success: true,
-        member: member ? { id: member.id, fullName: member.full_name, employeeId: member.employee_id, memberType: member.member_type, status: member.status, position: member.position, department: member.department, photoUrl: member.photo_url } : null,
+        member: member ? mapToFrontend(member, MEMBER_MAPPING) : null,
         attendance: attendance.map((a: any) => ({ id: a.events?.id, name: a.events?.name, date: a.events?.date, created_at: a.created_at })),
         totalEvents: totalEventsArr.length,
         attendedEventsCount: attendance.length,
@@ -78,7 +79,7 @@ export async function GET(request: Request) {
     db.close();
     return NextResponse.json({
       success: true,
-      member: member ? { id: member.id, fullName: member.full_name, employeeId: member.employee_id, memberType: member.member_type, status: member.status, position: member.position, department: member.department, photoUrl: member.photo_url } : null,
+      member: member ? mapToFrontend(member, MEMBER_MAPPING) : null,
       attendance, totalEvents, attendedEventsCount: attendance.length,
     });
   } catch (error: any) {

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Save, Upload, Trash2, Move, Type, GripVertical, Image as ImageIcon, Download } from 'lucide-react';
+import { Plus, Save, Upload, Trash2, Move, Type, GripVertical, Image as ImageIcon, Download, Undo, Redo, AlignCenter, MoveVertical } from 'lucide-react';
 
 import { toast } from 'sonner';
 import { CredentialCard } from '../credential/CredentialCard';
@@ -20,7 +20,8 @@ const FIELD_CATALOG = [
   { value: 'employeeId', label: 'NO. NÓMINA' },
   { value: 'socioId', label: 'NO. SOCIO' },
   { value: 'position', label: 'PUESTO' },
-  { value: 'department', label: 'DEPARTAMENTO' },
+  { value: 'department', label: 'DIRECCIÓN' },
+  { value: 'secretariat', label: 'SECRETARÍA' },
   { value: 'memberType', label: 'TIPO DE AGREMIADO' },
   { value: 'address', label: 'DOMICILIO' },
   { value: 'colonia', label: 'COLONIA' },
@@ -37,30 +38,126 @@ const FIELD_CATALOG = [
 
 const mockMember: Member = {
   id: 'preview', fullName: 'JUAN PEREZ LOPEZ', employeeId: '2196', socioId: '31',
-  position: 'INTENDENTE', department: 'PARQUES Y JARDINES', memberType: 'ACTIVO',
+  position: 'INTENDENTE', department: 'PARQUES Y JARDINES', secretariat: 'SECRETARÍA DE SERVICIOS PÚBLICOS', memberType: 'ACTIVO',
   status: 'ACTIVO', family: [], address: 'AV. SIEMPRE VIVA #123', colonia: 'CENTRO',
   municipio: 'MONTERREY, NL', curp: 'PERL900101HNLRPN09', phone: '8112345678',
   photoUrl: '/logos/logo2.png'
 };
+
+const MM = 7.56; // 1mm = ~3.78px, scaled by 2 for the editor to look big
 
 export const CredentialDesignPanel: React.FC = () => {
   const [designs, setDesigns] = useState<CredentialDesign[]>([]);
   const [activeDesign, setActiveDesign] = useState<CredentialDesign | null>(null);
   const [newFieldType, setNewFieldType] = useState('fullName');
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
+  const [isDraggingOrResizing, setIsDraggingOrResizing] = useState(false);
+  const [isMouseDragging, setIsMouseDragging] = useState(false);
   const [showGuides, setShowGuides] = useState(true);
+  const [isReady, setIsReady] = useState(false);
   const { config, setConfig } = useCredentialConfig();
+  const stateRef = React.useRef({ activeDesign, selectedElementId, selectedElementIds });
+
+  // History state for undo/redo
+  const [history, setHistory] = useState<{
+    past: CredentialDesign[];
+    future: CredentialDesign[];
+  }>({ past: [], future: [] });
+
+  const keyboardDragStartDesign = React.useRef<CredentialDesign | null>(null);
+
+  const updateActiveDesignWithHistory = useCallback((newDesign: CredentialDesign) => {
+    const currentDesign = stateRef.current.activeDesign;
+    if (!currentDesign) {
+      setActiveDesign(newDesign);
+      return;
+    }
+    
+    // Only push to past history if there are real changes and it's the same design ID
+    if (newDesign.id === currentDesign.id) {
+      const prevStr = JSON.stringify(currentDesign);
+      const nextStr = JSON.stringify(newDesign);
+      if (prevStr !== nextStr) {
+        setHistory(prev => ({
+          past: [...prev.past.slice(-49), currentDesign], // cap at 50
+          future: []
+        }));
+      }
+    } else {
+      // Design ID changed (switched designs), clear history
+      setHistory({ past: [], future: [] });
+    }
+    setActiveDesign(newDesign);
+  }, []);
+
+  const undo = useCallback(() => {
+    setHistory(prev => {
+      if (prev.past.length === 0) return prev;
+      const newPast = [...prev.past];
+      const previous = newPast.pop()!;
+      
+      const current = stateRef.current.activeDesign;
+      if (current) {
+        const newFuture = [current, ...prev.future.slice(0, 49)];
+        setActiveDesign(previous);
+        return {
+          past: newPast,
+          future: newFuture
+        };
+      }
+      return prev;
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    setHistory(prev => {
+      if (prev.future.length === 0) return prev;
+      const newFuture = [...prev.future];
+      const next = newFuture.shift()!;
+      
+      const current = stateRef.current.activeDesign;
+      if (current) {
+        const newPast = [...prev.past.slice(-49), current];
+        setActiveDesign(next);
+        return {
+          past: newPast,
+          future: newFuture
+        };
+      }
+      return prev;
+    });
+  }, []);
+
+  // Sync stateRef on every render to ensure event listeners and callbacks always have the freshest state without closures
+  stateRef.current = { activeDesign, selectedElementId, selectedElementIds };
+  const dragStartPositions = React.useRef<{ [key: string]: { x: number; y: number } }>({});
+  const dragStartDOMPositions = React.useRef<{ el: HTMLElement; startX: number; startY: number }[]>([]);
+
 
   const fetchDesigns = async () => {
     const res = await fetch('/api/settings/designs');
     const data = await res.json();
     setDesigns(data);
     const active = data.find((d: CredentialDesign) => d.is_active);
-    if (active) setActiveDesign(active);
-    else if (data.length > 0) setActiveDesign(data[0]);
+    if (active) {
+      setActiveDesign(active);
+      setHistory({ past: [], future: [] });
+    } else if (data.length > 0) {
+      setActiveDesign(data[0]);
+      setHistory({ past: [], future: [] });
+    }
   };
 
   useEffect(() => { fetchDesigns(); }, []);
+
+  // Delay rendering of Rnd components until animations finish (prevent layout offsets)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsReady(true);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Sync active design to the localStorage config used by CredentialCard
   useEffect(() => {
@@ -109,7 +206,7 @@ export const CredentialDesignPanel: React.FC = () => {
     if (!activeDesign) return;
     const newElements = [...activeDesign.elements];
     newElements[idx] = { ...newElements[idx], ...updates };
-    setActiveDesign({ ...activeDesign, elements: newElements });
+    updateActiveDesignWithHistory({ ...activeDesign, elements: newElements });
   };
 
   const addElement = () => {
@@ -125,18 +222,42 @@ export const CredentialDesignPanel: React.FC = () => {
       color: '#000000', font_size: 8, font_weight: 'bold', alignment: 'left',
       is_visible: true, sort_order: activeDesign.elements.length,
     };
-    setActiveDesign({ ...activeDesign, elements: [...activeDesign.elements, newEl] });
+    updateActiveDesignWithHistory({ ...activeDesign, elements: [...activeDesign.elements, newEl] });
   };
 
   const removeElement = (idx: number) => {
     if (!activeDesign) return;
     const newElements = activeDesign.elements.filter((_, i) => i !== idx);
-    setActiveDesign({ ...activeDesign, elements: newElements });
+    updateActiveDesignWithHistory({ ...activeDesign, elements: newElements });
   };
 
-  // Keyboard Arrow Keys Precision Positioning
+  const handleSelectElement = useCallback((id: string, isMultiSelect: boolean) => {
+    // Blur active input to enable keyboard precision positioning immediately
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT' || activeEl.tagName === 'TEXTAREA')) {
+      (activeEl as HTMLElement).blur();
+    }
+
+    setSelectedElementIds(prev => {
+      let next;
+      if (isMultiSelect) {
+        next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      } else {
+        next = [id];
+      }
+      setSelectedElementId(next.length > 0 ? next[next.length - 1] : null);
+      return next;
+    });
+  }, []);
+
+  // Keyboard Arrow Keys Precision Positioning for all selected elements
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (!activeDesign || !selectedElementId) return;
+    const { activeDesign: currentDesign, selectedElementId: currentId, selectedElementIds: currentIds } = stateRef.current;
+    if (!currentDesign) return;
+
+    // Use currentIds if populated, else fallback to currentId
+    const idsToMove = currentIds.length > 0 ? currentIds : (currentId ? [currentId] : []);
+    if (idsToMove.length === 0) return;
     
     // Bypass if user is actively focused on an input, select or textarea field
     const activeEl = document.activeElement;
@@ -144,41 +265,109 @@ export const CredentialDesignPanel: React.FC = () => {
       return;
     }
 
-    const idx = activeDesign.elements.findIndex(el => el.id === selectedElementId);
-    if (idx === -1) return;
-
-    const el = activeDesign.elements[idx];
-    const step = e.shiftKey ? 1.0 : 0.1; // 1mm with Shift, 0.1mm default
-    let newX = el.x;
-    let newY = el.y;
-
-    if (e.key === 'ArrowUp') {
-      newY = Number((el.y - step).toFixed(1));
-      e.preventDefault();
-    } else if (e.key === 'ArrowDown') {
-      newY = Number((el.y + step).toFixed(1));
-      e.preventDefault();
-    } else if (e.key === 'ArrowLeft') {
-      newX = Number((el.x - step).toFixed(1));
-      e.preventDefault();
-    } else if (e.key === 'ArrowRight') {
-      newX = Number((el.x + step).toFixed(1));
-      e.preventDefault();
-    } else {
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
       return;
     }
 
-    // Boundary constraints: PVC Card size is 86mm x 54mm
-    newX = Math.max(0, Math.min(86 - (el.w || 20), newX));
-    newY = Math.max(0, Math.min(54 - (el.h || 3), newY));
+    // Capture the initial design state before keyboard movement started, to push into undo history on keyUp
+    if (!keyboardDragStartDesign.current) {
+      keyboardDragStartDesign.current = currentDesign;
+    }
 
-    updateElement(idx, { x: newX, y: newY });
-  }, [activeDesign, selectedElementId]);
+    const step = e.shiftKey ? 1.0 : 0.1; // 1mm with Shift, 0.1mm default
+    let dx = 0;
+    let dy = 0;
+
+    if (e.key === 'ArrowUp') {
+      dy = -step;
+      e.preventDefault();
+    } else if (e.key === 'ArrowDown') {
+      dy = step;
+      e.preventDefault();
+    } else if (e.key === 'ArrowLeft') {
+      dx = -step;
+      e.preventDefault();
+    } else if (e.key === 'ArrowRight') {
+      dx = step;
+      e.preventDefault();
+    }
+
+    // Show guides during keyboard positioning movement
+    setIsDraggingOrResizing(true);
+
+    const newElements = currentDesign.elements.map(el => {
+      if (idsToMove.includes(el.id)) {
+        let newX = Number((el.x + dx).toFixed(1));
+        let newY = Number((el.y + dy).toFixed(1));
+        // Boundary constraints: PVC Card size is 86mm x 54mm
+        newX = Math.max(0, Math.min(86 - (el.w || 20), newX));
+        newY = Math.max(0, Math.min(54 - (el.h || 3), newY));
+        return { ...el, x: newX, y: newY };
+      }
+      return el;
+    });
+
+    setActiveDesign({ ...currentDesign, elements: newElements });
+  }, []);
+
+  const handleKeyUp = useCallback((e: KeyboardEvent) => {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      setIsDraggingOrResizing(false);
+      const current = stateRef.current.activeDesign;
+      if (keyboardDragStartDesign.current && current) {
+        const prevStr = JSON.stringify(keyboardDragStartDesign.current);
+        const nextStr = JSON.stringify(current);
+        if (prevStr !== nextStr) {
+          setHistory(prev => ({
+            past: [...prev.past.slice(-49), keyboardDragStartDesign.current!],
+            future: []
+          }));
+        }
+      }
+      keyboardDragStartDesign.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [handleKeyDown, handleKeyUp]);
+
+  // Shortcut listener for Ctrl + Z / Ctrl + Y / Ctrl + Shift + Z
+  useEffect(() => {
+    const handleUndoRedoShortcuts = (e: KeyboardEvent) => {
+      // Bypass if user is actively focused on an input, select or textarea field
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT' || activeEl.tagName === 'TEXTAREA')) {
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+        const key = e.key.toLowerCase();
+        if (key === 'z') {
+          if (e.shiftKey) {
+            e.preventDefault();
+            redo();
+          } else {
+            e.preventDefault();
+            undo();
+          }
+        } else if (key === 'y') {
+          e.preventDefault();
+          redo();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleUndoRedoShortcuts);
+    return () => {
+      window.removeEventListener('keydown', handleUndoRedoShortcuts);
+    };
+  }, [undo, redo]);
 
   // Alignment Guides (Smart Guides) calculation
   const getActiveGuides = () => {
@@ -190,7 +379,10 @@ export const CredentialDesignPanel: React.FC = () => {
     const activeGuidesX: number[] = [];
     const activeGuidesY: number[] = [];
 
-    const otherElements = activeDesign.elements.filter(el => el.id !== selectedElementId && el.is_visible);
+    // Filter out all currently selected elements so we don't snap to themselves during multi-drag
+    const otherElements = activeDesign.elements.filter(
+      el => !selectedElementIds.includes(el.id) && el.is_visible
+    );
 
     // Selected element's key X positions (left edge, center, right edge)
     const selXPoints = [selEl.x, selEl.x + (selEl.w || 20) / 2, selEl.x + (selEl.w || 20)];
@@ -230,6 +422,93 @@ export const CredentialDesignPanel: React.FC = () => {
   };
 
   const { x: guidesX, y: guidesY } = getActiveGuides();
+
+  const handleDragStart = useCallback((id: string) => {
+    setIsDraggingOrResizing(true);
+    setIsMouseDragging(true);
+    
+    const { activeDesign: currentDesign, selectedElementIds: currentIds } = stateRef.current;
+    if (!currentDesign) return;
+
+    let nextIds = currentIds;
+    if (!currentIds.includes(id)) {
+      nextIds = [id];
+      setSelectedElementIds([id]);
+      setSelectedElementId(id);
+    }
+
+    // Cache the DOM elements and initial translations of other selected elements to update directly
+    const domElements: { el: HTMLElement; startX: number; startY: number }[] = [];
+    nextIds.forEach(selectedId => {
+      if (selectedId === id) return; // Dragged element is moved natively by react-rnd
+      const domEl = document.getElementById(`rnd-${selectedId}`);
+      if (domEl) {
+        const style = window.getComputedStyle(domEl);
+        const matrix = new DOMMatrixReadOnly(style.transform);
+        domElements.push({
+          el: domEl,
+          startX: matrix.m41 || parseFloat(domEl.style.left) || 0,
+          startY: matrix.m42 || parseFloat(domEl.style.top) || 0,
+        });
+      }
+    });
+    dragStartDOMPositions.current = domElements;
+
+    const startPositions: { [key: string]: { x: number; y: number } } = {};
+    currentDesign.elements.forEach(el => {
+      if (nextIds.includes(el.id)) {
+        startPositions[el.id] = { x: el.x, y: el.y };
+      }
+    });
+    dragStartPositions.current = startPositions;
+  }, []);
+
+  const handleDrag = useCallback((id: string, d: any) => {
+    const startPos = dragStartPositions.current[id];
+    if (!startPos) return;
+
+    // Calculate relative pixel displacement
+    const dx_px = d.x - (startPos.x * MM);
+    const dy_px = d.y - (startPos.y * MM);
+
+    // Directly transform secondary DOM elements without triggering React renders
+    dragStartDOMPositions.current.forEach(item => {
+      const newTranslateX = item.startX + dx_px;
+      const newTranslateY = item.startY + dy_px;
+      item.el.style.transform = `translate(${newTranslateX}px, ${newTranslateY}px)`;
+    });
+  }, []);
+
+  const handleDragStop = useCallback((id: string, d: any) => {
+    setIsDraggingOrResizing(false);
+    setIsMouseDragging(false);
+    const { activeDesign: currentDesign, selectedElementIds: currentIds } = stateRef.current;
+    if (!currentDesign) return;
+
+    const startPos = dragStartPositions.current[id];
+    if (!startPos) return;
+
+    const dx = (d.x / MM) - startPos.x;
+    const dy = (d.y / MM) - startPos.y;
+
+    const newElements = currentDesign.elements.map(el => {
+      if (currentIds.includes(el.id)) {
+        const start = dragStartPositions.current[el.id];
+        if (start) {
+          let newX = Number((start.x + dx).toFixed(1));
+          let newY = Number((start.y + dy).toFixed(1));
+          newX = Math.max(0, Math.min(86 - (el.w || 20), newX));
+          newY = Math.max(0, Math.min(54 - (el.h || 3), newY));
+          return { ...el, x: newX, y: newY };
+        }
+      }
+      return el;
+    });
+
+    updateActiveDesignWithHistory({ ...currentDesign, elements: newElements });
+    dragStartDOMPositions.current = [];
+    dragStartPositions.current = {};
+  }, []);
 
   // Export Design to JSON file
   const handleExportDesign = () => {
@@ -303,7 +582,7 @@ export const CredentialDesignPanel: React.FC = () => {
           sort_order: i,
         }));
 
-        setActiveDesign({
+        updateActiveDesignWithHistory({
           ...activeDesign,
           primary_color: imported.primaryColor || activeDesign.primary_color,
           secondary_color: imported.secondaryColor || activeDesign.secondary_color,
@@ -325,7 +604,7 @@ export const CredentialDesignPanel: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file || !activeDesign) return;
     
-    const toastId = toast.loading('Optimizando y subiendo fondo de credencial...');
+    const toastId = toast.loading('Optimizando y subiendo fondo en súper alta calidad (600 DPI)...');
     try {
       // 1. Load image into HTML Image object
       const img = new Image();
@@ -337,29 +616,33 @@ export const CredentialDesignPanel: React.FC = () => {
         img.onerror = reject;
       });
       
-      // 2. Create canvas with ideal PVC high-resolution dimensions (300 DPI: 1016 x 638)
+      // 2. Create canvas with professional print dimensions (600 DPI: 2032 x 1276)
       const canvas = document.createElement('canvas');
-      canvas.width = 1016;
-      canvas.height = 638;
+      canvas.width = 2032;
+      canvas.height = 1276;
       
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('No se pudo inicializar el contexto de canvas.');
       
-      // Draw image covering the canvas (fill / crop if aspect ratio differs slightly)
+      // Configure high-quality smoothing for downscaling
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      
+      // Draw image covering the canvas
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       
       // Clean up object URL
       URL.revokeObjectURL(objectURL);
       
-      // 3. Convert to JPEG blob at high quality (0.92) for optimal print fidelity and file size
+      // 3. Convert to PNG blob (lossless compression) to keep logos & text crystal clear
       const optimizedBlob = await new Promise<Blob | null>((resolve) => {
-        canvas.toBlob(resolve, 'image/jpeg', 0.92);
+        canvas.toBlob(resolve, 'image/png');
       });
       
       if (!optimizedBlob) throw new Error('Error al optimizar la imagen.');
       
       // 4. Create upload payload
-      const optimizedFile = new File([optimizedBlob], 'fondo_frente.jpg', { type: 'image/jpeg' });
+      const optimizedFile = new File([optimizedBlob], 'fondo_frente.png', { type: 'image/png' });
       const formData = new FormData();
       formData.append('file', optimizedFile);
       
@@ -371,8 +654,8 @@ export const CredentialDesignPanel: React.FC = () => {
       const data = await res.json();
       
       if (data.url) {
-        setActiveDesign({ ...activeDesign, background_url: data.url, show_template: false });
-        toast.success('Fondo optimizado y subido correctamente', { id: toastId });
+        updateActiveDesignWithHistory({ ...activeDesign, background_url: data.url, show_template: false });
+        toast.success('Fondo optimizado y subido a 600 DPI', { id: toastId });
       } else {
         throw new Error(data.error || 'No se recibió la URL de la imagen');
       }
@@ -404,7 +687,10 @@ export const CredentialDesignPanel: React.FC = () => {
       const res2 = await fetch('/api/settings/designs');
       const data = await res2.json();
       const newlyCreated = data.find((d: any) => d.name === newDesign.name && d.section === section);
-      if (newlyCreated) setActiveDesign(newlyCreated);
+      if (newlyCreated) {
+        setActiveDesign(newlyCreated);
+        setHistory({ past: [], future: [] });
+      }
     }
   };
 
@@ -428,17 +714,91 @@ export const CredentialDesignPanel: React.FC = () => {
       // Try to find the active one, or just the first one
       const target = sectionDesigns.find(d => d.is_active) || sectionDesigns[0];
       setActiveDesign(target);
+      setHistory({ past: [], future: [] });
     } else {
       // Create if none exists
       createNewDesign(section);
     }
   };
 
+  // Centrar horizontalmente los elementos seleccionados
+  const handleCenterSelectedX = () => {
+    if (!activeDesign) return;
+    const idsToCenter = selectedElementIds.length > 0 ? selectedElementIds : (selectedElementId ? [selectedElementId] : []);
+    if (idsToCenter.length === 0) {
+      toast.info('Selecciona al menos un elemento para centrar');
+      return;
+    }
+
+    const newElements = activeDesign.elements.map(el => {
+      if (idsToCenter.includes(el.id)) {
+        // Card is 86mm wide. Center is at (86 - w) / 2
+        const w = el.w || 20;
+        const newX = Number(((86 - w) / 2).toFixed(1));
+        return { ...el, x: newX };
+      }
+      return el;
+    });
+
+    updateActiveDesignWithHistory({ ...activeDesign, elements: newElements });
+    toast.success(idsToCenter.length === 1 ? 'Elemento centrado horizontalmente' : 'Elementos centrados horizontalmente');
+  };
+
+  // Distribuir verticalmente de manera equitativa (misma distancia/brecha)
+  const handleDistributeSelectedY = () => {
+    if (!activeDesign) return;
+    const idsToDistribute = selectedElementIds.length > 0 ? selectedElementIds : [];
+    if (idsToDistribute.length < 3) {
+      toast.info('Selecciona al menos 3 elementos para distribuir el espacio vertical');
+      return;
+    }
+
+    // Filter elements that are selected and visible
+    const els = activeDesign.elements
+      .filter(el => idsToDistribute.includes(el.id))
+      .sort((a, b) => a.y - b.y);
+
+    const N = els.length;
+    const y0 = els[0].y;
+    const yLast = els[N - 1].y;
+    const hLast = els[N - 1].h || 3;
+    const totalSpan = yLast + hLast - y0;
+
+    // Sum of heights of all selected elements
+    const totalHeight = els.reduce((sum, el) => sum + (el.h || 3), 0);
+
+    // Total gap space
+    const totalGap = totalSpan - totalHeight;
+
+    if (totalGap < 0) {
+      toast.error('No hay suficiente espacio vertical entre el primer y último elemento para distribuirlos');
+      return;
+    }
+
+    const gap = totalGap / (N - 1);
+
+    let currentY = y0;
+    const distributedPositions: { [id: string]: number } = {};
+
+    els.forEach((el, idx) => {
+      distributedPositions[el.id] = Number(currentY.toFixed(1));
+      currentY += (el.h || 3) + gap;
+    });
+
+    const newElements = activeDesign.elements.map(el => {
+      if (idsToDistribute.includes(el.id)) {
+        return { ...el, y: distributedPositions[el.id] };
+      }
+      return el;
+    });
+
+    updateActiveDesignWithHistory({ ...activeDesign, elements: newElements });
+    toast.success('Elementos distribuidos verticalmente con espacios iguales');
+  };
+
   if (!activeDesign) {
     return <div className="flex items-center justify-center h-full text-gray-400 font-bold">Cargando diseños...</div>;
   }
-
-  const MM = 7.56; // 1mm = ~3.78px, scaled by 2 for the editor to look big
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
@@ -457,7 +817,7 @@ export const CredentialDesignPanel: React.FC = () => {
               </div>
             </div>
             <div className="flex gap-2">
-              <Select value={activeDesign.id} onValueChange={v => { const d = designs.find(x => x.id === v); if (d) setActiveDesign(d); }}>
+              <Select value={activeDesign.id} onValueChange={v => { const d = designs.find(x => x.id === v); if (d) { setActiveDesign(d); setHistory({ past: [], future: [] }); } }}>
                 <SelectTrigger className="h-10 rounded-xl text-sm font-bold flex-1"><SelectValue /></SelectTrigger>
                 <SelectContent>{designs.map(d => <SelectItem key={d.id} value={d.id}>{d.name} ({d.section})</SelectItem>)}</SelectContent>
               </Select>
@@ -469,7 +829,7 @@ export const CredentialDesignPanel: React.FC = () => {
 
           <div className="flex items-center justify-between px-1">
             <Label className="text-[10px] font-bold text-gray-500 uppercase">Plantilla Base (Logo/Foto)</Label>
-            <Switch checked={(activeDesign.show_template as any) !== false && (activeDesign.show_template as any) !== 0} onCheckedChange={v => setActiveDesign({ ...activeDesign, show_template: v })} />
+            <Switch checked={(activeDesign.show_template as any) !== false && (activeDesign.show_template as any) !== 0} onCheckedChange={v => updateActiveDesignWithHistory({ ...activeDesign, show_template: v })} />
           </div>
 
           {/* Add Element */}
@@ -488,6 +848,33 @@ export const CredentialDesignPanel: React.FC = () => {
           <Button onClick={handleSaveDesign} className="w-full h-11 bg-blue-900 hover:bg-blue-800 text-white font-bold rounded-xl gap-2 uppercase tracking-widest text-[10px]">
             <Save className="w-4 h-4" /> Guardar Diseño
           </Button>
+
+          {/* Alineación y Distribución */}
+          <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100/50 space-y-2">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-blue-950 flex items-center gap-1.5">
+              Alineación y Distribución
+            </Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCenterSelectedX}
+                disabled={!selectedElementId && selectedElementIds.length === 0}
+                className="h-8 text-[9px] uppercase font-black tracking-wider text-gray-700 bg-white border-gray-200 flex gap-1 items-center justify-center hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-gray-700 active:scale-95"
+              >
+                <AlignCenter className="w-3.5 h-3.5 text-blue-600" /> Centrar X
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDistributeSelectedY}
+                disabled={selectedElementIds.length < 3}
+                className="h-8 text-[9px] uppercase font-black tracking-wider text-gray-700 bg-white border-gray-200 flex gap-1 items-center justify-center hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-gray-700 active:scale-95"
+              >
+                <MoveVertical className="w-3.5 h-3.5 text-blue-600" /> Distribuir Y
+              </Button>
+            </div>
+          </div>
 
           {/* Import / Export Buttons */}
           <div className="grid grid-cols-2 gap-2">
@@ -518,15 +905,15 @@ export const CredentialDesignPanel: React.FC = () => {
             <div>
               <Label className="text-[9px] font-bold uppercase text-gray-400">Primario</Label>
               <div className="flex gap-1 mt-1">
-                <Input type="color" value={activeDesign.primary_color} onChange={e => setActiveDesign({ ...activeDesign, primary_color: e.target.value })} className="w-9 h-9 p-0.5 rounded-lg" />
-                <Input value={activeDesign.primary_color} onChange={e => setActiveDesign({ ...activeDesign, primary_color: e.target.value })} className="h-9 text-[10px] rounded-lg flex-1" />
+                <Input type="color" value={activeDesign.primary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, primary_color: e.target.value })} className="w-9 h-9 p-0.5 rounded-lg" />
+                <Input value={activeDesign.primary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, primary_color: e.target.value })} className="h-9 text-[10px] rounded-lg flex-1" />
               </div>
             </div>
             <div>
               <Label className="text-[9px] font-bold uppercase text-gray-400">Secundario</Label>
               <div className="flex gap-1 mt-1">
-                <Input type="color" value={activeDesign.secondary_color} onChange={e => setActiveDesign({ ...activeDesign, secondary_color: e.target.value })} className="w-9 h-9 p-0.5 rounded-lg" />
-                <Input value={activeDesign.secondary_color} onChange={e => setActiveDesign({ ...activeDesign, secondary_color: e.target.value })} className="h-9 text-[10px] rounded-lg flex-1" />
+                <Input type="color" value={activeDesign.secondary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, secondary_color: e.target.value })} className="w-9 h-9 p-0.5 rounded-lg" />
+                <Input value={activeDesign.secondary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, secondary_color: e.target.value })} className="h-9 text-[10px] rounded-lg flex-1" />
               </div>
             </div>
           </div>
@@ -542,7 +929,7 @@ export const CredentialDesignPanel: React.FC = () => {
                 </Button>
               </div>
               {activeDesign.background_url && (
-                <Button variant="ghost" size="icon" onClick={() => setActiveDesign({ ...activeDesign, background_url: undefined })} className="h-9 w-9 text-red-400 hover:text-red-600 rounded-xl">
+                <Button variant="ghost" size="icon" onClick={() => updateActiveDesignWithHistory({ ...activeDesign, background_url: undefined })} className="h-9 w-9 text-red-400 hover:text-red-600 rounded-xl">
                   <Trash2 className="w-4 h-4" />
                 </Button>
               )}
@@ -555,13 +942,13 @@ export const CredentialDesignPanel: React.FC = () => {
           {activeDesign.elements.map((el, idx) => (
             <div 
               key={el.id} 
-              className={`bg-white rounded-xl border overflow-hidden flex-shrink-0 cursor-pointer transition-colors ${selectedElementId === el.id ? 'border-blue-500 shadow-md ring-1 ring-blue-500' : 'border-gray-100 hover:border-blue-200'}`}
-              onClick={() => setSelectedElementId(el.id)}
+              className={`bg-white rounded-xl border overflow-hidden flex-shrink-0 cursor-pointer transition-colors ${selectedElementIds.includes(el.id) ? 'border-blue-500 shadow-md ring-1 ring-blue-500' : 'border-gray-100 hover:border-blue-200'}`}
+              onClick={(e) => handleSelectElement(el.id, e.ctrlKey || e.shiftKey)}
             >
-              <div className={`flex items-center justify-between px-3 py-2 ${selectedElementId === el.id ? 'bg-blue-50' : 'border-b border-gray-50'}`}>
+              <div className={`flex items-center justify-between px-3 py-2 ${selectedElementIds.includes(el.id) ? 'bg-blue-50' : 'border-b border-gray-50'}`}>
                 <div className="flex items-center gap-2">
                   <GripVertical className="w-4 h-4 text-gray-300" />
-                  <span className={`text-[10px] font-black uppercase ${selectedElementId === el.id ? 'text-blue-700' : 'text-gray-600'}`}>{el.label}</span>
+                  <span className={`text-[10px] font-black uppercase ${selectedElementIds.includes(el.id) ? 'text-blue-700' : 'text-gray-600'}`}>{el.label}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Switch checked={!!el.is_visible} onCheckedChange={v => updateElement(idx, { is_visible: v as any })} />
@@ -571,7 +958,7 @@ export const CredentialDesignPanel: React.FC = () => {
                 </div>
               </div>
               {el.is_visible && selectedElementId === el.id && (
-                <div className="p-3 grid grid-cols-4 gap-2 bg-white">
+                <div className="p-3 grid grid-cols-4 gap-2 bg-white" onClick={(e) => e.stopPropagation()}>
                   <div><Label className="text-[8px] font-bold text-gray-400">X (mm)</Label>
                     <Input type="number" step="0.1" value={el.x} onChange={e => updateElement(idx, { x: Number(e.target.value) })} className="h-7 text-[10px] rounded-lg" /></div>
                   <div><Label className="text-[8px] font-bold text-gray-400">Y (mm)</Label>
@@ -617,7 +1004,29 @@ export const CredentialDesignPanel: React.FC = () => {
 
       {/* Right Preview */}
       <div className="flex-1 bg-[#e8e8e8] flex items-center justify-center p-8 relative" style={{ backgroundImage: 'linear-gradient(45deg, #d0d0d0 25%, transparent 25%, transparent 75%, #d0d0d0 75%), linear-gradient(45deg, #d0d0d0 25%, transparent 25%, transparent 75%, #d0d0d0 75%)', backgroundSize: '20px 20px', backgroundPosition: '0 0, 10px 10px' }}>
-        <div className="absolute top-4 right-4 bg-white/80 px-4 py-1 rounded-full z-10 shadow-sm">
+        <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full z-10 shadow-lg border border-gray-100 flex items-center gap-3">
+          <div className="flex items-center gap-1 border-r border-gray-200 pr-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={history.past.length === 0}
+              onClick={undo}
+              className="h-7 w-7 rounded-lg text-gray-500 hover:text-blue-600 disabled:opacity-30 disabled:hover:text-gray-500 hover:bg-gray-100"
+              title="Deshacer (Ctrl + Z)"
+            >
+              <Undo className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={history.future.length === 0}
+              onClick={redo}
+              className="h-7 w-7 rounded-lg text-gray-500 hover:text-blue-600 disabled:opacity-30 disabled:hover:text-gray-500 hover:bg-gray-100"
+              title="Rehacer (Ctrl + Y / Ctrl + Shift + Z)"
+            >
+              <Redo className="w-4 h-4" />
+            </Button>
+          </div>
           <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Editor Visual (Escala 2x)</span>
         </div>
         
@@ -644,14 +1053,14 @@ export const CredentialDesignPanel: React.FC = () => {
           )}
 
           {/* Alignment Guides */}
-          {showGuides && guidesX.map(gx => (
+          {showGuides && isDraggingOrResizing && guidesX.map(gx => (
             <div 
               key={`guide-x-${gx}`} 
               className="absolute top-0 bottom-0 border-l border-dashed border-emerald-500 z-40 pointer-events-none"
               style={{ left: `${gx * MM}px`, opacity: 0.8 }}
             />
           ))}
-          {showGuides && guidesY.map(gy => (
+          {showGuides && isDraggingOrResizing && guidesY.map(gy => (
             <div 
               key={`guide-y-${gy}`} 
               className="absolute left-0 right-0 border-t border-dashed border-emerald-500 z-40 pointer-events-none"
@@ -661,16 +1070,19 @@ export const CredentialDesignPanel: React.FC = () => {
 
           {/* Interactive Elements */}
 
-          {activeDesign.elements.map((el, idx) => el.is_visible && (
+          {isReady && activeDesign.elements.map((el, idx) => el.is_visible && (
             <Rnd
-              key={el.id}
+              id={`rnd-${el.id}`}
+              key={`${el.id}-${el.x}-${el.y}`}
               bounds="parent"
               size={{ width: el.w * MM, height: el.h * MM }}
               position={{ x: el.x * MM, y: el.y * MM }}
-              onDragStart={() => setSelectedElementId(el.id)}
-              onDragStop={(e, d) => updateElement(idx, { x: Number((d.x / MM).toFixed(1)), y: Number((d.y / MM).toFixed(1)) })}
-              onResizeStart={() => setSelectedElementId(el.id)}
+              onDragStart={() => handleDragStart(el.id)}
+              onDrag={(e, d) => handleDrag(el.id, d)}
+              onDragStop={(e, d) => handleDragStop(el.id, d)}
+              onResizeStart={() => setIsDraggingOrResizing(true)}
               onResizeStop={(e, dir, ref, delta, position) => {
+                setIsDraggingOrResizing(false);
                 updateElement(idx, { 
                   w: Number((parseFloat(ref.style.width) / MM).toFixed(1)), 
                   h: Number((parseFloat(ref.style.height) / MM).toFixed(1)),
@@ -678,11 +1090,14 @@ export const CredentialDesignPanel: React.FC = () => {
                   y: Number((position.y / MM).toFixed(1))
                 });
               }}
-              className={`group ${selectedElementId === el.id ? 'ring-1 ring-blue-500 z-50' : 'z-10'}`}
+              className={`group ${selectedElementIds.includes(el.id) ? 'ring-1 ring-blue-500 z-50' : 'z-10'}`}
               style={{ position: 'absolute' }}
-              onClick={() => setSelectedElementId(el.id)}
+              onClick={(e: any) => {
+                e.stopPropagation();
+                handleSelectElement(el.id, e.ctrlKey || e.shiftKey);
+              }}
             >
-              <div className="absolute inset-0 border border-transparent group-hover:border-blue-400 group-hover:bg-blue-400/10 cursor-move transition-colors" />
+              <div className={`absolute inset-0 border border-transparent group-hover:border-blue-400 group-hover:bg-blue-400/10 cursor-move transition-colors ${selectedElementIds.includes(el.id) ? 'border-blue-500 bg-blue-500/5' : ''}`} />
               <div 
                 className="w-full h-full relative z-10 pointer-events-none flex"
                 style={{
