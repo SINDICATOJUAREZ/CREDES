@@ -19,8 +19,8 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
   const [selectedMemberForPreview, setSelectedMemberForPreview] = useState<any | null>(null);
 
   useEffect(() => {
-    if (isOpen) calc();
-  }, [isOpen]);
+    if (isOpen || inline) calc();
+  }, [isOpen, inline]);
 
   const parseDate = (dateStr: string | any) => {
     if (!dateStr) return null;

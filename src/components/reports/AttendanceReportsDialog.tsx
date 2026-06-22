@@ -56,10 +56,10 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
   const [complaintFollowUp, setComplaintFollowUp] = useState('');
 
   useEffect(() => { 
-    if (isOpen && tab === 'cumpleanos') {
+    if ((isOpen || inline) && tab === 'cumpleanos') {
       calcBdays();
     } 
-  }, [isOpen, tab]);
+  }, [isOpen, inline, tab]);
 
   const calcBdays = async () => {
     try {
