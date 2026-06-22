@@ -13,6 +13,9 @@ export async function middleware(request: NextRequest) {
     if (isPublicPath) {
       return NextResponse.next();
     }
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
@@ -31,6 +34,9 @@ export async function middleware(request: NextRequest) {
     if (isPublicPath) {
       return NextResponse.next();
     }
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Token inválido o expirado' }, { status: 401 });
+    }
     const response = NextResponse.redirect(new URL('/login', request.url));
     response.cookies.delete('auth-token');
     return response;
@@ -42,12 +48,11 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api (except for auth related)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public (public images/logos)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|logos|RECURSOS|backgrounds).*)',
+    '/((?!_next/static|_next/image|favicon.ico|logos|RECURSOS|backgrounds).*)',
   ],
 };

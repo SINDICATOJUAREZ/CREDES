@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Lock, Mail, Loader2, ShieldCheck } from 'lucide-react';
+import { Lock, Mail, Loader2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,9 +61,13 @@ export default function LoginPage() {
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-              className="w-20 h-20 bg-gradient-to-tr from-blue-600 to-blue-400 rounded-3xl flex items-center justify-center mb-6 shadow-lg shadow-blue-500/20"
+              className="mb-6 flex items-center justify-center"
             >
-              <ShieldCheck className="w-10 h-10 text-white" />
+              <img 
+                src="/logos/logo.png" 
+                alt="SUTSMBJ Logo" 
+                className="h-24 w-auto object-contain drop-shadow-[0_0_15px_rgba(59,130,246,0.4)]" 
+              />
             </motion.div>
             <h1 className="text-3xl font-black text-white tracking-tighter uppercase mb-2">SIC-<span className="text-blue-500">SUTSMBJ</span></h1>
             <p className="text-gray-400 text-sm font-medium tracking-wide">Sistema de Control y Registro de Agremiados</p>
@@ -71,7 +75,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
-              <Label className="text-xs font-black text-blue-400 uppercase tracking-widest ml-1">Correo Institucional</Label>
+              <Label className="text-xs font-black text-blue-400 uppercase tracking-widest ml-1">Correo</Label>
               <div className="relative group">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 group-focus-within:text-blue-400 transition-colors" />
                 <Input 

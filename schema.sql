@@ -108,6 +108,7 @@ CREATE TABLE IF NOT EXISTS credential_designs (
     primary_color TEXT DEFAULT '#003366',
     secondary_color TEXT DEFAULT '#EAB308',
     is_active INTEGER DEFAULT 0,
+    show_template INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -212,8 +213,24 @@ CREATE TABLE IF NOT EXISTS member_attendance (
     event_id TEXT NOT NULL,
     attended INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+    FOREIGN KEY (employee_id) REFERENCES members(employee_id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_attendance_employee ON member_attendance(employee_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_event ON member_attendance(event_id);
+
+-- =============================================
+-- Quejas y Reportes de Agremiados
+-- =============================================
+CREATE TABLE IF NOT EXISTS member_complaints (
+    id TEXT PRIMARY KEY,
+    employee_id TEXT NOT NULL,
+    report_date TEXT NOT NULL,
+    description TEXT NOT NULL,
+    follow_up TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES members(employee_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_complaints_employee ON member_complaints(employee_id);

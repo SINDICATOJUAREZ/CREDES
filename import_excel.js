@@ -4,9 +4,9 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const EXCEL_PATH = 'I:/APLICACIONES/SINDICATO/CREDENCIALES/RECURSOS/BASE DE DATOS SINDICATO JUAREZ, N.L.2026.xlsx';
+const EXCEL_PATH = 'I:/APLICACIONES/SINDICATO/RECURSOS/BASE DE DATOS SINDICATO JUAREZ, N.L.2026.xlsx';
 const DB_PATH = 'i:/APLICACIONES/SINDICATO/CREDENCIALES/database.sqlite';
-const FOTOS_DIR = 'I:/APLICACIONES/SINDICATO/CREDENCIALES/RECURSOS/FOTOS';
+const FOTOS_DIR = 'I:/APLICACIONES/SINDICATO/RECURSOS/FOTOS';
 
 const db = new Database(DB_PATH);
 
@@ -112,7 +112,7 @@ const insertMember = db.prepare(`
         department, secretariat, curp, rfc, birth_date, birth_place, age, gender, 
         address, colonia, municipio, cp, email, phone, 
         emergency_contact, emergency_phone, education, blood_type, 
-        marital_status, spouse_name, photo_url, join_date, alta_sindicato, fecha_baja, delegate, 
+        marital_status, spouse_name, photo_url, join_date, alta_sindicato, fecha_baja, delegate_name_legacy, 
         salary, bonos, bono_asistencia
     ) VALUES (
         ?, ?, ?, ?, ?, ?, ?, 
