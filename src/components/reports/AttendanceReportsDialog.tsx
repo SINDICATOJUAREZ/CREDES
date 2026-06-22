@@ -1,19 +1,20 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Search, Gift, ClipboardCheck, User as UserIcon, Plus, Trash2, Users, FileText, Eye, QrCode } from 'lucide-react';
+import { Search, Gift, ClipboardCheck, User as UserIcon, Plus, Trash2, Users, FileText, Eye, QrCode, ArrowLeft } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Member } from '@/types/member';
 import { toast } from 'sonner';
 import { QRScanner } from './QRScanner';
+import Link from 'next/link';
 
-interface Props { isOpen: boolean; onClose: () => void; initialTab?: TabType; }
+interface Props { isOpen?: boolean; onClose?: () => void; initialTab?: TabType; inline?: boolean; }
 type TabType = 'busqueda' | 'cumpleanos' | 'asistencia';
 interface AttRecord { id: string; name: string; date: string; created_at: string; }
 interface EventRecord { id: string; name: string; date: string; attendee_count: number; }
 
-export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqueda' }: Props) {
+export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, initialTab = 'busqueda', inline = false }: Props) {
   const [tab, setTab] = useState<TabType>(initialTab);
   
   useEffect(() => {
@@ -957,20 +958,26 @@ export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqued
     w.document.close();
   };
 
-  return (
-    <Dialog open={isOpen} onOpenChange={o => !o && onClose()}>
-      <DialogContent className="max-w-[95vw] md:max-w-6xl h-[90vh] md:h-[85vh] rounded-[2rem] border border-gray-200 shadow-2xl p-0 overflow-hidden bg-white flex flex-col-reverse md:flex-row">
-        {/* Sidebar / Bottom Nav on mobile */}
-        <div className="w-full md:w-64 bg-[#1E293B] flex flex-row md:flex-col shrink-0 text-white shadow-2xl z-20">
-          <div className="hidden md:flex p-6 flex-col gap-1 border-b border-white/5">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center p-1.5 backdrop-blur-sm border border-white/10">
-                <img src="/logos/logo.png" alt="" className="w-full h-full object-contain" />
-              </div>
-              <h2 className="text-xl font-black tracking-tighter uppercase italic">SICS</h2>
+  const reportsContent = (
+    <div className={inline ? "w-full bg-white border border-gray-200 shadow-xl rounded-[2rem] overflow-hidden flex flex-col-reverse md:flex-row h-[calc(100vh-140px)] min-h-[600px]" : "max-w-[95vw] md:max-w-6xl h-[90vh] md:h-[85vh] rounded-[2rem] border border-gray-200 shadow-2xl p-0 overflow-hidden bg-white flex flex-col-reverse md:flex-row"}>
+      {/* Sidebar / Bottom Nav on mobile */}
+      <div className="w-full md:w-64 bg-[#1E293B] flex flex-row md:flex-col shrink-0 text-white shadow-2xl z-20">
+        <div className="hidden md:flex p-6 flex-col gap-1 border-b border-white/5">
+          {inline && (
+            <Link href="/">
+              <Button variant="ghost" size="icon" className="rounded-full text-white hover:bg-white/10 hover:text-white mb-2 self-start -ml-2 h-9 w-9">
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+            </Link>
+          )}
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center p-1.5 backdrop-blur-sm border border-white/10">
+              <img src="/logos/logo.png" alt="" className="w-full h-full object-contain" />
             </div>
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest px-1">Gestión Integral SUTSMBJ</p>
+            <h2 className="text-xl font-black tracking-tighter uppercase italic">SICS</h2>
           </div>
+          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest px-1">Gestión Integral SUTSMBJ</p>
+        </div>
           <nav className="flex-1 px-2 py-2 md:mt-6 md:px-3 flex flex-row md:flex-col gap-2 justify-around md:justify-start overflow-x-auto">
             {([
               ['busqueda','Consultar',Search],
@@ -1042,6 +1049,16 @@ export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqued
 
         {/* Content */}
         <div className="flex-1 bg-white flex flex-col overflow-hidden relative min-h-0">
+          {inline && (
+            <div className="p-4 border-b border-gray-100 flex items-center md:hidden shrink-0">
+              <Link href="/">
+                <Button variant="ghost" size="icon" className="rounded-full text-slate-700 hover:bg-slate-100">
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+              </Link>
+              <span className="font-black text-slate-800 uppercase tracking-wider text-sm ml-2">Menú Principal</span>
+            </div>
+          )}
           <div className="absolute top-4 right-4 md:top-6 md:right-8 z-10 scale-75 md:scale-100 origin-top-right">
             <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100 shadow-sm">
               <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
@@ -1531,7 +1548,21 @@ export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqued
             </div>
           )}
         </div>
-      </DialogContent>
+      </div>
+    );
+
+  return (
+    <>
+      {inline ? (
+        reportsContent
+      ) : (
+        <Dialog open={isOpen} onOpenChange={o => !o && onClose()}>
+          <DialogContent showCloseButton={false} className="max-w-[95vw] md:max-w-6xl h-[90vh] md:h-[85vh] rounded-[2rem] border border-gray-200 shadow-2xl p-0 overflow-hidden bg-white flex flex-col-reverse md:flex-row">
+            {reportsContent}
+          </DialogContent>
+        </Dialog>
+      )}
+
       {showQR && (
         <QRScanner onScan={handleQRResult} onClose={() => setShowQR(false)} />
       )}
@@ -1598,6 +1629,6 @@ export function AttendanceReportsDialog({ isOpen, onClose, initialTab = 'busqued
           </DialogContent>
         </Dialog>
       )}
-    </Dialog>
+    </>
   );
 }

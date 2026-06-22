@@ -1,17 +1,19 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Users, X, Printer } from 'lucide-react';
+import { Users, X, Printer, ArrowLeft } from 'lucide-react';
 import { Member } from '@/types/member';
 import { generateResumePDF } from '@/lib/pdf-generator';
 import { Button } from "@/components/ui/button";
+import Link from 'next/link';
 
 interface Props {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  inline?: boolean;
 }
 
-export function PensionersDialog({ isOpen, onClose }: Props) {
+export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = false }: Props) {
   const [list, setList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedMemberForPreview, setSelectedMemberForPreview] = useState<any | null>(null);
@@ -127,11 +129,18 @@ export function PensionersDialog({ isOpen, onClose }: Props) {
     }
   };
 
-  return (
-    <Dialog open={isOpen} onOpenChange={o => !o && onClose()}>
-      <DialogContent className="max-w-[95vw] md:max-w-7xl h-[90vh] rounded-[2rem] md:rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-gray-50/98 backdrop-blur-xl flex flex-col">
-        {/* Header */}
-        <div className="px-5 py-5 md:px-10 md:py-8 bg-white border-b border-gray-100 flex justify-between items-center shrink-0">
+  const pensionersContent = (
+    <div className={inline ? "w-full bg-white border border-gray-100 shadow-xl rounded-[2rem] overflow-hidden flex flex-col h-[calc(100vh-140px)] min-h-[600px]" : "max-w-[95vw] md:max-w-7xl h-[90vh] rounded-[2rem] md:rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-gray-50/98 backdrop-blur-xl flex flex-col"}>
+      {/* Header */}
+      <div className="px-5 py-5 md:px-10 md:py-8 bg-white border-b border-gray-100 flex justify-between items-center shrink-0">
+        <div className="flex items-center gap-4 flex-1">
+          {inline && (
+            <Link href="/">
+              <Button variant="ghost" size="icon" className="rounded-full">
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+            </Link>
+          )}
           <div className="flex-1">
             <h2 className="text-2xl md:text-4xl font-black text-blue-900 uppercase tracking-tighter flex items-center gap-3 md:gap-4">
               <Users className="w-8 h-8 md:w-10 md:h-10 text-cyan-600 shrink-0" />
@@ -141,95 +150,111 @@ export function PensionersDialog({ isOpen, onClose }: Props) {
               Edad y Antigüedad (&gt;50 años / &gt;=15 años serv.) o por Incapacidad (&gt;=10 años serv.)
             </p>
           </div>
+        </div>
+        {!inline && (
           <button onClick={onClose} className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-2xl bg-gray-50 flex items-center justify-center hover:bg-red-50 hover:text-red-600 transition-all active:scale-95 ml-2 md:ml-0">
             <X className="w-5 h-5 md:w-6 md:h-6" />
           </button>
-        </div>
+        )}
+      </div>
 
-        {/* List Area */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-10 bg-gray-50/30 scrollbar-premium min-h-0">
-          <style jsx global>{`
-            .scrollbar-premium::-webkit-scrollbar {
-              width: 8px;
-            }
-            .scrollbar-premium::-webkit-scrollbar-track {
-              background: rgba(0,0,0,0.03);
-              border-radius: 10px;
-            }
-            .scrollbar-premium::-webkit-scrollbar-thumb {
-              background: rgba(0,0,0,0.1);
-              border-radius: 10px;
-              border: 2px solid transparent;
-              background-clip: padding-box;
-            }
-            .scrollbar-premium::-webkit-scrollbar-thumb:hover {
-              background: rgba(0,0,0,0.2);
-              border: 2px solid transparent;
-              background-clip: padding-box;
-            }
-          `}</style>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {list.map((m, i) => (
-              <div key={i} className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-xl hover:border-blue-200 transition-all duration-500">
-                {m.pensionType === 'INCAPACIDAD' ? (
-                  <div className="absolute top-0 left-0 px-4 py-2 rounded-br-3xl bg-amber-500 text-white text-[9px] font-black uppercase tracking-widest shadow-sm">
-                    Incapacidad
-                  </div>
-                ) : null}
-                
-                <div className={`absolute top-0 right-0 px-6 py-2 rounded-bl-3xl text-white text-[10px] font-black uppercase tracking-widest shadow-sm ${m.pensionPct === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`}>
-                  {m.pensionPct}% Pensión
+      {/* List Area */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-10 bg-gray-50/30 scrollbar-premium min-h-0">
+        <style jsx global>{`
+          .scrollbar-premium::-webkit-scrollbar {
+            width: 8px;
+          }
+          .scrollbar-premium::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.03);
+            border-radius: 10px;
+          }
+          .scrollbar-premium::-webkit-scrollbar-thumb {
+            background: rgba(0,0,0,0.1);
+            border-radius: 10px;
+            border: 2px solid transparent;
+            background-clip: padding-box;
+          }
+          .scrollbar-premium::-webkit-scrollbar-thumb:hover {
+            background: rgba(0,0,0,0.2);
+            border: 2px solid transparent;
+            background-clip: padding-box;
+          }
+        `}</style>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {list.map((m, i) => (
+            <div key={i} className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-xl hover:border-blue-200 transition-all duration-500">
+              {m.pensionType === 'INCAPACIDAD' ? (
+                <div className="absolute top-0 left-0 px-4 py-2 rounded-br-3xl bg-amber-500 text-white text-[9px] font-black uppercase tracking-widest shadow-sm">
+                  Incapacidad
                 </div>
-                
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-16 h-16 rounded-2xl border-2 border-gray-50 overflow-hidden shadow-inner bg-gray-50">
-                    {m.photoUrl ? <img src={m.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300 font-black text-xl">{m.fullName.charAt(0)}</div>}
-                  </div>
-                  <div className="min-w-0">
-                    <h4 className="font-black text-blue-900 uppercase text-sm truncate leading-tight mb-1">{m.fullName}</h4>
-                    <p className="text-[10px] text-blue-600 font-black uppercase tracking-widest italic">{m.position}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mb-2">
-                  <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100/50">
-                    <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest mb-1 text-center">Edad</p>
-                    <p className="text-xl font-black text-blue-900 text-center">{m.calculatedAge} <span className="text-[10px] opacity-50 uppercase">años</span></p>
-                  </div>
-                  <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100/50">
-                    <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest mb-1 text-center">Antigüedad</p>
-                    <p className="text-xl font-black text-blue-900 text-center">{m.calculatedYears} <span className="text-[10px] opacity-50 uppercase">años</span></p>
-                  </div>
-                </div>
-                
-                <div className="mt-4 pt-4 border-t border-dashed border-gray-100 flex justify-between items-center mb-4">
-                  <div className="flex flex-col">
-                    <span className="text-[9px] text-gray-400 font-black uppercase">Ingreso</span>
-                    <span className="text-[11px] text-slate-700 font-bold">{m.joinDate}</span>
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <span className="text-[9px] text-gray-400 font-black uppercase">Nómina</span>
-                    <span className="text-[11px] text-slate-700 font-bold">#{m.employeeId}</span>
-                  </div>
-                </div>
-
-                <button 
-                  onClick={() => setSelectedMemberForPreview(m)}
-                  className="w-full py-3 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-2xl font-black text-[10px] uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 group-hover:bg-blue-600 group-hover:text-white shadow-sm shadow-blue-100"
-                >
-                  <Printer className="w-4 h-4" />
-                  Previsualizar Expediente
-                </button>
+              ) : null}
+              
+              <div className={`absolute top-0 right-0 px-6 py-2 rounded-bl-3xl text-white text-[10px] font-black uppercase tracking-widest shadow-sm ${m.pensionPct === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`}>
+                {m.pensionPct}% Pensión
               </div>
-            ))}
-            {list.length === 0 && (
-              <div className="col-span-full py-20 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
-                <p className="text-gray-400 font-black uppercase tracking-widest italic">No se encontraron miembros elegibles para pensión próxima</p>
+              
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 rounded-2xl border-2 border-gray-50 overflow-hidden shadow-inner bg-gray-50">
+                  {m.photoUrl ? <img src={m.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300 font-black text-xl">{m.fullName.charAt(0)}</div>}
+                </div>
+                <div className="min-w-0">
+                  <h4 className="font-black text-blue-900 uppercase text-sm truncate leading-tight mb-1">{m.fullName}</h4>
+                  <p className="text-[10px] text-blue-600 font-black uppercase tracking-widest italic">{m.position}</p>
+                </div>
               </div>
-            )}
-          </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-2">
+                <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100/50">
+                  <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest mb-1 text-center">Edad</p>
+                  <p className="text-xl font-black text-blue-900 text-center">{m.calculatedAge} <span className="text-[10px] opacity-50 uppercase">años</span></p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100/50">
+                  <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest mb-1 text-center">Antigüedad</p>
+                  <p className="text-xl font-black text-blue-900 text-center">{m.calculatedYears} <span className="text-[10px] opacity-50 uppercase">años</span></p>
+                </div>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-dashed border-gray-100 flex justify-between items-center mb-4">
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-gray-400 font-black uppercase">Ingreso</span>
+                  <span className="text-[11px] text-slate-700 font-bold">{m.joinDate}</span>
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="text-[9px] text-gray-400 font-black uppercase">Nómina</span>
+                  <span className="text-[11px] text-slate-700 font-bold">#{m.employeeId}</span>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setSelectedMemberForPreview(m)}
+                className="w-full py-3 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-2xl font-black text-[10px] uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 group-hover:bg-blue-600 group-hover:text-white shadow-sm shadow-blue-100"
+              >
+                <Printer className="w-4 h-4" />
+                Previsualizar Expediente
+              </button>
+            </div>
+          ))}
+          {list.length === 0 && (
+            <div className="col-span-full py-20 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
+              <p className="text-gray-400 font-black uppercase tracking-widest italic">No se encontraron miembros elegibles para pensión próxima</p>
+            </div>
+          )}
         </div>
-      </DialogContent>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {inline ? (
+        pensionersContent
+      ) : (
+        <Dialog open={isOpen} onOpenChange={o => !o && onClose()}>
+          <DialogContent showCloseButton={false} className="max-w-[95vw] md:max-w-7xl h-[90vh] rounded-[2rem] md:rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-gray-50/98 backdrop-blur-xl flex flex-col">
+            {pensionersContent}
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Real-time Expediente Preview Dialog */}
       <Dialog open={selectedMemberForPreview !== null} onOpenChange={o => !o && setSelectedMemberForPreview(null)}>
@@ -374,6 +399,6 @@ export function PensionersDialog({ isOpen, onClose }: Props) {
           </div>
         </DialogContent>
       </Dialog>
-    </Dialog>
+    </>
   );
 }

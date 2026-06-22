@@ -58,6 +58,7 @@ export const SystemSettingsDialog: React.FC<SystemSettingsDialogProps> = ({ isOp
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent 
+        showCloseButton={false}
         className="max-w-[95vw] md:max-w-[1400px] h-[90vh] rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden bg-white flex flex-col"
       >
         <div className="flex h-full w-full min-h-0">
