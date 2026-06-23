@@ -102,6 +102,7 @@ export interface Role {
   can_create_member: boolean;
   can_search_member: boolean;
   can_view_reports: boolean;
+  can_view_member_reports: boolean;
   can_view_pensioners: boolean;
   can_access_settings: boolean;
   userCount?: number;

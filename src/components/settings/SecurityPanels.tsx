@@ -146,6 +146,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   can_create_member: 'Crear Agremiado',
   can_search_member: 'Buscar Agremiado',
   can_view_reports: 'Reportes de Asistencia',
+  can_view_member_reports: 'Reportes de Agremiados',
   can_view_pensioners: 'Futuros Pensionados',
   can_access_settings: 'Configuración',
 };
@@ -155,7 +156,7 @@ export const RolesPanel: React.FC = () => {
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
-  const emptyRole: Role = { id: '', name: '', description: '', can_create_member: false, can_search_member: false, can_view_reports: false, can_view_pensioners: false, can_access_settings: false };
+  const emptyRole: Role = { id: '', name: '', description: '', can_create_member: false, can_search_member: false, can_view_reports: false, can_view_member_reports: false, can_view_pensioners: false, can_access_settings: false };
 
   const fetchRoles = async () => {
     const res = await fetch('/api/settings/roles');

@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS roles (
     can_create_member INTEGER DEFAULT 0,
     can_search_member INTEGER DEFAULT 0,
     can_view_reports INTEGER DEFAULT 0,
+    can_view_member_reports INTEGER DEFAULT 0,
     can_view_pensioners INTEGER DEFAULT 0,
     can_access_settings INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -158,12 +159,12 @@ CREATE TABLE IF NOT EXISTS audit_log (
 -- =============================================
 -- Datos Iniciales: Roles por defecto
 -- =============================================
-INSERT OR IGNORE INTO roles (id, name, description, can_create_member, can_search_member, can_view_reports, can_view_pensioners, can_access_settings)
+INSERT OR IGNORE INTO roles (id, name, description, can_create_member, can_search_member, can_view_reports, can_view_member_reports, can_view_pensioners, can_access_settings)
 VALUES
-  ('role-master', 'MASTER', 'Administrador Supremo', 1, 1, 1, 1, 1),
-  ('role-admin', 'ADMINISTRADOR', 'Alta, baja y modificaciones', 1, 1, 1, 1, 0),
-  ('role-capturista', 'CAPTURISTA', 'Permisos de Alta y Edición', 1, 1, 0, 0, 0),
-  ('role-consulta', 'CONSULTA', 'Solo lectura', 0, 1, 1, 1, 0);
+  ('role-master', 'MASTER', 'Administrador Supremo', 1, 1, 1, 1, 1, 1),
+  ('role-admin', 'ADMINISTRADOR', 'Alta, baja y modificaciones', 1, 1, 1, 1, 1, 0),
+  ('role-capturista', 'CAPTURISTA', 'Permisos de Alta y Edición', 1, 1, 0, 0, 0, 0),
+  ('role-consulta', 'CONSULTA', 'Solo lectura', 0, 1, 1, 1, 1, 0);
 
 -- =============================================
 -- Datos Iniciales: Usuario MASTER por defecto
