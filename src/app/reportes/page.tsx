@@ -80,6 +80,12 @@ export default function ReportesAgremiadosPage() {
     if (selectedReport && selectedReport.id !== 'ALL') {
       base = base.filter(m => m.memberType === selectedReport.id);
     }
+    if (selectedReport && (selectedReport.id === 'ACTIVO' || selectedReport.id === 'DELEGADO' || selectedReport.id === 'ESPERA' || selectedReport.id === 'PENSIONADO')) {
+      base = base.filter(m => {
+        const status = (m.status || '').toUpperCase().trim();
+        return status !== 'BAJA' && status !== 'FINADO';
+      });
+    }
     const depts = base.map(m => m.department?.trim()).filter(Boolean);
     return Array.from(new Set(depts)).sort() as string[];
   };
@@ -89,6 +95,12 @@ export default function ReportesAgremiadosPage() {
     let base = membersCache;
     if (selectedReport && selectedReport.id !== 'ALL') {
       base = base.filter(m => m.memberType === selectedReport.id);
+    }
+    if (selectedReport && (selectedReport.id === 'ACTIVO' || selectedReport.id === 'DELEGADO' || selectedReport.id === 'ESPERA' || selectedReport.id === 'PENSIONADO')) {
+      base = base.filter(m => {
+        const status = (m.status || '').toUpperCase().trim();
+        return status !== 'BAJA' && status !== 'FINADO';
+      });
     }
     if (dept !== 'ALL') {
       base = base.filter(m => m.department === dept);
@@ -156,6 +168,14 @@ export default function ReportesAgremiadosPage() {
         } else {
           fetchedData = data || [];
         }
+
+        // Exclude members whose status is 'BAJA' or 'FINADO' from active lists
+        if (reportId === 'ACTIVO' || reportId === 'DELEGADO' || reportId === 'ESPERA' || reportId === 'PENSIONADO') {
+          fetchedData = fetchedData.filter((m: any) => {
+            const status = (m.status || '').toUpperCase().trim();
+            return status !== 'BAJA' && status !== 'FINADO';
+          });
+        }
       }
 
       // Initialize selection with all matching item IDs
@@ -208,6 +228,14 @@ export default function ReportesAgremiadosPage() {
       // Base type filter
       if (selectedReport.id !== 'ALL') {
         base = base.filter(m => m.memberType === selectedReport.id);
+      }
+
+      // Exclude members whose status is 'BAJA' or 'FINADO' from active lists
+      if (selectedReport.id === 'ACTIVO' || selectedReport.id === 'DELEGADO' || selectedReport.id === 'ESPERA' || selectedReport.id === 'PENSIONADO') {
+        base = base.filter((m: any) => {
+          const status = (m.status || '').toUpperCase().trim();
+          return status !== 'BAJA' && status !== 'FINADO';
+        });
       }
 
       // Search query (Nómina or Nombre)
