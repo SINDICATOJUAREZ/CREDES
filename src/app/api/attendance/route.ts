@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { isProduction, sSelect, sSelectOne, sInsert, sUpdate, sDelete } from '@/lib/supabase';
 import { MEMBER_MAPPING, mapToFrontend } from '@/lib/db-utils';
+import { hasPermission } from '@/lib/auth-utils';
 
 function extractEmployeeId(text: string): string | null {
   if (!text) return null;
@@ -20,6 +21,9 @@ function extractEmployeeId(text: string): string | null {
 
 
 export async function GET(request: Request) {
+  if (!await hasPermission('canViewReports')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const { searchParams } = new URL(request.url);
     const employeeId = searchParams.get('employeeId');
@@ -125,6 +129,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!await hasPermission('canViewReports')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const data = await request.json();
 

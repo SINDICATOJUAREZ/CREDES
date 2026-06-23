@@ -21,6 +21,7 @@ export async function GET() {
         email: payload.email,
         fullName: payload.fullName,
         role: payload.role,
+        permissions: payload.permissions || {},
       }
     });
   } catch (error) {

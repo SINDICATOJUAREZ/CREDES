@@ -2,8 +2,12 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { MEMBER_MAPPING, mapToFrontend, generateInsert, generateUpdate } from '@/lib/db-utils';
 import { isProduction, sSelect, sSelectCount, sInsert, sUpdate, sDelete } from '@/lib/supabase';
+import { hasPermission } from '@/lib/auth-utils';
 
 export async function GET(request: Request) {
+  if (!await hasPermission('canSearchMember') && !await hasPermission('canViewPensioners') && !await hasPermission('canViewMemberReports')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
@@ -98,6 +102,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!await hasPermission('canCreateMember')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const data = await request.json();
     const id = data.id || crypto.randomUUID();
@@ -142,6 +149,9 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  if (!await hasPermission('canCreateMember')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const data = await request.json();
     if (!data.id) throw new Error('ID is required');
@@ -187,6 +197,9 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  if (!await hasPermission('canCreateMember')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

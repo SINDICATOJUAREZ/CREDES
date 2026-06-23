@@ -18,9 +18,11 @@ interface MemberTableProps {
   onView: (member: Member) => void;
   onEdit: (member: Member) => void;
   onDelete: (id: string) => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
-export const MemberTable: React.FC<MemberTableProps> = ({ members, onView, onEdit, onDelete }) => {
+export const MemberTable: React.FC<MemberTableProps> = ({ members, onView, onEdit, onDelete, canEdit = true, canDelete = true }) => {
   return (
     <div className="space-y-8 h-full flex flex-col">
       <div className="rounded-[2rem] border border-gray-100 bg-white overflow-auto shadow-xl shadow-gray-200/50 flex-1">
@@ -41,7 +43,7 @@ export const MemberTable: React.FC<MemberTableProps> = ({ members, onView, onEdi
                 <TableRow 
                   key={member.id} 
                   className="hover:bg-blue-50/50 transition-all border-b border-gray-50 cursor-pointer group"
-                  onClick={() => onEdit(member)}
+                  onClick={() => canEdit ? onEdit(member) : onView(member)}
                 >
                   <TableCell className="py-3 px-4">
                     {member.photoUrl ? (
@@ -110,12 +112,16 @@ export const MemberTable: React.FC<MemberTableProps> = ({ members, onView, onEdi
                       <Button variant="outline" size="sm" className="h-9 px-3 rounded-xl border-gray-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all font-bold gap-2" onClick={(e) => { e.stopPropagation(); onView(member); }}>
                         <Eye className="w-4 h-4" /> <span className="hidden sm:inline">Ver</span>
                       </Button>
-                      <Button variant="outline" size="sm" className="h-9 px-3 rounded-xl border-gray-200 hover:bg-gray-50 transition-all font-bold" onClick={(e) => { e.stopPropagation(); onEdit(member); }}>
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" className="h-9 px-3 rounded-xl border-red-50 hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all font-bold" onClick={(e) => { e.stopPropagation(); onDelete(member.id); }}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {canEdit && (
+                        <Button variant="outline" size="sm" className="h-9 px-3 rounded-xl border-gray-200 hover:bg-gray-50 transition-all font-bold" onClick={(e) => { e.stopPropagation(); onEdit(member); }}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button variant="outline" size="sm" className="h-9 px-3 rounded-xl border-red-50 hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all font-bold" onClick={(e) => { e.stopPropagation(); onDelete(member.id); }}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

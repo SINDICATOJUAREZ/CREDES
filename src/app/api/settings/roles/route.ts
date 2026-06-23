@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { isProduction, sSelect, sInsert, sUpdate, sDelete } from '@/lib/supabase';
+import { hasPermission } from '@/lib/auth-utils';
 
 export async function GET() {
+  if (!await hasPermission('canAccessSettings')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     if (isProduction) {
       const roles = await sSelect('roles', 'order=name');
@@ -25,6 +29,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!await hasPermission('canAccessSettings')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const data = await request.json();
     const id = `role-${crypto.randomUUID().substring(0, 8)}`;
@@ -44,6 +51,9 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  if (!await hasPermission('canAccessSettings')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const data = await request.json();
     if (isProduction) {
@@ -62,6 +72,9 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  if (!await hasPermission('canAccessSettings')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

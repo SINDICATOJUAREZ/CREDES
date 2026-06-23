@@ -21,7 +21,11 @@ export default function Home() {
   const router = useRouter();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [user, setUser] = useState<{ fullName: string; role: string } | null>(null);
+  const [user, setUser] = useState<{ 
+    fullName: string; 
+    role: string; 
+    permissions?: Record<string, boolean>;
+  } | null>(null);
 
   // States for unified modal windows
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -85,37 +89,48 @@ export default function Home() {
       description: 'Registra un nuevo miembro en el sistema y captura su fotografía.',
       icon: Plus, 
       color: 'from-blue-500 to-blue-600',
-      action: () => setIsFormOpen(true)
+      action: () => setIsFormOpen(true),
+      permission: 'canCreateMember'
     },
     { 
       title: 'Buscar agremiado', 
       description: 'Consulta el padrón completo, edita datos e imprime credenciales.',
       icon: Search, 
       color: 'from-indigo-500 to-indigo-600',
-      action: () => setIsSearchOpen(true)
+      action: () => setIsSearchOpen(true),
+      permission: 'canSearchMember'
     },
     { 
       title: 'Reportes de asistencia', 
       description: 'Consulta listas de asistencia por eventos, cumpleaños y firmas.',
       icon: FileText, 
       color: 'from-sky-500 to-sky-600',
-      action: () => setIsAttendanceOpen(true)
+      action: () => setIsAttendanceOpen(true),
+      permission: 'canViewReports'
     },
     { 
       title: 'Reportes de agremiados', 
       description: 'Genera reportes personalizados de padrones y exporta en PDF/Excel.',
       icon: Award, 
       color: 'from-violet-500 to-violet-600',
-      action: () => setIsReportsOpen(true)
+      action: () => setIsReportsOpen(true),
+      permission: 'canViewMemberReports'
     },
     { 
       title: 'Futuros pensionados', 
       description: 'Administra y proyecta los agremiados próximos a jubilarse.',
       icon: Users, 
       color: 'from-cyan-500 to-cyan-600',
-      action: () => setIsPensionersOpen(true)
+      action: () => setIsPensionersOpen(true),
+      permission: 'canViewPensioners'
     }
   ];
+
+  const visibleMenuItems = MENU_ITEMS.filter(item => {
+    if (!user) return false;
+    if (user.role === 'MASTER') return true;
+    return !!user.permissions?.[item.permission];
+  });
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -214,7 +229,7 @@ export default function Home() {
           animate="show"
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 w-full mb-12"
         >
-          {MENU_ITEMS.map((item) => {
+          {visibleMenuItems.map((item) => {
             const CardContent = (
               <div className="flex flex-col items-center justify-center p-6 h-full text-center gap-4 relative">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-200 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>

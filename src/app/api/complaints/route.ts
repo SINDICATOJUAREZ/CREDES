@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { isProduction, sSelect, sSelectOne, sInsert, sUpdate, sDelete } from '@/lib/supabase';
+import { hasPermission } from '@/lib/auth-utils';
 
 // Helper to initialize table in local SQLite
 async function initSQLiteTable() {
@@ -23,6 +24,9 @@ async function initSQLiteTable() {
 }
 
 export async function GET(request: Request) {
+  if (!await hasPermission('canSearchMember') && !await hasPermission('canViewReports')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const { searchParams } = new URL(request.url);
     const employeeId = searchParams.get('employeeId');
@@ -91,6 +95,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!await hasPermission('canViewReports') && !await hasPermission('canCreateMember')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const data = await request.json();
     const { id, employeeId, reportDate, description, followUp } = data;
@@ -149,6 +156,9 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  if (!await hasPermission('canViewReports') && !await hasPermission('canCreateMember')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

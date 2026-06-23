@@ -21,6 +21,18 @@ export function MemberDirectoryPanel({ inline = false, onClose = () => {} }: { i
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | undefined>(undefined);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const localUser = localStorage.getItem('user');
+    if (localUser) {
+      try {
+        setUser(JSON.parse(localUser));
+      } catch (e) {}
+    }
+  }, []);
+
+  const canCreate = user?.role === 'MASTER' || !!user?.permissions?.canCreateMember;
 
   // Debounce search
   useEffect(() => {
@@ -95,12 +107,14 @@ export function MemberDirectoryPanel({ inline = false, onClose = () => {} }: { i
             Directorio de Agremiados
           </h1>
         </div>
-        <Button 
-          onClick={() => { setEditingMember(undefined); setIsFormOpen(true); }}
-          className="bg-blue-600 hover:bg-blue-700 rounded-full font-bold px-6"
-        >
-          NUEVO AGREMIADO
-        </Button>
+        {canCreate && (
+          <Button 
+            onClick={() => { setEditingMember(undefined); setIsFormOpen(true); }}
+            className="bg-blue-600 hover:bg-blue-700 rounded-full font-bold px-6"
+          >
+            NUEVO AGREMIADO
+          </Button>
+        )}
       </div>
 
       {/* Main Content */}
@@ -128,6 +142,8 @@ export function MemberDirectoryPanel({ inline = false, onClose = () => {} }: { i
               onView={(m) => generateResumePDF(m)} 
               onEdit={(m) => { setEditingMember(m); setIsFormOpen(true); }} 
               onDelete={handleDeleteMember}
+              canEdit={canCreate}
+              canDelete={canCreate}
             />
           )}
 

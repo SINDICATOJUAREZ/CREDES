@@ -2,8 +2,12 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { isProduction, sSelect, sSelectOne, sInsert, sUpdate, sDelete } from '@/lib/supabase';
+import { hasPermission } from '@/lib/auth-utils';
 
 export async function GET() {
+  if (!await hasPermission('canAccessSettings')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     if (isProduction) {
       const users = await sSelect('users', 'select=id,full_name,email,role_id,is_active,last_login,created_at,roles!role_id(name,description)&order=full_name');
@@ -23,6 +27,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!await hasPermission('canAccessSettings')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const data = await request.json();
     const id = `user-${crypto.randomUUID().substring(0, 8)}`;
@@ -50,6 +57,9 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  if (!await hasPermission('canAccessSettings')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const data = await request.json();
     if (isProduction) {
@@ -79,6 +89,9 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  if (!await hasPermission('canAccessSettings')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
