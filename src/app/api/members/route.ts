@@ -5,7 +5,12 @@ import { isProduction, sSelect, sSelectCount, sInsert, sUpdate, sDelete } from '
 import { hasPermission } from '@/lib/auth-utils';
 
 export async function GET(request: Request) {
-  if (!await hasPermission('canSearchMember') && !await hasPermission('canViewPensioners') && !await hasPermission('canViewMemberReports')) {
+  if (
+    !await hasPermission('canSearchMember') && 
+    !await hasPermission('canViewPensioners') && 
+    !await hasPermission('canViewMemberReports') &&
+    !await hasPermission('canViewReports')
+  ) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
   try {
