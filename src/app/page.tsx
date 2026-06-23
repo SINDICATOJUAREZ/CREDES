@@ -1,15 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Member } from '@/types/member';
 import { Button } from "@/components/ui/button";
-import { Plus, Search, FileText, Users, LogOut, Award } from 'lucide-react';
+import { Plus, Search, FileText, Users, LogOut, Award, Settings } from 'lucide-react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Toaster, toast } from 'sonner';
 import { MemberForm } from '@/components/members/MemberForm';
 import { SystemSettingsDialog } from '@/components/members/SystemSettingsDialog';
 import { motion } from 'framer-motion';
-import { Settings } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -17,6 +16,35 @@ export default function Home() {
   const router = useRouter();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [user, setUser] = useState<{ fullName: string; role: string } | null>(null);
+
+  useEffect(() => {
+    // 1. Instant loading from localStorage
+    const localUser = localStorage.getItem('user');
+    if (localUser) {
+      try {
+        setUser(JSON.parse(localUser));
+      } catch (e) {}
+    }
+
+    // 2. Fetch fresh session from server
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.user) {
+          setUser(data.user);
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 6 && hour < 12) return 'Buenos días';
+    if (hour >= 12 && hour < 19) return 'Buenas tardes';
+    return 'Buenas noches';
+  };
 
   const handleFormSubmit = async (data: Member) => {
     try {
@@ -30,11 +58,63 @@ export default function Home() {
       
       toast.success('Agremiado registrado');
       setIsFormOpen(false);
-      // Optional: Navigate to search to see the new member
       router.push('/agremiados');
     } catch (error) {
       toast.error('Error al guardar los cambios');
     }
+  };
+
+  const MENU_ITEMS = [
+    { 
+      title: 'Crear agremiado', 
+      description: 'Registra un nuevo miembro en el sistema y captura su fotografía.',
+      icon: Plus, 
+      color: 'from-blue-500 to-blue-600',
+      action: () => setIsFormOpen(true)
+    },
+    { 
+      title: 'Buscar agremiado', 
+      description: 'Consulta el padrón completo, edita datos e imprime credenciales.',
+      icon: Search, 
+      color: 'from-indigo-500 to-indigo-600',
+      href: '/agremiados'
+    },
+    { 
+      title: 'Reportes de asistencia', 
+      description: 'Consulta listas de asistencia por eventos, cumpleaños y firmas.',
+      icon: FileText, 
+      color: 'from-sky-500 to-sky-600',
+      href: '/asistencias'
+    },
+    { 
+      title: 'Reportes de agremiados', 
+      description: 'Genera reportes personalizados de padrones y exporta en PDF/Excel.',
+      icon: Award, 
+      color: 'from-violet-500 to-violet-600',
+      href: '/reportes'
+    },
+    { 
+      title: 'Futuros pensionados', 
+      description: 'Administra y proyecta los agremiados próximos a jubilarse.',
+      icon: Users, 
+      color: 'from-cyan-500 to-cyan-600',
+      href: '/pensionados'
+    }
+  ];
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.08
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 300, damping: 24 } }
   };
 
   return (
@@ -49,96 +129,123 @@ export default function Home() {
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-4 mb-4"
+          className="mt-6 mb-4"
         >
-          <img src="/logos/logo2.png" alt="SUTSMBJ Logo" className="h-48 w-auto drop-shadow-2xl" />
+          <img src="/logos/logo2.png" alt="SUTSMBJ Logo" className="h-36 w-auto object-contain drop-shadow-xl" />
         </motion.div>
 
         {/* SYSTEM NAME */}
-        <div className="text-center mb-10 px-4">
+        <div className="text-center mb-8 px-4">
           <h1 className="text-4xl font-black text-blue-900 tracking-tight leading-tight">SICSUTSMBJ</h1>
-          <p className="text-lg font-bold text-gray-600 mt-2 max-w-3xl mx-auto">
+          <p className="text-base font-bold text-gray-500 mt-2 max-w-3xl mx-auto">
             Sistema Integral de Credencialización Del Sindicato Único de Trabajadores al Servicio del Municipio de Benito Juárez Nuevo León.
           </p>
         </div>
 
+        {/* USER WELCOME & SESSION PANEL */}
+        {user && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="w-full flex flex-col sm:flex-row items-center justify-between p-6 bg-gray-50 border border-gray-100 rounded-3xl mb-8 gap-4 shadow-sm"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-blue-900 text-white flex items-center justify-center font-black text-xl shadow-md">
+                {user.fullName.charAt(0).toUpperCase()}
+              </div>
+              <div className="text-center sm:text-left">
+                <p className="text-xs font-semibold text-gray-400">{getGreeting()},</p>
+                <h2 className="text-lg font-black text-gray-800 uppercase tracking-tight">{user.fullName}</h2>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className={`text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full shadow-sm border ${
+                user.role === 'MASTER' 
+                  ? 'bg-red-50 text-red-700 border-red-200' 
+                  : user.role === 'ADMINISTRADOR' 
+                    ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                    : 'bg-blue-50 text-blue-700 border-blue-200'
+              }`}>
+                {user.role}
+              </span>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={() => setIsSettingsOpen(true)}
+                className="w-10 h-10 rounded-xl border-gray-200 bg-white shadow-sm hover:bg-blue-50 hover:border-blue-200 text-gray-500 hover:text-blue-600 transition-all active:scale-95 group"
+                title="Configuración del Sistema"
+              >
+                <Settings className="w-5 h-5 group-hover:rotate-45 transition-transform" />
+              </Button>
+              <button
+                onClick={async () => {
+                  try {
+                    localStorage.removeItem('user');
+                    await fetch('/api/auth/logout', { method: 'POST' });
+                    window.location.href = '/login';
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }}
+                className="flex items-center justify-center w-10 h-10 rounded-xl border border-gray-200 bg-white shadow-sm hover:bg-red-50 hover:border-red-200 text-gray-500 hover:text-red-600 transition-all active:scale-95 group"
+                title="Cerrar sesión"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+
         {/* MAIN BUTTONS GRID */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 w-full mb-12">
-          {[
-            { 
-              title: 'Crear agremiado', 
-              icon: Plus, 
-              color: 'bg-blue-600',
-              action: () => setIsFormOpen(true)
-            },
-            { 
-              title: 'Buscar agremiado', 
-              icon: Search, 
-              color: 'bg-indigo-600',
-              href: '/agremiados'
-            },
-            { 
-              title: 'Reportes de asistencia', 
-              icon: FileText, 
-              color: 'bg-blue-500',
-              href: '/asistencias'
-            },
-            { 
-              title: 'Reportes de agremiados', 
-              icon: Award, 
-              color: 'bg-violet-600',
-              href: '/reportes'
-            },
-            { 
-              title: 'Futuros pensionados', 
-              icon: Users, 
-              color: 'bg-cyan-600',
-              href: '/pensionados'
-            }
-          ].map((item, i) => {
-            const ButtonContent = (
-              <>
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 w-full mb-12"
+        >
+          {MENU_ITEMS.map((item) => {
+            const CardContent = (
+              <div className="flex flex-col items-center justify-center p-6 h-full text-center gap-4 relative">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-200 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <div className={`${item.color} w-16 h-16 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200 group-hover:scale-110 group-hover:rotate-3 transition-all`}>
-                  <item.icon className="w-8 h-8" />
+                <div className={`bg-gradient-to-br ${item.color} w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-100 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
+                  <item.icon className="w-7 h-7" />
                 </div>
-                <h3 className="text-lg font-black text-gray-800 px-4 text-center leading-tight uppercase tracking-wide">
-                  {item.title}
-                </h3>
-              </>
+                <div className="flex flex-col gap-2 flex-1 justify-center">
+                  <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide leading-tight group-hover:text-blue-900 transition-colors">
+                    {item.title}
+                  </h3>
+                  <p className="text-[11px] font-medium text-gray-400 leading-normal line-clamp-3">
+                    {item.description}
+                  </p>
+                </div>
+              </div>
             );
 
+            const cardClasses = "group relative h-56 bg-white border border-gray-100 shadow-xl shadow-gray-200/40 rounded-[2rem] flex flex-col transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:border-blue-100 active:scale-95 overflow-hidden cursor-pointer w-full text-left";
+
             return item.href ? (
-              <Link href={item.href} key={item.title} className="group relative h-48 bg-white border border-gray-100 shadow-xl shadow-gray-200/40 rounded-3xl flex flex-col items-center justify-center gap-4 transition-all hover:-translate-y-2 hover:shadow-2xl hover:border-blue-100 active:scale-95 overflow-hidden">
-                {ButtonContent}
-              </Link>
+              <motion.div key={item.title} variants={itemVariants} className="w-full">
+                <Link href={item.href} className={cardClasses}>
+                  {CardContent}
+                </Link>
+              </motion.div>
             ) : (
-              <button
-                key={item.title}
-                onClick={item.action}
-                className="group relative h-48 bg-white border border-gray-100 shadow-xl shadow-gray-200/40 rounded-3xl flex flex-col items-center justify-center gap-4 transition-all hover:-translate-y-2 hover:shadow-2xl hover:border-blue-100 active:scale-95 overflow-hidden"
-              >
-                {ButtonContent}
-              </button>
+              <motion.div key={item.title} variants={itemVariants} className="w-full">
+                <button
+                  onClick={item.action}
+                  className={cardClasses}
+                >
+                  {CardContent}
+                </button>
+              </motion.div>
             );
           })}
-        </div>
+        </motion.div>
 
         <div className="mt-auto pb-8 opacity-20">
           <img src="/logos/logo.png" alt="SUTSMBJ Logo" className="h-12 grayscale" />
         </div>
-      </div>
-
-      {/* GEAR BUTTON FOR CAMERA SETTINGS */}
-      <div className="fixed bottom-8 left-8">
-        <Button 
-          variant="outline" 
-          size="icon" 
-          onClick={() => setIsSettingsOpen(true)}
-          className="w-14 h-14 rounded-2xl border-gray-200 bg-white shadow-xl hover:bg-blue-50 hover:border-blue-200 text-gray-400 hover:text-blue-600 transition-all active:scale-95 group"
-        >
-          <Settings className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500" />
-        </Button>
       </div>
 
       <SystemSettingsDialog isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />

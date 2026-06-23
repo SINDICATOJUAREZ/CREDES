@@ -29,6 +29,7 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok) {
+        localStorage.setItem('user', JSON.stringify(data.user));
         toast.success(`Bienvenido, ${data.user.fullName}`);
         router.push('/');
         router.refresh();
