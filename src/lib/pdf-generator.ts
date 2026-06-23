@@ -137,11 +137,13 @@ export const generateVectorialCredentialPDF = async (member: Member, config: Cre
     const y = el.y;
 
     if (el.type === 'qr') {
-      const qrData = [
-        `NOMBRE: ${member.fullName}`,
-        `NÓMINA: ${member.employeeId}`,
-        `PUESTO: ${member.position || ''}`
-      ].join('\n');
+      const qrData = member.legacyQrData 
+        ? member.legacyQrData 
+        : [
+            `NOMBRE: ${member.fullName}`,
+            `NÓMINA: ${member.employeeId}`,
+            `PUESTO: ${member.position || ''}`
+          ].join('\n');
       const qrBase64 = await QRCode.toDataURL(qrData, { margin: 1, errorCorrectionLevel: 'H' });
       pdf.addImage(qrBase64, 'PNG', x, y, el.w || 20, el.h || 20);
       continue;

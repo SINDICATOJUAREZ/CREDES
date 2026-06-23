@@ -88,6 +88,7 @@ export interface Member {
   
   // App specific
   qrData?: string;
+  legacyQrData?: string;
   expiryDate?: string;
 }
 

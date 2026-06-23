@@ -41,6 +41,7 @@ export const MEMBER_MAPPING: Record<string, string> = {
   salary: 'salary',
   bonos: 'bonos',
   bono_asistencia: 'bonoAsistencia',
+  legacy_qr_data: 'legacyQrData',
   last_updated: 'lastUpdated'
 };
 

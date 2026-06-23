@@ -6,7 +6,8 @@ import { Member, Delegate } from '@/types/member';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, Users, Briefcase, User, Phone, DollarSign, Star, Award, Printer } from 'lucide-react';
+import { Plus, Trash2, Users, Briefcase, User, Phone, DollarSign, Star, Award, Printer, HelpCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { motion } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCredentialConfig } from '@/hooks/useCredentialConfig';
@@ -25,6 +26,8 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
   const { config } = useCredentialConfig();
   const [isPrinting, setIsPrinting] = useState(false);
   const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
+  const [showQRUpdateDialog, setShowQRUpdateDialog] = useState(false);
+  const [pendingPrintFn, setPendingPrintFn] = useState<((update: boolean) => Promise<void>) | null>(null);
   
   const { register, control, handleSubmit, reset, watch, setValue, getValues } = useForm<Member>({
     defaultValues: initialData || {
@@ -425,9 +428,36 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
             <Button 
               type="button" 
               onClick={async () => {
-                setIsPrinting(true);
-                await generateVectorialCredentialPDF(watch(), config, `Credencial_${watch('fullName')}`);
-                setIsPrinting(false);
+                const legacyQr = watch('legacyQrData');
+                const printFn = async (updateQr: boolean) => {
+                  setIsPrinting(true);
+                  let memberData = watch();
+                  if (updateQr) {
+                    setValue('legacyQrData', undefined);
+                    memberData = { ...memberData, legacyQrData: undefined };
+                    try {
+                      await fetch('/api/members', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(memberData)
+                      });
+                      import('sonner').then(({ toast }) => toast.success('Código QR actualizado a la nueva versión'));
+                    } catch (e) {
+                      console.error('Error updating member QR:', e);
+                    }
+                  }
+                  await generateVectorialCredentialPDF(memberData, config, `Credencial_${watch('fullName')}`);
+                  setIsPrinting(false);
+                };
+
+                if (legacyQr) {
+                  setPendingPrintFn(() => printFn);
+                  setShowQRUpdateDialog(true);
+                } else {
+                  setIsPrinting(true);
+                  await generateVectorialCredentialPDF(watch(), config, `Credencial_${watch('fullName')}`);
+                  setIsPrinting(false);
+                }
               }}
               className="bg-amber-500 hover:bg-amber-600 text-white font-black px-8 h-14 rounded-2xl shadow-xl transition-all active:scale-95 uppercase tracking-widest text-xs flex gap-2"
             >
@@ -469,6 +499,73 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
         onPhotoCapture={(url) => setValue('photoUrl', url)} 
         currentPhoto={watch('photoUrl')}
       />
+
+      {/* Dialogo de Confirmacion de QR Historico */}
+      <Dialog open={showQRUpdateDialog} onOpenChange={setShowQRUpdateDialog}>
+        <DialogContent className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-6 bg-white">
+          <DialogHeader className="flex flex-col items-center text-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+              <HelpCircle className="w-10 h-10 animate-bounce" />
+            </div>
+            <DialogTitle className="text-2xl font-black text-blue-900 uppercase tracking-tight">
+              Código QR Existente Detectado
+            </DialogTitle>
+            <DialogDescription className="text-sm font-semibold text-gray-500 leading-relaxed">
+              Este agremiado cuenta con un código QR de una credencial anterior. ¿Deseas actualizar el código QR de esta credencial con el nuevo formato de nuestro sistema?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="my-6 p-4 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2.5 text-xs text-slate-600 font-bold">
+            <div className="flex gap-2">
+              <span className="text-blue-600">✓</span>
+              <span><strong>Actualizar (Recomendado):</strong> Genera un nuevo QR interactivo y limpia el registro anterior de la base de datos.</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-amber-500">✓</span>
+              <span><strong>Mantener Anterior:</strong> Imprime conservando el código QR anterior para compatibilidad en las asistencias.</span>
+            </div>
+          </div>
+          <DialogFooter className="flex flex-col sm:flex-row gap-3 w-full">
+            <Button
+              type="button"
+              onClick={async () => {
+                setShowQRUpdateDialog(false);
+                if (pendingPrintFn) {
+                  await pendingPrintFn(true);
+                  setPendingPrintFn(null);
+                }
+              }}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black h-12 rounded-xl uppercase tracking-wider text-xs shadow-lg shadow-blue-500/20 active:scale-95 transition-all cursor-pointer"
+            >
+              Actualizar a Nueva Versión
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={async () => {
+                setShowQRUpdateDialog(false);
+                if (pendingPrintFn) {
+                  await pendingPrintFn(false);
+                  setPendingPrintFn(null);
+                }
+              }}
+              className="w-full border-gray-200 text-gray-700 font-black h-12 rounded-xl uppercase tracking-wider text-xs hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
+            >
+              Mantener QR Anterior
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setShowQRUpdateDialog(false);
+                setPendingPrintFn(null);
+              }}
+              className="w-full text-slate-400 font-black h-12 rounded-xl uppercase tracking-wider text-xs hover:bg-slate-50 cursor-pointer"
+            >
+              Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 };

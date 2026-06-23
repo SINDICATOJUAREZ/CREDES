@@ -40,8 +40,9 @@ export async function GET(request: Request) {
       }
 
       if (!employeeId) return NextResponse.json({ error: 'Se requiere employeeId' }, { status: 400 });
-      const member = await sSelectOne('members', `employee_id=eq.${encodeURIComponent(employeeId)}`);
-      const attendance = await sSelect('member_attendance', `select=*,events(id,name,date)&employee_id=eq.${encodeURIComponent(employeeId)}&order=created_at.desc`);
+      const member = await sSelectOne('members', `or=(employee_id.eq.${encodeURIComponent(employeeId)},legacy_qr_data.eq.${encodeURIComponent(employeeId)})`);
+      const actualEmployeeId = member ? member.employee_id : employeeId;
+      const attendance = await sSelect('member_attendance', `select=*,events(id,name,date)&employee_id=eq.${encodeURIComponent(actualEmployeeId)}&order=created_at.desc`);
       const totalEventsArr = await sSelect('events', 'select=id');
       return NextResponse.json({
         success: true,
@@ -73,8 +74,9 @@ export async function GET(request: Request) {
     }
 
     if (!employeeId) { db.close(); return NextResponse.json({ error: 'Se requiere employeeId' }, { status: 400 }); }
-    const member = db.prepare('SELECT * FROM members WHERE employee_id = ?').get(employeeId) as any;
-    const attendance = db.prepare(`SELECT e.id, e.name, e.date, ma.created_at FROM member_attendance ma JOIN events e ON ma.event_id = e.id WHERE ma.employee_id = ? ORDER BY e.date DESC, ma.created_at DESC`).all(employeeId);
+    const member = db.prepare('SELECT * FROM members WHERE employee_id = ? OR legacy_qr_data = ?').get(employeeId, employeeId) as any;
+    const actualEmployeeId = member ? member.employee_id : employeeId;
+    const attendance = db.prepare(`SELECT e.id, e.name, e.date, ma.created_at FROM member_attendance ma JOIN events e ON ma.event_id = e.id WHERE ma.employee_id = ? ORDER BY e.date DESC, ma.created_at DESC`).all(actualEmployeeId);
     const totalEvents = (db.prepare('SELECT COUNT(*) as count FROM events').get() as any).count;
     db.close();
     return NextResponse.json({
