@@ -524,7 +524,8 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
               <span><strong>Mantener Anterior:</strong> Imprime conservando el código QR anterior para compatibilidad en las asistencias.</span>
             </div>
           </div>
-          <DialogFooter className="flex flex-col sm:flex-row gap-3 w-full">
+          
+          <div className="flex flex-col gap-2.5 mt-6 w-full shrink-0">
             <Button
               type="button"
               onClick={async () => {
@@ -534,7 +535,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
                   setPendingPrintFn(null);
                 }
               }}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black h-12 rounded-xl uppercase tracking-wider text-xs shadow-lg shadow-blue-500/20 active:scale-95 transition-all cursor-pointer"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black h-12 rounded-xl uppercase tracking-wider text-xs shadow-lg shadow-blue-500/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
             >
               Actualizar a Nueva Versión
             </Button>
@@ -548,7 +549,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
                   setPendingPrintFn(null);
                 }
               }}
-              className="w-full border-gray-200 text-gray-700 font-black h-12 rounded-xl uppercase tracking-wider text-xs hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
+              className="w-full border border-gray-200 text-gray-700 bg-white font-black h-12 rounded-xl uppercase tracking-wider text-xs hover:bg-slate-50 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
             >
               Mantener QR Anterior
             </Button>
@@ -559,11 +560,11 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
                 setShowQRUpdateDialog(false);
                 setPendingPrintFn(null);
               }}
-              className="w-full text-slate-400 font-black h-12 rounded-xl uppercase tracking-wider text-xs hover:bg-slate-50 cursor-pointer"
+              className="w-full text-slate-400 font-black h-12 rounded-xl uppercase tracking-wider text-xs hover:bg-slate-50 cursor-pointer flex items-center justify-center"
             >
               Cancelar
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </form>
