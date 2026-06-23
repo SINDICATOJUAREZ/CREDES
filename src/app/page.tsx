@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Member } from '@/types/member';
 import { Button } from "@/components/ui/button";
-import { Plus, Search, FileText, Users, LogOut } from 'lucide-react';
+import { Plus, Search, FileText, Users, LogOut, Award } from 'lucide-react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Toaster, toast } from 'sonner';
 import { MemberForm } from '@/components/members/MemberForm';
@@ -63,7 +63,7 @@ export default function Home() {
         </div>
 
         {/* MAIN BUTTONS GRID */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 w-full mb-12">
           {[
             { 
               title: 'Crear agremiado', 
@@ -82,6 +82,12 @@ export default function Home() {
               icon: FileText, 
               color: 'bg-blue-500',
               href: '/asistencias'
+            },
+            { 
+              title: 'Reportes de agremiados', 
+              icon: Award, 
+              color: 'bg-violet-600',
+              href: '/reportes'
             },
             { 
               title: 'Futuros pensionados', 

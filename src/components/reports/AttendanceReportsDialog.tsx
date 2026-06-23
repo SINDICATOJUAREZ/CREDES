@@ -992,52 +992,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
             ))}
           </nav>
 
-          {/* Recuadro de Reportes Varios */}
-          <div className="hidden md:block px-3 py-4 border-t border-white/5">
-            <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 space-y-2.5">
-              <p className="text-[10px] text-blue-400 font-black uppercase tracking-wider flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5" /> Reportes Varios
-              </p>
-              <div className="space-y-1">
-                <button 
-                  onClick={() => printCustomReport('ALL')} 
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-gray-300 hover:bg-white/10 hover:text-white transition-all flex items-center gap-2 uppercase tracking-wide"
-                >
-                  <Users className="w-3.5 h-3.5 text-blue-400 shrink-0" /> Padrón Completo
-                </button>
-                <button 
-                  onClick={() => printCustomReport('ACTIVO')} 
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-gray-300 hover:bg-white/10 hover:text-white transition-all flex items-center gap-2 uppercase tracking-wide"
-                >
-                  <Users className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Agremiados Activos
-                </button>
-                <button 
-                  onClick={() => printCustomReport('ESPERA')} 
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-gray-300 hover:bg-white/10 hover:text-white transition-all flex items-center gap-2 uppercase tracking-wide"
-                >
-                  <Users className="w-3.5 h-3.5 text-amber-400 shrink-0" /> Lista de Espera
-                </button>
-                <button 
-                  onClick={() => printCustomReport('DELEGADO')} 
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-gray-300 hover:bg-white/10 hover:text-white transition-all flex items-center gap-2 uppercase tracking-wide"
-                >
-                  <Users className="w-3.5 h-3.5 text-purple-400 shrink-0" /> Delegados
-                </button>
-                <button 
-                  onClick={() => printCustomReport('PENSIONADO')} 
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-gray-300 hover:bg-white/10 hover:text-white transition-all flex items-center gap-2 uppercase tracking-wide"
-                >
-                  <Users className="w-3.5 h-3.5 text-red-400 shrink-0" /> Jubilados
-                </button>
-                <button 
-                  onClick={printComplaintsReport} 
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-gray-300 hover:bg-white/10 hover:text-white transition-all flex items-center gap-2 uppercase tracking-wide border-t border-white/5 pt-2 mt-1"
-                >
-                  <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" /> Quejas de Agremiados
-                </button>
-              </div>
-            </div>
-          </div>
+
 
           <div className="hidden md:block p-6 border-t border-white/5">
             <div className="bg-white/5 p-3 rounded-xl border border-white/10">
