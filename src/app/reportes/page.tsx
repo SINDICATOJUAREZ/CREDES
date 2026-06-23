@@ -412,44 +412,35 @@ export default function ReportesAgremiadosPage() {
               const isProcessing = generatingReport === item.id;
               
               return (
-                <div 
-                  key={item.id} 
-                  className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex flex-col justify-between group hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden"
+                <button
+                  key={item.id}
+                  onClick={item.action}
+                  disabled={generatingReport !== null}
+                  className="w-full text-left bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex flex-col justify-between group hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden focus:outline-none disabled:opacity-75 disabled:cursor-not-allowed"
                 >
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-200 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   
-                  <div>
-                    {/* Icon wrapper */}
-                    <div className={`${item.color.split(' ')[0]} w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform mb-5`}>
-                      <IconComponent className="w-6 h-6" />
+                  <div className="w-full flex flex-col h-full justify-between">
+                    <div>
+                      {/* Icon wrapper */}
+                      <div className={`${item.color.split(' ')[0]} w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform mb-5`}>
+                        {isProcessing ? (
+                          <Loader2 className="w-6 h-6 animate-spin" />
+                        ) : (
+                          <IconComponent className="w-6 h-6" />
+                        )}
+                      </div>
+
+                      <h3 className="text-base font-black text-slate-800 uppercase tracking-wide mb-2 flex items-center gap-2">
+                        {item.title}
+                        {isProcessing && <span className="text-[10px] text-blue-600 font-bold normal-case animate-pulse">(Generando...)</span>}
+                      </h3>
+                      <p className="text-xs text-gray-400 font-medium leading-relaxed">
+                        {item.description}
+                      </p>
                     </div>
-
-                    <h3 className="text-base font-black text-slate-800 uppercase tracking-wide mb-2">
-                      {item.title}
-                    </h3>
-                    <p className="text-xs text-gray-400 font-medium leading-relaxed mb-6">
-                      {item.description}
-                    </p>
                   </div>
-
-                  <Button
-                    onClick={item.action}
-                    disabled={generatingReport !== null}
-                    className="w-full py-5 bg-slate-900 hover:bg-blue-600 text-white font-black text-[10px] uppercase tracking-wider rounded-2xl transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
-                  >
-                    {isProcessing ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Generando...
-                      </>
-                    ) : (
-                      <>
-                        <Printer className="w-4 h-4" />
-                        Imprimir PDF
-                      </>
-                    )}
-                  </Button>
-                </div>
+                </button>
               );
             })}
           </div>
