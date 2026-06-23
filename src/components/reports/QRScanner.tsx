@@ -13,7 +13,26 @@ export function QRScanner({ onScan, onClose }: Props) {
   useEffect(() => {
     scannerRef.current = new Html5QrcodeScanner(
       "reader",
-      { fps: 10, qrbox: { width: 250, height: 250 } },
+      { 
+        fps: 30, // 3x higher frame rate (30fps instead of 10fps) for smoother scan loops
+        qrbox: (width, height) => {
+          // Dynamic scaling region to match mobile and desktop screens perfectly
+          const minEdge = Math.min(width, height);
+          const qrboxSize = Math.floor(minEdge * 0.7);
+          return { width: qrboxSize, height: qrboxSize };
+        },
+        aspectRatio: 1.0, // Crop feed to square region for faster image processing
+        rememberLastUsedCamera: true, // Avoid prompting selection on subsequent uses
+        supportedScanTypes: [0], // Restrict to camera only (SCAN_TYPE_CAMERA = 0), hiding image drop tabs
+        videoConstraints: {
+          facingMode: "environment", // Prioritize back-facing camera
+          width: { min: 640, ideal: 1280, max: 1920 },
+          height: { min: 480, ideal: 720, max: 1080 },
+        },
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true // GPU-accelerated native browser decoding (decodes instantly)
+        }
+      },
       /* verbose= */ false
     );
 
