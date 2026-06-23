@@ -9,14 +9,25 @@ import { Toaster, toast } from 'sonner';
 import { MemberForm } from '@/components/members/MemberForm';
 import { SystemSettingsDialog } from '@/components/members/SystemSettingsDialog';
 import { motion } from 'framer-motion';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+
+// Import sub-pages as components for modal integration
+import { MemberDirectoryPanel } from '@/components/members/MemberDirectoryPanel';
+import { AttendanceReportsDialog } from '@/components/reports/AttendanceReportsDialog';
+import { MemberReportsPanel } from '@/components/reports/MemberReportsPanel';
+import { PensionersDialog } from '@/components/reports/PensionersDialog';
 
 export default function Home() {
   const router = useRouter();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [user, setUser] = useState<{ fullName: string; role: string } | null>(null);
+
+  // States for unified modal windows
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isAttendanceOpen, setIsAttendanceOpen] = useState(false);
+  const [isReportsOpen, setIsReportsOpen] = useState(false);
+  const [isPensionersOpen, setIsPensionersOpen] = useState(false);
 
   useEffect(() => {
     // 1. Instant loading from localStorage
@@ -58,7 +69,11 @@ export default function Home() {
       
       toast.success('Agremiado registrado');
       setIsFormOpen(false);
-      router.push('/agremiados');
+      
+      // If the directory modal is open, trigger a refresh on it by reloading or resetting state
+      if (isSearchOpen) {
+        // Just trigger search open refresh if necessary, page state uses useSWR which auto-refreshes on focus
+      }
     } catch (error) {
       toast.error('Error al guardar los cambios');
     }
@@ -77,28 +92,28 @@ export default function Home() {
       description: 'Consulta el padrón completo, edita datos e imprime credenciales.',
       icon: Search, 
       color: 'from-indigo-500 to-indigo-600',
-      href: '/agremiados'
+      action: () => setIsSearchOpen(true)
     },
     { 
       title: 'Reportes de asistencia', 
       description: 'Consulta listas de asistencia por eventos, cumpleaños y firmas.',
       icon: FileText, 
       color: 'from-sky-500 to-sky-600',
-      href: '/asistencias'
+      action: () => setIsAttendanceOpen(true)
     },
     { 
       title: 'Reportes de agremiados', 
       description: 'Genera reportes personalizados de padrones y exporta en PDF/Excel.',
       icon: Award, 
       color: 'from-violet-500 to-violet-600',
-      href: '/reportes'
+      action: () => setIsReportsOpen(true)
     },
     { 
       title: 'Futuros pensionados', 
       description: 'Administra y proyecta los agremiados próximos a jubilarse.',
       icon: Users, 
       color: 'from-cyan-500 to-cyan-600',
-      href: '/pensionados'
+      action: () => setIsPensionersOpen(true)
     }
   ];
 
@@ -219,13 +234,7 @@ export default function Home() {
 
             const cardClasses = "group relative h-56 bg-white border border-gray-100 shadow-xl shadow-gray-200/40 rounded-[2rem] flex flex-col transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:border-blue-100 active:scale-95 overflow-hidden cursor-pointer w-full text-left";
 
-            return item.href ? (
-              <motion.div key={item.title} variants={itemVariants} className="w-full">
-                <Link href={item.href} className={cardClasses}>
-                  {CardContent}
-                </Link>
-              </motion.div>
-            ) : (
+            return (
               <motion.div key={item.title} variants={itemVariants} className="w-full">
                 <button
                   onClick={item.action}
@@ -249,6 +258,34 @@ export default function Home() {
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-[95vw] md:max-w-[1150px] max-h-[95vh] rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
           <MemberForm onSubmit={handleFormSubmit} onCancel={() => setIsFormOpen(false)} />
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL PARA BUSCAR AGREMIADO (DIRECTORIO) */}
+      <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
+        <DialogContent className="max-w-[95vw] md:max-w-[1300px] h-[90vh] rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
+          <MemberDirectoryPanel inline={true} onClose={() => setIsSearchOpen(false)} />
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL PARA REPORTES DE ASISTENCIA */}
+      <Dialog open={isAttendanceOpen} onOpenChange={setIsAttendanceOpen}>
+        <DialogContent className="max-w-[95vw] md:max-w-[1300px] h-[90vh] rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
+          <AttendanceReportsDialog inline={true} onClose={() => setIsAttendanceOpen(false)} />
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL PARA REPORTES DE AGREMIADOS */}
+      <Dialog open={isReportsOpen} onOpenChange={setIsReportsOpen}>
+        <DialogContent className="max-w-[95vw] md:max-w-[1300px] h-[90vh] rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
+          <MemberReportsPanel inline={true} onClose={() => setIsReportsOpen(false)} />
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL PARA FUTUROS PENSIONADOS */}
+      <Dialog open={isPensionersOpen} onOpenChange={setIsPensionersOpen}>
+        <DialogContent className="max-w-[95vw] md:max-w-[1300px] h-[90vh] rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
+          <PensionersDialog inline={true} onClose={() => setIsPensionersOpen(false)} />
         </DialogContent>
       </Dialog>
     </main>

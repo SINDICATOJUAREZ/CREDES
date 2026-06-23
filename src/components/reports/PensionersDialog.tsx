@@ -135,11 +135,17 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
       <div className="px-5 py-5 md:px-10 md:py-8 bg-white border-b border-gray-100 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-4 flex-1">
           {inline && (
-            <Link href="/">
-              <Button variant="ghost" size="icon" className="rounded-full">
+            onClose ? (
+              <Button onClick={onClose} variant="ghost" size="icon" className="rounded-full">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-            </Link>
+            ) : (
+              <Link href="/">
+                <Button variant="ghost" size="icon" className="rounded-full">
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+              </Link>
+            )
           )}
           <div className="flex-1">
             <h2 className="text-2xl md:text-4xl font-black text-blue-900 uppercase tracking-tighter flex items-center gap-3 md:gap-4">

@@ -964,11 +964,17 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
       <div className="w-full md:w-64 bg-[#1E293B] flex flex-row md:flex-col shrink-0 text-white shadow-2xl z-20">
         <div className="hidden md:flex p-6 flex-col gap-1 border-b border-white/5">
           {inline && (
-            <Link href="/">
-              <Button variant="ghost" size="icon" className="rounded-full text-white hover:bg-white/10 hover:text-white mb-2 self-start -ml-2 h-9 w-9">
+            onClose ? (
+              <Button onClick={onClose} variant="ghost" size="icon" className="rounded-full text-white hover:bg-white/10 hover:text-white mb-2 self-start -ml-2 h-9 w-9">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-            </Link>
+            ) : (
+              <Link href="/">
+                <Button variant="ghost" size="icon" className="rounded-full text-white hover:bg-white/10 hover:text-white mb-2 self-start -ml-2 h-9 w-9">
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+              </Link>
+            )
           )}
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center p-1.5 backdrop-blur-sm border border-white/10">
@@ -1006,11 +1012,17 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
         <div className="flex-1 bg-white flex flex-col overflow-hidden relative min-h-0">
           {inline && (
             <div className="p-4 border-b border-gray-100 flex items-center md:hidden shrink-0">
-              <Link href="/">
-                <Button variant="ghost" size="icon" className="rounded-full text-slate-700 hover:bg-slate-100">
+              {onClose ? (
+                <Button onClick={onClose} variant="ghost" size="icon" className="rounded-full text-slate-700 hover:bg-slate-100">
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
-              </Link>
+              ) : (
+                <Link href="/">
+                  <Button variant="ghost" size="icon" className="rounded-full text-slate-700 hover:bg-slate-100">
+                    <ArrowLeft className="w-5 h-5" />
+                  </Button>
+                </Link>
+              )}
               <span className="font-black text-slate-800 uppercase tracking-wider text-sm ml-2">Menú Principal</span>
             </div>
           )}
