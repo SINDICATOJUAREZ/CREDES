@@ -148,36 +148,31 @@ export default function Home() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="w-full flex flex-col sm:flex-row items-center justify-between p-6 bg-gray-50 border border-gray-100 rounded-3xl mb-8 gap-4 shadow-sm"
+            className="w-full relative p-6 bg-gray-50 border border-gray-100 rounded-3xl mb-8 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between min-h-[5.5rem] gap-4"
           >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-900 text-white flex items-center justify-center font-black text-xl shadow-md">
+            <div className="flex items-center gap-4 pr-24 sm:pr-0">
+              <div className="w-12 h-12 rounded-2xl bg-blue-900 text-white flex items-center justify-center font-black text-xl shadow-md flex-shrink-0">
                 {user.fullName.charAt(0).toUpperCase()}
               </div>
-              <div className="text-center sm:text-left">
+              <div className="text-left">
                 <p className="text-xs font-semibold text-gray-400">{getGreeting()},</p>
                 <h2 className="text-lg font-black text-gray-800 uppercase tracking-tight">{user.fullName}</h2>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className={`text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full shadow-sm border ${
-                user.role === 'MASTER' 
-                  ? 'bg-red-50 text-red-700 border-red-200' 
-                  : user.role === 'ADMINISTRADOR' 
-                    ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                    : 'bg-blue-50 text-blue-700 border-blue-200'
-              }`}>
-                {user.role}
-              </span>
-              <Button 
-                variant="outline" 
-                size="icon" 
-                onClick={() => setIsSettingsOpen(true)}
-                className="w-10 h-10 rounded-xl border-gray-200 bg-white shadow-sm hover:bg-blue-50 hover:border-blue-200 text-gray-500 hover:text-blue-600 transition-all active:scale-95 group"
-                title="Configuración del Sistema"
-              >
-                <Settings className="w-5 h-5 group-hover:rotate-45 transition-transform" />
-              </Button>
+            
+            {/* Upper Right Action Buttons */}
+            <div className="absolute top-4 right-4 flex items-center gap-2">
+              {user.role === 'MASTER' && (
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="w-10 h-10 rounded-xl border-gray-200 bg-white shadow-sm hover:bg-blue-50 hover:border-blue-200 text-gray-500 hover:text-blue-600 transition-all active:scale-95 group"
+                  title="Configuración del Sistema"
+                >
+                  <Settings className="w-5 h-5 group-hover:rotate-45 transition-transform" />
+                </Button>
+              )}
               <button
                 onClick={async () => {
                   try {
