@@ -24,7 +24,11 @@ async function initSQLiteTable() {
 }
 
 export async function GET(request: Request) {
-  if (!await hasPermission('canSearchMember') && !await hasPermission('canViewReports')) {
+  if (
+    !await hasPermission('canSearchMember') && 
+    !await hasPermission('canViewReports') &&
+    !await hasPermission('canViewMemberReports')
+  ) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
   try {

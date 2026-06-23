@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { isProduction, sUpdate } from '@/lib/supabase';
+import { hasPermission } from '@/lib/auth-utils';
 
 const BASE_DIR = 'I:/APLICACIONES/SINDICATO/RECURSOS/FOTOS';
 
@@ -18,6 +19,9 @@ function ensureLocalDir() {
 }
 
 export async function GET() {
+  if (!await hasPermission('canCreateMember') && !await hasPermission('canAccessSettings')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     if (isProduction) {
       try {
@@ -80,6 +84,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  if (!await hasPermission('canCreateMember')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -152,6 +159,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  if (!await hasPermission('canCreateMember')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const { searchParams } = new URL(request.url);
     const name = searchParams.get('name');
