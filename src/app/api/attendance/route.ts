@@ -3,6 +3,22 @@ import crypto from 'crypto';
 import { isProduction, sSelect, sSelectOne, sInsert, sUpdate, sDelete } from '@/lib/supabase';
 import { MEMBER_MAPPING, mapToFrontend } from '@/lib/db-utils';
 
+function extractEmployeeId(text: string): string | null {
+  if (!text) return null;
+  // Try spelling variants of NOMINA
+  const match = text.match(/(?:NOMINA|NÓMINA|NOMIONA|NIMINA|NOMONA|NOMIN|NOMIONA)[^\d]*(\d+)/i);
+  if (match) {
+    return match[1];
+  }
+  // Try a 3-6 digit number anywhere in the string
+  const numMatch = text.match(/\b(\d{3,6})\b/);
+  if (numMatch) {
+    return numMatch[1];
+  }
+  return null;
+}
+
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -40,8 +56,17 @@ export async function GET(request: Request) {
       }
 
       if (!employeeId) return NextResponse.json({ error: 'Se requiere employeeId' }, { status: 400 });
-      const member = await sSelectOne('members', `or=(employee_id.eq.${encodeURIComponent(employeeId)},legacy_qr_data.eq.${encodeURIComponent(employeeId)})`);
-      const actualEmployeeId = member ? member.employee_id : employeeId;
+      const cleanId = employeeId.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      let member = await sSelectOne('members', `or=(employee_id.eq.${encodeURIComponent(cleanId)},legacy_qr_data.eq.${encodeURIComponent(cleanId)})`);
+      
+      if (!member) {
+        const extracted = extractEmployeeId(cleanId);
+        if (extracted) {
+          member = await sSelectOne('members', `employee_id=eq.${encodeURIComponent(extracted)}`);
+        }
+      }
+
+      const actualEmployeeId = member ? member.employee_id : cleanId;
       const attendance = await sSelect('member_attendance', `select=*,events(id,name,date)&employee_id=eq.${encodeURIComponent(actualEmployeeId)}&order=created_at.desc`);
       const totalEventsArr = await sSelect('events', 'select=id');
       return NextResponse.json({
@@ -74,8 +99,17 @@ export async function GET(request: Request) {
     }
 
     if (!employeeId) { db.close(); return NextResponse.json({ error: 'Se requiere employeeId' }, { status: 400 }); }
-    const member = db.prepare('SELECT * FROM members WHERE employee_id = ? OR legacy_qr_data = ?').get(employeeId, employeeId) as any;
-    const actualEmployeeId = member ? member.employee_id : employeeId;
+    const cleanId = employeeId.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    let member = db.prepare('SELECT * FROM members WHERE employee_id = ? OR legacy_qr_data = ?').get(cleanId, cleanId) as any;
+    
+    if (!member) {
+      const extracted = extractEmployeeId(cleanId);
+      if (extracted) {
+        member = db.prepare('SELECT * FROM members WHERE employee_id = ?').get(extracted) as any;
+      }
+    }
+
+    const actualEmployeeId = member ? member.employee_id : cleanId;
     const attendance = db.prepare(`SELECT e.id, e.name, e.date, ma.created_at FROM member_attendance ma JOIN events e ON ma.event_id = e.id WHERE ma.employee_id = ? ORDER BY e.date DESC, ma.created_at DESC`).all(actualEmployeeId);
     const totalEvents = (db.prepare('SELECT COUNT(*) as count FROM events').get() as any).count;
     db.close();

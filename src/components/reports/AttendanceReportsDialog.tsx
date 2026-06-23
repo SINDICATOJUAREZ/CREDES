@@ -118,7 +118,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
   const loadAtt = async (nomina: string) => {
     setAttLoading(true); setSelMember(null); setAttData([]); setComplaintsData([]); setProfileTab('asistencia');
     try {
-      const r = await fetch(`/api/attendance?employeeId=${nomina}`);
+      const r = await fetch(`/api/attendance?employeeId=${encodeURIComponent(nomina)}`);
       const d = await r.json();
       if (d.success) { 
         setSelMember(d.member || results.find((m: Member)=>m.employeeId===nomina)); 
@@ -378,12 +378,13 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
   };
 
   const handleQRResult = (text: string) => {
-    let nomina = text.trim();
+    const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+    let nomina = normalizedText;
     
     // Check if the text is a JSON string (for older credentials or compatibility)
     try {
-      if (text.startsWith('{') && text.endsWith('}')) {
-        const parsed = JSON.parse(text);
+      if (normalizedText.startsWith('{') && normalizedText.endsWith('}')) {
+        const parsed = JSON.parse(normalizedText);
         if (parsed) {
           const val = parsed.nomina || parsed.employeeId;
           if (val) {
@@ -396,8 +397,8 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
     }
     
     // If the QR contains multiple fields (e.g. NÓMINA: 1234), extract the value
-    if (text.includes('NÓMINA:')) {
-      const match = text.match(/NÓMINA:\s*(.*)/i);
+    if (normalizedText.includes('NÓMINA:')) {
+      const match = normalizedText.match(/NÓMINA:\s*(.*)/i);
       if (match && match[1]) {
         nomina = match[1].trim();
       }
@@ -412,7 +413,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
     if (!nominaToSearch || !captureEvent) return;
     setIsSearching(true);
     try {
-      const r = await fetch(`/api/attendance?employeeId=${nominaToSearch}`);
+      const r = await fetch(`/api/attendance?employeeId=${encodeURIComponent(nominaToSearch)}`);
       const d = await r.json();
       if (d.success && d.member) {
         setSearchingMember(d.member);
