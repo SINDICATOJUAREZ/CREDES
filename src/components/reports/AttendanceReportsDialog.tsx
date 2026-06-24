@@ -252,7 +252,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
           .signature-box { width: 250px; text-align: center; border-top: 1px solid #000; padding-top: 10px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
           
           @media print { 
-            .actions-bar { display: none; }
+            .actions-bar { display: none !important; }
             body { padding: 0; }
             .report-container { max-width: 100%; margin: 0; }
           }
@@ -510,7 +510,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
         .attendance-list li::before { content: "✓"; color: #059669; font-size: 18px; }
         
         @media print { 
-          .actions-bar { display: none; }
+          .actions-bar { display: none !important; }
           body { padding: 0; }
           .report-container { max-width: 100%; margin: 0; }
         }
@@ -649,7 +649,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
           .signature-box { width: 250px; text-align: center; border-top: 1px solid #000; padding-top: 10px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
           
           @media print { 
-            .actions-bar { display: none; }
+            .actions-bar { display: none !important; }
             body { padding: 0; }
             .report-container { max-width: 100%; margin: 0; }
           }
@@ -800,7 +800,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
         .signature-box { width: 220px; text-align: center; border-top: 1px solid #000; padding-top: 8px; font-size: 10px; font-weight: bold; text-transform: uppercase; color: #000; }
         
         @media print { 
-          .actions-bar { display: none; }
+          .actions-bar { display: none !important; }
           body { padding: 0; }
           .ficha-container { max-width: 100%; margin: 0; }
         }

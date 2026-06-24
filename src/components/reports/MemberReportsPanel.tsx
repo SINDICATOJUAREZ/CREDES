@@ -376,7 +376,7 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
         .signature-box { width: 250px; text-align: center; border-top: 1px solid #000; padding-top: 10px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
         
         @media print { 
-          .actions-bar { display: none; }
+          .actions-bar { display: none !important; }
           body { padding: 0; }
           .report-container { max-width: 100%; margin: 0; }
         }
@@ -502,7 +502,7 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
         .signature-box { width: 250px; text-align: center; border-top: 1px solid #000; padding-top: 10px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
         
         @media print { 
-          .actions-bar { display: none; }
+          .actions-bar { display: none !important; }
           body { padding: 0; }
           .report-container { max-width: 100%; margin: 0; }
         }
