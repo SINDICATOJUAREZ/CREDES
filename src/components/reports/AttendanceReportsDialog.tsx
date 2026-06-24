@@ -493,7 +493,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
         .logo-center { flex: 1; text-align: center; }
         .logo-img { width: 450px; height: auto; }
         .photo-right { width: 150px; text-align: right; }
-        .photo-right .photo-box { width: 140px; height: 175px; border: 1px solid #ccc; border-radius: 15px; background-size: cover; background-position: center; background-repeat: no-repeat; margin-left: auto; }
+        .photo-right .photo-img { width: 140px; height: 175px; border: 1px solid #ccc; border-radius: 15px; object-fit: cover; margin-left: auto; display: block; }
         .no-photo-placeholder { width: 140px; height: 175px; border: 1px solid #ccc; border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #999; background: #f8fafc; margin-left: auto; }
         
         .page-title { text-align: center; font-size: 26px; font-weight: bold; margin: 40px 0; text-transform: uppercase; border-bottom: 1px solid #eee; padding-bottom: 10px; }
@@ -548,7 +548,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
           </div>
           <div class="photo-right">
             ${selMember.photoUrl 
-              ? `<div class="photo-box" style="background-image: url('${selMember.photoUrl}')"></div>`
+              ? `<img src="${selMember.photoUrl}" class="photo-img" />`
               : `<div class="no-photo-placeholder">SIN FOTO</div>`}
           </div>
         </div>
