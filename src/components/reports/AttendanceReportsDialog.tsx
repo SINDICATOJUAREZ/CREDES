@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Search, Gift, ClipboardCheck, User as UserIcon, Plus, Trash2, Users, FileText, Eye, QrCode, ArrowLeft } from 'lucide-react';
+import { Search, Gift, ClipboardCheck, User as UserIcon, Plus, Trash2, Users, FileText, Eye, QrCode, ArrowLeft, Trophy, BarChart3, Download } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Member } from '@/types/member';
@@ -10,7 +10,7 @@ import { QRScanner } from './QRScanner';
 import Link from 'next/link';
 
 interface Props { isOpen?: boolean; onClose?: () => void; initialTab?: TabType; inline?: boolean; }
-type TabType = 'busqueda' | 'cumpleanos' | 'asistencia';
+type TabType = 'busqueda' | 'cumpleanos' | 'asistencia' | 'top20';
 interface AttRecord { id: string; name: string; date: string; created_at: string; }
 interface EventRecord { id: string; name: string; date: string; attendee_count: number; }
 
@@ -54,6 +54,72 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
   const [complaintDate, setComplaintDate] = useState('');
   const [complaintDescription, setComplaintDescription] = useState('');
   const [complaintFollowUp, setComplaintFollowUp] = useState('');
+  
+  const [top20Data, setTop20Data] = useState<any[]>([]);
+  const [top20Loading, setTop20Loading] = useState(false);
+  const [top20Search, setTop20Search] = useState('');
+  const [top20TypeFilter, setTop20TypeFilter] = useState('ALL');
+
+  useEffect(() => { 
+    if ((isOpen || inline) && tab === 'top20') {
+      loadTop20();
+    } 
+  }, [isOpen, inline, tab]);
+
+  const loadTop20 = async () => {
+    setTop20Loading(true);
+    try {
+      const r = await fetch('/api/attendance?action=top20');
+      const d = await r.json();
+      if (d.success) setTop20Data(d.data || []);
+      else toast.error(d.error || 'Error cargando top 20');
+    } catch { 
+      toast.error('Error cargando top 20'); 
+    } finally {
+      setTop20Loading(false);
+    }
+  };
+
+  const chartData = top20Data
+    .filter((m: any) => m.memberType === 'ACTIVO' || m.memberType === 'ESPERA')
+    .slice(0, 20);
+
+  const filteredAllAttendees = top20Data.filter((item: any) => {
+    const query = top20Search.toLowerCase().trim();
+    const matchesSearch = !query || 
+      item.fullName.toLowerCase().includes(query) || 
+      item.employeeId.toLowerCase().includes(query);
+    const matchesType = top20TypeFilter === 'ALL' || item.memberType === top20TypeFilter;
+    return matchesSearch && matchesType;
+  });
+
+  const downloadTop20CSV = () => {
+    if (filteredAllAttendees.length === 0) return;
+    const headers = ['Posición', 'Nómina', 'Nombre Completo', 'Tipo Miembro', 'Departamento', 'Estatus', 'Asistencias'];
+    const rows = filteredAllAttendees.map((item, idx) => [
+      idx + 1,
+      item.employeeId,
+      item.fullName,
+      item.memberType,
+      item.department,
+      item.status,
+      item.count
+    ]);
+    const csvContent = '\uFEFF' + [
+      headers.map(h => `"${h.replace(/"/g, '""')}"`).join(','),
+      ...rows.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Top_Asistencias_${new Date().toISOString().slice(0,10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Excel/CSV de asistentes descargado');
+  };
 
   useEffect(() => { 
     if ((isOpen || inline) && tab === 'cumpleanos') {
@@ -989,9 +1055,10 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
             {([
               ['busqueda','Consultar',Search],
               ['cumpleanos','Cumpleaños',Gift],
-              ['asistencia','Asistencia',ClipboardCheck]
+              ['asistencia','Asistencia',ClipboardCheck],
+              ['top20','Top 20',Trophy]
             ] as const).map(([k,l,Icon])=>(
-              <button key={k} onClick={()=>{setTab(k as TabType); if(k==='asistencia')loadEvents();}}
+              <button key={k} onClick={()=>{setTab(k as TabType); if(k==='asistencia')loadEvents(); if(k==='top20')loadTop20();}}
                 className={`flex-1 md:w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-2 md:px-4 py-3 md:py-3.5 rounded-xl transition-all duration-300 ${tab===k?'bg-blue-600 text-white shadow-lg shadow-blue-900/40 md:translate-x-1':'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
                 <Icon className={`w-5 h-5 md:w-4 md:h-4 ${tab===k?'text-white':'text-gray-500 group-hover:text-white'}`} />
                 <span className="text-[10px] md:text-sm font-bold tracking-tight">{l}</span>
@@ -1513,6 +1580,200 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {tab === 'top20' && (
+            <div className="p-4 md:p-10 flex-1 overflow-y-auto min-h-0 bg-slate-50/50">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-8 animate-in fade-in slide-in-from-top-4 duration-300">
+                <div>
+                  <h2 className="text-2xl md:text-3xl font-black text-blue-900 tracking-tighter uppercase mb-1">Top 20 Asistencias</h2>
+                  <p className="text-gray-400 text-xs md:text-sm font-medium">Agremiados y Lista de Espera con mayor asistencia registrada</p>
+                </div>
+                
+                <Button
+                  onClick={downloadTop20CSV}
+                  disabled={top20Data.length === 0}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest px-5 py-2.5 rounded-xl shadow-lg shadow-emerald-100 flex items-center gap-2 self-start md:self-auto text-xs"
+                >
+                  <Download className="w-4 h-4" />
+                  Exportar CSV
+                </Button>
+              </div>
+
+              {top20Loading ? (
+                <div className="flex flex-col items-center justify-center py-20 text-blue-600 gap-3">
+                  <div className="w-10 h-10 border-4 border-t-blue-600 border-blue-100 rounded-full animate-spin"></div>
+                  <span className="font-bold uppercase tracking-wider text-xs">Cargando estadísticas...</span>
+                </div>
+              ) : top20Data.length === 0 ? (
+                <div className="text-center py-20 text-gray-400 italic">No hay registros de asistencia en el sistema.</div>
+              ) : (
+                <div className="space-y-10 animate-in fade-in zoom-in duration-300">
+                  
+                  {/* CHART CARD */}
+                  <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm">
+                    <h3 className="font-black text-blue-900 uppercase text-sm tracking-wider mb-6 flex items-center gap-2">
+                      <BarChart3 className="w-5 h-5 text-blue-600" />
+                      Gráfica de Rendimiento (Top 20)
+                    </h3>
+                    
+                    <div className="space-y-4">
+                      {chartData.map((item, idx) => {
+                        const maxCount = chartData[0]?.count || 1;
+                        const pct = Math.max(8, (item.count / maxCount) * 100);
+                        
+                        // Top 3 distinct ranking designs
+                        const rankColors = [
+                          'bg-amber-400 text-amber-950 ring-4 ring-amber-100', // Gold
+                          'bg-slate-300 text-slate-900 ring-4 ring-slate-100', // Silver
+                          'bg-amber-600 text-amber-50 ring-4 ring-amber-100',  // Bronze
+                        ];
+                        const rankBadge = idx < 3 
+                          ? rankColors[idx]
+                          : 'bg-slate-100 text-slate-600';
+
+                        return (
+                          <div key={item.employeeId} className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 group p-2 rounded-2xl hover:bg-slate-50/80 transition-colors">
+                            {/* Member Meta */}
+                            <div className="flex items-center gap-3 w-full md:w-80 shrink-0">
+                              <span className={`w-8 h-8 rounded-xl font-black text-xs flex items-center justify-center shrink-0 ${rankBadge}`}>
+                                #{idx + 1}
+                              </span>
+                              
+                              <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                                {item.photoUrl ? (
+                                  <img src={item.photoUrl} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold text-sm bg-slate-100">
+                                    {item.fullName.charAt(0)}
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div className="min-w-0 flex-1">
+                                <p className="font-black text-slate-800 text-sm truncate uppercase leading-tight">{item.fullName}</p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Nómina: {item.employeeId}</span>
+                                  <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${
+                                    item.memberType === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800' : 
+                                    item.memberType === 'ESPERA' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-800'
+                                  }`}>
+                                    {getMemberTypeLabel(item.memberType)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Bar proportion */}
+                            <div className="flex-1 flex items-center gap-3">
+                              <div className="flex-1 h-5 bg-slate-100 rounded-full overflow-hidden relative border border-slate-200/50">
+                                <div 
+                                  className="h-full rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-1000 ease-out shadow-sm"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <span className="w-28 text-right font-black text-blue-900 text-sm shrink-0 whitespace-nowrap">
+                                {item.count} {item.count === 1 ? 'asistencia' : 'asistencias'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {chartData.length === 0 && (
+                        <div className="text-center py-10 text-gray-400 italic">No hay agremiados o lista de espera con asistencia.</div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* ALL ATTENDEES TABLE */}
+                  <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                      <h3 className="font-black text-blue-900 uppercase text-sm tracking-wider flex items-center gap-2">
+                        <Users className="w-5 h-5 text-blue-600" />
+                        Listado General de Asistentes
+                      </h3>
+                      
+                      <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                        {/* Search input */}
+                        <div className="relative flex-1 sm:w-64">
+                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                          <Input
+                            placeholder="Buscar por nombre o nómina..."
+                            value={top20Search}
+                            onChange={(e) => setTop20Search(e.target.value)}
+                            className="pl-10 text-xs font-semibold uppercase bg-gray-50 border-gray-200 focus:bg-white rounded-xl h-9"
+                          />
+                        </div>
+                        
+                        {/* Filter dropdown */}
+                        <select
+                          value={top20TypeFilter}
+                          onChange={(e) => setTop20TypeFilter(e.target.value)}
+                          className="bg-gray-50 border border-gray-200 text-slate-800 rounded-xl px-3 py-1 text-xs font-bold uppercase h-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="ALL">Todos los roles</option>
+                          <option value="ACTIVO">Activos</option>
+                          <option value="ESPERA">Lista de Espera</option>
+                          <option value="PENSIONADO">Pensionados</option>
+                          <option value="DELEGADO">Delegados</option>
+                          <option value="BAJA">Bajas</option>
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div className="overflow-x-auto border border-gray-100 rounded-2xl">
+                      <table className="w-full border-collapse text-left">
+                        <thead>
+                          <tr className="bg-slate-50/80 border-b border-gray-100 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                            <th className="py-3 px-4 text-center w-16">Pos.</th>
+                            <th className="py-3 px-4 w-24">Nómina</th>
+                            <th className="py-3 px-4">Nombre Completo</th>
+                            <th className="py-3 px-4 w-32">Tipo Miembro</th>
+                            <th className="py-3 px-4 w-44">Secretaría / Dirección</th>
+                            <th className="py-3 px-4 w-28 text-center">Estatus</th>
+                            <th className="py-3 px-4 w-32 text-center">Asistencias</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50 text-xs font-medium text-slate-700">
+                          {filteredAllAttendees.map((item, idx) => (
+                            <tr key={item.employeeId} className="hover:bg-slate-50/50 transition-colors uppercase">
+                              <td className="py-3 px-4 text-center font-bold text-slate-400">#{idx + 1}</td>
+                              <td className="py-3 px-4 font-mono font-bold text-slate-900">{item.employeeId}</td>
+                              <td className="py-3 px-4 font-bold text-slate-900">{item.fullName}</td>
+                              <td className="py-3 px-4">
+                                <span className={`px-2.5 py-1 rounded-full text-[9px] font-black tracking-wider ${
+                                  item.memberType === 'ACTIVO' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                  item.memberType === 'ESPERA' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                                  'bg-slate-100 text-slate-600'
+                                }`}>
+                                  {getMemberTypeLabel(item.memberType)}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-slate-500 truncate max-w-[170px]">{item.department}</td>
+                              <td className="py-3 px-4 text-center">
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                                  item.status === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {item.status}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-center font-black text-blue-900 text-sm">{item.count}</td>
+                            </tr>
+                          ))}
+                          {filteredAllAttendees.length === 0 && (
+                            <tr>
+                              <td colSpan={7} className="py-12 text-center text-gray-400 italic">
+                                No se encontraron asistentes con los filtros aplicados.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

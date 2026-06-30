@@ -30,6 +30,39 @@ export async function GET(request: Request) {
     const action = searchParams.get('action');
 
     if (isProduction) {
+      if (action === 'top20') {
+        const attendance = await sSelect('member_attendance', 'select=employee_id');
+        const members = await sSelect('members', 'select=employee_id,full_name,member_type,status,department,photo_url');
+        
+        const counts: Record<string, number> = {};
+        for (const a of attendance) {
+          if (a.employee_id) {
+            counts[a.employee_id] = (counts[a.employee_id] || 0) + 1;
+          }
+        }
+        
+        const membersMap: Record<string, any> = {};
+        for (const m of members) {
+          membersMap[m.employee_id] = m;
+        }
+        
+        const result = Object.entries(counts).map(([empId, count]) => {
+          const m = membersMap[empId] || {};
+          return {
+            employeeId: empId,
+            fullName: m.full_name || `Nómina ${empId}`,
+            memberType: m.member_type || 'UNKNOWN',
+            status: m.status || 'UNKNOWN',
+            department: m.department || 'N/A',
+            photoUrl: m.photo_url || null,
+            count
+          };
+        });
+        
+        result.sort((a, b) => b.count - a.count);
+        return NextResponse.json({ success: true, data: result });
+      }
+
       if (action === 'listEvents') {
         const events = await sSelect('events', 'select=*,member_attendance(count)&order=date.desc,name.desc,created_at.desc');
         const mapped = events.map((e: any) => ({
@@ -86,6 +119,28 @@ export async function GET(request: Request) {
     const Database = (await import('better-sqlite3')).default;
     const path = await import('path');
     const db = new Database(path.join(process.cwd(), 'database.sqlite'));
+
+    if (action === 'top20') {
+      const rows = db.prepare(`
+        SELECT ma.employee_id as employeeId, COUNT(*) as count, m.full_name as fullName, 
+               m.member_type as memberType, m.status, m.department, m.photo_url as photoUrl
+        FROM member_attendance ma
+        LEFT JOIN members m ON m.employee_id = ma.employee_id
+        GROUP BY ma.employee_id
+        ORDER BY count DESC
+      `).all() as any[];
+      db.close();
+      
+      const result = rows.map(r => ({
+        ...r,
+        fullName: r.fullName || `Nómina ${r.employeeId}`,
+        memberType: r.memberType || 'UNKNOWN',
+        status: r.status || 'UNKNOWN',
+        department: r.department || 'N/A'
+      }));
+      
+      return NextResponse.json({ success: true, data: result });
+    }
 
     if (action === 'listEvents') {
       const events = db.prepare(`SELECT e.*, (SELECT COUNT(*) FROM member_attendance ma WHERE ma.event_id = e.id) as attendee_count FROM events e ORDER BY e.date DESC, e.name DESC, e.created_at DESC`).all();
