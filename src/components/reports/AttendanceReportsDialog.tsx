@@ -1634,7 +1634,12 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                           : 'bg-slate-100 text-slate-600';
 
                         return (
-                          <div key={item.employeeId} className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 group p-2 rounded-2xl hover:bg-slate-50/80 transition-colors">
+                          <div 
+                            key={item.employeeId} 
+                            onClick={() => { loadAtt(item.employeeId); setTab('busqueda'); }}
+                            className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 group p-2 rounded-2xl hover:bg-slate-50/80 cursor-pointer hover:shadow-sm border border-transparent hover:border-blue-100 transition-all duration-200"
+                            title="Haz clic para ver reporte de asistencia y quejas"
+                          >
                             {/* Member Meta */}
                             <div className="flex items-center gap-3 w-full md:w-80 shrink-0">
                               <span className={`w-8 h-8 rounded-xl font-black text-xs flex items-center justify-center shrink-0 ${rankBadge}`}>
@@ -1737,7 +1742,12 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                         </thead>
                         <tbody className="divide-y divide-gray-50 text-xs font-medium text-slate-700">
                           {filteredAllAttendees.map((item, idx) => (
-                            <tr key={item.employeeId} className="hover:bg-slate-50/50 transition-colors uppercase">
+                            <tr 
+                              key={item.employeeId} 
+                              onClick={() => { loadAtt(item.employeeId); setTab('busqueda'); }}
+                              className="hover:bg-blue-50/40 cursor-pointer transition-colors uppercase"
+                              title="Haz clic para ver reporte de asistencia y quejas"
+                            >
                               <td className="py-3 px-4 text-center font-bold text-slate-400">#{idx + 1}</td>
                               <td className="py-3 px-4 font-mono font-bold text-slate-900">{item.employeeId}</td>
                               <td className="py-3 px-4 font-bold text-slate-900">{item.fullName}</td>
