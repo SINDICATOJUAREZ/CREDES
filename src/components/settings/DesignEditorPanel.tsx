@@ -38,7 +38,7 @@ const FIELD_CATALOG = [
 
 const mockMember: Member = {
   id: 'preview', fullName: 'JUAN PEREZ LOPEZ', employeeId: '2196', socioId: '31',
-  position: 'INTENDENTE', department: 'PARQUES Y JARDINES', secretariat: 'SECRETARÍA DE SERVICIOS PÚBLICOS', memberType: 'ACTIVO',
+  position: 'INTENDENTE', department: 'PARQUES Y JARDINES', secretariat: 'SECRETARÍA DE SERVICIOS PÚBLICOS', memberType: 'AGREMIADO',
   status: 'ACTIVO', family: [], address: 'AV. SIEMPRE VIVA #123', colonia: 'CENTRO',
   municipio: 'MONTERREY, NL', curp: 'PERL900101HNLRPN09', phone: '8112345678',
   photoUrl: '/logos/logo2.png'

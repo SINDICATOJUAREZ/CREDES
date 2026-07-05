@@ -81,7 +81,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
   };
 
   const chartData = top20Data
-    .filter((m: any) => m.memberType === 'ACTIVO' || m.memberType === 'ESPERA')
+    .filter((m: any) => m.status === 'ACTIVO' || m.status === 'LISTA DE ESPERA')
     .slice(0, 20);
 
   const filteredAllAttendees = top20Data.filter((item: any) => {
@@ -528,8 +528,10 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
 
   const getMemberTypeLabel = (type: string) => {
     switch (type) {
+      case 'SECRETARIO GENERAL': return 'Secretario General';
       case 'SECRETARIO_GENERAL': return 'Secretario General';
       case 'DELEGADO': return 'Delegado';
+      case 'AGREMIADO': return 'Agremiado';
       case 'ACTIVO': return 'Agremiado';
       case 'ESPERA': return 'Lista de Espera';
       case 'PENSIONADO': return 'Pensionado';
@@ -658,11 +660,19 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
       let title = 'PADRÓN GENERAL DE MIEMBROS';
       
       if (typeFilter !== 'ALL') {
-        filtered = allMembers.filter(m => m.memberType === typeFilter);
-        if (typeFilter === 'ACTIVO') title = 'PADRÓN GENERAL DE AGREMIADOS';
-        else if (typeFilter === 'ESPERA') title = 'PADRÓN EN LISTA DE ESPERA';
-        else if (typeFilter === 'DELEGADO') title = 'PADRÓN DE DELEGADOS SINDICALES';
-        else if (typeFilter === 'PENSIONADO') title = 'PADRÓN DE JUBILADOS Y PENSIONADOS';
+        if (typeFilter === 'ACTIVO') {
+          filtered = allMembers.filter(m => m.memberType === 'AGREMIADO' && m.status === 'ACTIVO');
+          title = 'PADRÓN GENERAL DE AGREMIADOS';
+        } else if (typeFilter === 'ESPERA') {
+          filtered = allMembers.filter(m => m.status === 'LISTA DE ESPERA');
+          title = 'PADRÓN EN LISTA DE ESPERA';
+        } else if (typeFilter === 'DELEGADO') {
+          filtered = allMembers.filter(m => m.memberType === 'DELEGADO' && m.status === 'ACTIVO');
+          title = 'PADRÓN DE DELEGADOS SINDICALES';
+        } else if (typeFilter === 'PENSIONADO') {
+          filtered = allMembers.filter(m => m.status === 'PENSIONADO');
+          title = 'PADRÓN DE JUBILADOS Y PENSIONADOS';
+        }
       }
 
       // Sort by fullName
@@ -1661,10 +1671,12 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                                 <div className="flex items-center gap-2 mt-0.5">
                                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Nómina: {item.employeeId}</span>
                                   <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${
-                                    item.memberType === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800' : 
-                                    item.memberType === 'ESPERA' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-800'
+                                    item.status === 'LISTA DE ESPERA' ? 'bg-amber-100 text-amber-800' : 
+                                    item.memberType === 'DELEGADO' ? 'bg-purple-100 text-purple-800' :
+                                    item.memberType === 'SECRETARIO GENERAL' ? 'bg-indigo-100 text-indigo-800' :
+                                    'bg-emerald-100 text-emerald-800'
                                   }`}>
-                                    {getMemberTypeLabel(item.memberType)}
+                                    {item.status === 'LISTA DE ESPERA' ? 'Lista de Espera' : getMemberTypeLabel(item.memberType)}
                                   </span>
                                 </div>
                               </div>
@@ -1753,9 +1765,9 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                               <td className="py-3 px-4 font-bold text-slate-900">{item.fullName}</td>
                               <td className="py-3 px-4">
                                 <span className={`px-2.5 py-1 rounded-full text-[9px] font-black tracking-wider ${
-                                  item.memberType === 'ACTIVO' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                                  item.memberType === 'ESPERA' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                                  'bg-slate-100 text-slate-600'
+                                  item.memberType === 'AGREMIADO' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                  item.memberType === 'DELEGADO' ? 'bg-purple-50 text-purple-700 border border-purple-100' :
+                                  'bg-amber-50 text-amber-700 border border-amber-100'
                                 }`}>
                                   {getMemberTypeLabel(item.memberType)}
                                 </span>
@@ -1763,7 +1775,11 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                               <td className="py-3 px-4 text-slate-500 truncate max-w-[170px]">{item.department}</td>
                               <td className="py-3 px-4 text-center">
                                 <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
-                                  item.status === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                                  item.status === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800' : 
+                                  item.status === 'PENSIONADO' ? 'bg-blue-100 text-blue-800' :
+                                  item.status === 'LISTA DE ESPERA' ? 'bg-orange-100 text-orange-800' :
+                                  item.status === 'INCAPACITADO' ? 'bg-amber-100 text-amber-800' :
+                                  'bg-red-100 text-red-800'
                                 }`}>
                                   {item.status}
                                 </span>

@@ -77,14 +77,16 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
   const getUniqueDepartments = () => {
     if (!membersCache) return [];
     let base = membersCache;
-    if (selectedReport && selectedReport.id !== 'ALL') {
-      base = base.filter(m => m.memberType === selectedReport.id);
-    }
-    if (selectedReport && (selectedReport.id === 'ACTIVO' || selectedReport.id === 'DELEGADO' || selectedReport.id === 'ESPERA' || selectedReport.id === 'PENSIONADO')) {
-      base = base.filter(m => {
-        const status = (m.status || '').toUpperCase().trim();
-        return status !== 'BAJA' && status !== 'FINADO';
-      });
+    if (selectedReport) {
+      if (selectedReport.id === 'ACTIVO') {
+        base = base.filter(m => m.memberType === 'AGREMIADO' && m.status === 'ACTIVO');
+      } else if (selectedReport.id === 'DELEGADO') {
+        base = base.filter(m => m.memberType === 'DELEGADO' && m.status === 'ACTIVO');
+      } else if (selectedReport.id === 'ESPERA') {
+        base = base.filter(m => m.status === 'LISTA DE ESPERA');
+      } else if (selectedReport.id === 'PENSIONADO') {
+        base = base.filter(m => m.status === 'PENSIONADO');
+      }
     }
     const depts = base.map(m => m.department?.trim()).filter(Boolean);
     return Array.from(new Set(depts)).sort() as string[];
@@ -93,14 +95,16 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
   const getFilteredMembersCount = (dept: string) => {
     if (!membersCache) return 0;
     let base = membersCache;
-    if (selectedReport && selectedReport.id !== 'ALL') {
-      base = base.filter(m => m.memberType === selectedReport.id);
-    }
-    if (selectedReport && (selectedReport.id === 'ACTIVO' || selectedReport.id === 'DELEGADO' || selectedReport.id === 'ESPERA' || selectedReport.id === 'PENSIONADO')) {
-      base = base.filter(m => {
-        const status = (m.status || '').toUpperCase().trim();
-        return status !== 'BAJA' && status !== 'FINADO';
-      });
+    if (selectedReport) {
+      if (selectedReport.id === 'ACTIVO') {
+        base = base.filter(m => m.memberType === 'AGREMIADO' && m.status === 'ACTIVO');
+      } else if (selectedReport.id === 'DELEGADO') {
+        base = base.filter(m => m.memberType === 'DELEGADO' && m.status === 'ACTIVO');
+      } else if (selectedReport.id === 'ESPERA') {
+        base = base.filter(m => m.status === 'LISTA DE ESPERA');
+      } else if (selectedReport.id === 'PENSIONADO') {
+        base = base.filter(m => m.status === 'PENSIONADO');
+      }
     }
     if (dept !== 'ALL') {
       base = base.filter(m => m.department === dept);
@@ -162,19 +166,17 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
           setMembersCache(data);
         }
         
-        // Filter base members by type
-        if (reportId !== 'ALL') {
-          fetchedData = (data || []).filter((m: any) => m.memberType === reportId);
+        // Filter base members by type and status
+        if (reportId === 'ACTIVO') {
+          fetchedData = (data || []).filter((m: any) => m.memberType === 'AGREMIADO' && m.status === 'ACTIVO');
+        } else if (reportId === 'DELEGADO') {
+          fetchedData = (data || []).filter((m: any) => m.memberType === 'DELEGADO' && m.status === 'ACTIVO');
+        } else if (reportId === 'ESPERA') {
+          fetchedData = (data || []).filter((m: any) => m.status === 'LISTA DE ESPERA');
+        } else if (reportId === 'PENSIONADO') {
+          fetchedData = (data || []).filter((m: any) => m.status === 'PENSIONADO');
         } else {
           fetchedData = data || [];
-        }
-
-        // Exclude members whose status is 'BAJA' or 'FINADO' from active lists
-        if (reportId === 'ACTIVO' || reportId === 'DELEGADO' || reportId === 'ESPERA' || reportId === 'PENSIONADO') {
-          fetchedData = fetchedData.filter((m: any) => {
-            const status = (m.status || '').toUpperCase().trim();
-            return status !== 'BAJA' && status !== 'FINADO';
-          });
         }
       }
 
@@ -225,17 +227,15 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
       if (!membersCache) return [];
       let base = [...membersCache];
       
-      // Base type filter
-      if (selectedReport.id !== 'ALL') {
-        base = base.filter(m => m.memberType === selectedReport.id);
-      }
-
-      // Exclude members whose status is 'BAJA' or 'FINADO' from active lists
-      if (selectedReport.id === 'ACTIVO' || selectedReport.id === 'DELEGADO' || selectedReport.id === 'ESPERA' || selectedReport.id === 'PENSIONADO') {
-        base = base.filter((m: any) => {
-          const status = (m.status || '').toUpperCase().trim();
-          return status !== 'BAJA' && status !== 'FINADO';
-        });
+      // Base type and status filter
+      if (selectedReport.id === 'ACTIVO') {
+        base = base.filter(m => m.memberType === 'AGREMIADO' && m.status === 'ACTIVO');
+      } else if (selectedReport.id === 'DELEGADO') {
+        base = base.filter(m => m.memberType === 'DELEGADO' && m.status === 'ACTIVO');
+      } else if (selectedReport.id === 'ESPERA') {
+        base = base.filter(m => m.status === 'LISTA DE ESPERA');
+      } else if (selectedReport.id === 'PENSIONADO') {
+        base = base.filter(m => m.status === 'PENSIONADO');
       }
 
       // Search query (Nómina or Nombre)

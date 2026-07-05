@@ -32,7 +32,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
   const { register, control, handleSubmit, reset, watch, setValue, getValues } = useForm<Member>({
     defaultValues: initialData || {
       fullName: '',
-      memberType: 'ACTIVO',
+      memberType: 'AGREMIADO',
       status: 'ACTIVO',
       position: '',
       department: '',
@@ -223,6 +223,10 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
                 <select {...register('status')} className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-gray-50/30 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="ACTIVO">ACTIVO</option>
                   <option value="BAJA">BAJA</option>
+                  <option value="LISTA DE ESPERA">LISTA DE ESPERA</option>
+                  <option value="FINADO">FINADO</option>
+                  <option value="INCAPACITADO">INCAPACITADO</option>
+                  <option value="PENSIONADO">PENSIONADO</option>
                 </select>
               </div>
               <div className="space-y-2 col-span-2">
@@ -232,10 +236,9 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
               <div className="space-y-2">
                 <Label className="text-xs font-black text-blue-900 uppercase tracking-widest">Tipo de Miembro</Label>
                 <select {...register('memberType')} className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-gray-50/30 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="ACTIVO">Agremiado</option>
+                  <option value="AGREMIADO">Agremiado</option>
                   <option value="DELEGADO">Delegado</option>
-                  <option value="SECRETARIO_GENERAL">Secretario General</option>
-                  <option value="ESPERA">Lista de espera</option>
+                  <option value="SECRETARIO GENERAL">Secretario General</option>
                 </select>
               </div>
               <div className="space-y-2">

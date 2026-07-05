@@ -65,7 +65,8 @@ export const MemberTable: React.FC<MemberTableProps> = ({ members, onView, onEdi
                     <div className="flex flex-col">
                       <span className="font-bold text-gray-900">{member.fullName}</span>
                       <div className="flex gap-2 mt-1">
-                        {member.memberType === 'SECRETARIO_GENERAL' && (
+                        {/* Member Type Badge */}
+                        {member.memberType === 'SECRETARIO GENERAL' && (
                           <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full border border-amber-200">
                             Secretario General
                           </span>
@@ -75,24 +76,36 @@ export const MemberTable: React.FC<MemberTableProps> = ({ members, onView, onEdi
                             Delegado
                           </span>
                         )}
-                        {member.memberType === 'ACTIVO' && (
+                        {member.memberType === 'AGREMIADO' && (
                           <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-green-100 text-green-700 rounded-full border border-green-200">
                             Agremiado
                           </span>
                         )}
-                        {member.memberType === 'ESPERA' && (
+
+                        {/* Status Badges (if not normal ACTIVO status) */}
+                        {member.status === 'BAJA' && (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-red-100 text-red-700 rounded-full border border-red-200">
+                            Baja
+                          </span>
+                        )}
+                        {member.status === 'LISTA DE ESPERA' && (
                           <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full border border-orange-200">
                             Lista de Espera
                           </span>
                         )}
-                        {member.memberType === 'PENSIONADO' && (
+                        {member.status === 'PENSIONADO' && (
                           <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full border border-blue-200">
                             Pensionado
                           </span>
                         )}
-                        {member.memberType === 'BAJA' && (
-                          <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-red-100 text-red-700 rounded-full border border-red-200">
-                            Baja
+                        {member.status === 'FINADO' && (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full border border-slate-200">
+                            Finado
+                          </span>
+                        )}
+                        {member.status === 'INCAPACITADO' && (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full border border-amber-200">
+                            Incapacitado
                           </span>
                         )}
                       </div>
