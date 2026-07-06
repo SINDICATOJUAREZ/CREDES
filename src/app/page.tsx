@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Member } from '@/types/member';
 import { Button } from "@/components/ui/button";
-import { Plus, Search, FileText, Users, LogOut, Award, Settings } from 'lucide-react';
+import { Plus, Search, FileText, Users, LogOut, Award, Settings, Gift, FileWarning } from 'lucide-react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Toaster, toast } from 'sonner';
 import { MemberForm } from '@/components/members/MemberForm';
@@ -32,6 +32,8 @@ export default function Home() {
   const [isAttendanceOpen, setIsAttendanceOpen] = useState(false);
   const [isReportsOpen, setIsReportsOpen] = useState(false);
   const [isPensionersOpen, setIsPensionersOpen] = useState(false);
+  const [attendanceTab, setAttendanceTab] = useState<'busqueda' | 'cumpleanos'>('busqueda');
+  const [reportsInitialTab, setReportsInitialTab] = useState<string | null>(null);
 
   useEffect(() => {
     // 1. Instant loading from localStorage
@@ -105,16 +107,44 @@ export default function Home() {
       description: 'Consulta listas de asistencia por eventos, cumpleaños y firmas.',
       icon: FileText, 
       color: 'from-sky-500 to-sky-600',
-      action: () => setIsAttendanceOpen(true),
+      action: () => {
+        setAttendanceTab('busqueda');
+        setIsAttendanceOpen(true);
+      },
       permission: 'canViewReports'
+    },
+    { 
+      title: 'Cumpleaños', 
+      description: 'Consulta los cumpleaños del mes y felicita a los agremiados.',
+      icon: Gift, 
+      color: 'from-rose-500 to-rose-600',
+      action: () => {
+        setAttendanceTab('cumpleanos');
+        setIsAttendanceOpen(true);
+      },
+      permission: 'canViewBirthdays'
     },
     { 
       title: 'Reportes de agremiados', 
       description: 'Genera reportes personalizados de padrones y exporta en PDF/Excel.',
       icon: Award, 
       color: 'from-violet-500 to-violet-600',
-      action: () => setIsReportsOpen(true),
+      action: () => {
+        setReportsInitialTab(null);
+        setIsReportsOpen(true);
+      },
       permission: 'canViewMemberReports'
+    },
+    { 
+      title: 'Formato de Apoyo', 
+      description: 'Concentrado e historial de formatos de apoyo de los miembros.',
+      icon: FileWarning, 
+      color: 'from-rose-500 to-rose-600',
+      action: () => {
+        setReportsInitialTab('complaints');
+        setIsReportsOpen(true);
+      },
+      permission: 'canViewComplaints'
     },
     { 
       title: 'Futuros pensionados', 
@@ -227,7 +257,7 @@ export default function Home() {
           variants={containerVariants}
           initial="hidden"
           animate="show"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 w-full mb-12"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full mb-12"
         >
           {visibleMenuItems.map((item) => {
             const CardContent = (
@@ -283,17 +313,25 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      {/* MODAL PARA REPORTES DE ASISTENCIA */}
+      {/* MODAL PARA REPORTES DE ASISTENCIA Y CUMPLEAÑOS */}
       <Dialog open={isAttendanceOpen} onOpenChange={setIsAttendanceOpen}>
-        <DialogContent className="max-w-[95vw] md:max-w-[1300px] h-[90vh] rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
-          <AttendanceReportsDialog inline={true} onClose={() => setIsAttendanceOpen(false)} />
+        <DialogContent className={attendanceTab === 'cumpleanos'
+          ? "max-w-[95vw] md:max-w-[900px] h-[75vh] rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden bg-white"
+          : "max-w-[95vw] md:max-w-[1300px] h-[90vh] rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden bg-white"
+        }>
+          <AttendanceReportsDialog 
+            inline={true} 
+            initialTab={attendanceTab} 
+            onlyShowBirthdays={attendanceTab === 'cumpleanos'} 
+            onClose={() => setIsAttendanceOpen(false)} 
+          />
         </DialogContent>
       </Dialog>
 
       {/* MODAL PARA REPORTES DE AGREMIADOS */}
       <Dialog open={isReportsOpen} onOpenChange={setIsReportsOpen}>
         <DialogContent className="max-w-[95vw] md:max-w-[1300px] h-[90vh] rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
-          <MemberReportsPanel inline={true} onClose={() => setIsReportsOpen(false)} />
+          <MemberReportsPanel inline={true} initialReport={reportsInitialTab} onClose={() => setIsReportsOpen(false)} />
         </DialogContent>
       </Dialog>
 

@@ -1,27 +1,22 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { jwtVerify } from 'jose';
+import { getSessionUser } from '@/lib/auth-utils';
 
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('auth-token')?.value;
+    const session = await getSessionUser();
 
-    if (!token) {
+    if (!session) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
-
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'sindicato-secret-key-2026');
-    const { payload } = await jwtVerify(token, secret);
 
     return NextResponse.json({
       success: true,
       user: {
-        id: payload.userId,
-        email: payload.email,
-        fullName: payload.fullName,
-        role: payload.role,
-        permissions: payload.permissions || {},
+        id: session.userId,
+        email: session.email,
+        fullName: session.fullName,
+        role: session.role,
+        permissions: session.permissions || {},
       }
     });
   } catch (error) {

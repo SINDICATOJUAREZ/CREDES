@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Search, Gift, ClipboardCheck, User as UserIcon, Plus, Trash2, Users, FileText, Eye, QrCode, ArrowLeft, Trophy, BarChart3, Download } from 'lucide-react';
+import { Search, Gift, ClipboardCheck, User as UserIcon, Plus, Trash2, Users, FileText, Eye, QrCode, ArrowLeft, Trophy, BarChart3, Download, X, Edit2, Check } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Member } from '@/types/member';
@@ -9,19 +9,21 @@ import { toast } from 'sonner';
 import { QRScanner } from './QRScanner';
 import Link from 'next/link';
 
-interface Props { isOpen?: boolean; onClose?: () => void; initialTab?: TabType; inline?: boolean; }
+interface Props { isOpen?: boolean; onClose?: () => void; initialTab?: TabType; inline?: boolean; onlyShowBirthdays?: boolean; }
 type TabType = 'busqueda' | 'cumpleanos' | 'asistencia' | 'top20';
 interface AttRecord { id: string; name: string; date: string; created_at: string; }
 interface EventRecord { id: string; name: string; date: string; attendee_count: number; }
 
-export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, initialTab = 'busqueda', inline = false }: Props) {
-  const [tab, setTab] = useState<TabType>(initialTab);
+export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, initialTab = 'busqueda', inline = false, onlyShowBirthdays = false }: Props) {
+  const [tab, setTab] = useState<TabType>(onlyShowBirthdays ? 'cumpleanos' : initialTab);
   
   useEffect(() => {
-    if (isOpen && initialTab) {
+    if (onlyShowBirthdays) {
+      setTab('cumpleanos');
+    } else if ((isOpen || inline) && initialTab) {
       setTab(initialTab);
     }
-  }, [isOpen, initialTab]);
+  }, [isOpen, inline, initialTab, onlyShowBirthdays]);
   const [sq, setSq] = useState('');
   const [results, setResults] = useState<Member[]>([]);
   const [bdays, setBdays] = useState<Member[]>([]);
@@ -43,6 +45,8 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
   const [searchingMember, setSearchingMember] = useState<any | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [editingEventName, setEditingEventName] = useState<string>('');
   const captureRef = useRef<any>(null);
 
   // Quejas y Reportes states
@@ -165,238 +169,23 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
     }
   };
 
-  const loadComplaints = async (nomina: string) => {
-    setComplaintsLoading(true);
-    setComplaintsData([]);
-    try {
-      const r = await fetch(`/api/complaints?employeeId=${nomina}`);
-      const d = await r.json();
-      if (d.success) {
-        setComplaintsData(d.complaints);
-      }
-    } catch {
-      toast.error('Error cargando reportes / quejas');
-    } finally {
-      setComplaintsLoading(false);
-    }
-  };
-
   const loadAtt = async (nomina: string) => {
-    setAttLoading(true); setSelMember(null); setAttData([]); setComplaintsData([]); setProfileTab('asistencia');
+    setAttLoading(true); setSelMember(null); setAttData([]);
     try {
       const r = await fetch(`/api/attendance?employeeId=${encodeURIComponent(nomina)}`);
       const d = await r.json();
       if (d.success) { 
         setSelMember(d.member || results.find((m: Member)=>m.employeeId===nomina)); 
-        setAttData(d.attendance); 
-        await loadComplaints(nomina);
+        const sortedAttendance = (d.attendance || []).sort((a: any, b: any) => {
+          const dateA = extractDateFromEventName(a.name);
+          const dateB = extractDateFromEventName(b.name);
+          if (dateA !== dateB) return dateA.localeCompare(dateB);
+          return (a.created_at || '').localeCompare(b.created_at || '');
+        });
+        setAttData(sortedAttendance); 
       }
     } catch { toast.error('Error cargando asistencias'); }
     finally { setAttLoading(false); }
-  };
-
-  const openNewComplaintForm = () => {
-    setEditingComplaint(null);
-    setComplaintDate(new Date().toISOString().slice(0, 10));
-    setComplaintDescription('');
-    setComplaintFollowUp('');
-    setShowComplaintForm(true);
-  };
-
-  const openEditComplaintForm = (c: any) => {
-    setEditingComplaint(c);
-    setComplaintDate(c.report_date);
-    setComplaintDescription(c.description);
-    setComplaintFollowUp(c.follow_up || '');
-    setShowComplaintForm(true);
-  };
-
-  const saveComplaint = async () => {
-    if (!complaintDate.trim() || !complaintDescription.trim()) {
-      toast.error('La fecha y descripción son obligatorias.');
-      return;
-    }
-
-    try {
-      const payload = {
-        id: editingComplaint?.id,
-        employeeId: selMember.employeeId,
-        reportDate: complaintDate,
-        description: complaintDescription,
-        followUp: complaintFollowUp
-      };
-
-      const res = await fetch('/api/complaints', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const d = await res.json();
-      if (d.success) {
-        toast.success(editingComplaint ? 'Reporte actualizado con éxito' : 'Reporte guardado con éxito');
-        setShowComplaintForm(false);
-        await loadComplaints(selMember.employeeId);
-      } else {
-        toast.error('Error al guardar: ' + d.error);
-      }
-    } catch {
-      toast.error('Error guardando el reporte / queja');
-    }
-  };
-
-  const deleteComplaint = async (id: string) => {
-    if (!confirm('¿Estás seguro de eliminar este reporte?')) return;
-    try {
-      const res = await fetch(`/api/complaints?id=${id}`, { method: 'DELETE' });
-      const d = await res.json();
-      if (d.success) {
-        toast.success('Reporte eliminado con éxito');
-        await loadComplaints(selMember.employeeId);
-      } else {
-        toast.error('Error: ' + d.error);
-      }
-    } catch {
-      toast.error('Error al eliminar');
-    }
-  };
-
-  const printComplaintsReport = async () => {
-    toast.info('Generando concentrado de quejas...');
-    try {
-      const r = await fetch('/api/complaints');
-      const d = await r.json();
-      const allComplaints: any[] = d.complaints || [];
-
-      if (allComplaints.length === 0) {
-        toast.warning('No hay reportes de quejas en el sistema para imprimir.');
-        return;
-      }
-
-      const w = window.open('', '_blank');
-      if (!w) { toast.error('Popup bloqueado. Por favor permite las ventanas emergentes.'); return; }
-
-      const title = 'CONCENTRADO DE QUEJAS Y REPORTES DE AGREMIADOS';
-
-      const rows = allComplaints.map((c, idx) => `
-        <tr style="border-bottom: 1px solid #e2e8f0; font-size: 10px; vertical-align: top;">
-          <td style="padding: 10px; font-weight: bold; color: #64748b; text-align: center;">${idx + 1}</td>
-          <td style="padding: 10px; font-family: monospace; font-weight: bold; text-align: center;">${c.employee_id || 'N/A'}</td>
-          <td style="padding: 10px; font-weight: bold; text-transform: uppercase;">${c.member_name || 'N/A'}</td>
-          <td style="padding: 10px; text-transform: uppercase; font-size: 9px; color: #475569;">${c.member_department || 'N/A'}</td>
-          <td style="padding: 10px; text-align: center; font-weight: bold; color: #1e3a8a;">
-            ${new Date(c.report_date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-          </td>
-          <td style="padding: 10px; font-size: 9px; white-space: pre-wrap; max-width: 250px; line-height: 1.3;">${c.description || 'N/A'}</td>
-          <td style="padding: 10px; font-size: 9px; white-space: pre-wrap; max-width: 200px; color: #047857; font-weight: 600; line-height: 1.3; background-color: #f0fdf4;">${c.follow_up || 'PENDIENTE'}</td>
-        </tr>
-      `).join('');
-
-      w.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>${title}</title>
-        <style>
-          body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 40px; color: #000; line-height: 1.4; background: #fff; }
-          .report-container { width: 100%; max-width: 1200px; margin: 0 auto; }
-          
-          .header-container { display: flex; align-items: center; justify-content: center; margin-bottom: 20px; border-bottom: 2px solid #1e3a8a; padding-bottom: 15px; }
-          .logo-box { text-align: center; width: 100%; }
-          .logo-img { height: 100px; width: auto; max-width: 100%; display: block; margin: 0 auto; }
-          
-          .page-title { text-align: center; font-size: 18px; font-weight: 900; margin: 25px 0; text-transform: uppercase; color: #1f2937; letter-spacing: 1px; }
-          
-          .report-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          .report-table th { background: #1e3a8a; color: white; padding: 12px 10px; font-size: 11px; font-weight: bold; text-transform: uppercase; border: 1px solid #1e3a8a; }
-          .report-table td { border: 1px solid #e2e8f0; }
-          
-          .summary-box { display: flex; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px 25px; margin-top: 20px; margin-bottom: 30px; }
-          .summary-item { font-size: 12px; font-weight: bold; color: #475569; }
-          .summary-item span { font-size: 14px; font-weight: 900; color: #1e3a8a; margin-left: 5px; }
-          
-          .signature-section { display: flex; justify-content: space-around; margin-top: 80px; page-break-inside: avoid; }
-          .signature-box { width: 250px; text-align: center; border-top: 1px solid #000; padding-top: 10px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
-          
-          @media print { 
-            .actions-bar { display: none !important; }
-            body { padding: 0; }
-            .report-container { max-width: 100%; margin: 0; }
-          }
-          .actions-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 100; }
-          .btn { border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); font-size: 14px; transition: all 0.2s; }
-          .btn-print { background: #1e3a8a; color: white; }
-          .btn-download { background: #059669; color: white; }
-          .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 10px -1px rgba(0,0,0,0.15); }
-        </style>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-        <script>
-          function downloadPDF() {
-            const element = document.querySelector('.report-container');
-            const opt = {
-              margin: 10,
-              filename: 'Concentrado_Quejas_${new Date().toISOString().slice(0,10)}.pdf',
-              image: { type: 'jpeg', quality: 0.98 },
-              html2canvas: { scale: 2, useCORS: true },
-              jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-            };
-            html2pdf().set(opt).from(element).save();
-          }
-        </script>
-      </head>
-      <body>
-        <div class="actions-bar">
-          <button class="btn btn-download" onclick="downloadPDF()">Descargar PDF</button>
-          <button class="btn btn-print" onclick="window.print()">Imprimir Reporte</button>
-        </div>
-        <div class="report-container">
-          <div class="header-container">
-            <div class="logo-box">
-              <img src="/logos/logo2.png" class="logo-img">
-            </div>
-          </div>
-  
-          <div class="page-title">${title}</div>
-  
-          <div class="summary-box">
-            <div class="summary-item">Total quejas / reportes: <span>${allComplaints.length}</span></div>
-            <div class="summary-item">Fecha de generación: <span>${new Date().toLocaleDateString('es-ES', {day:'2-digit', month:'2-digit', year:'numeric'})}</span></div>
-          </div>
-  
-          <table class="report-table">
-            <thead>
-              <tr>
-                <th style="width: 40px;">No.</th>
-                <th style="width: 80px;">Nómina</th>
-                <th style="width: 180px;">Trabajador</th>
-                <th style="width: 140px;">Secretaría / Dirección</th>
-                <th style="width: 100px;">Fecha Levantamiento</th>
-                <th>Descripción Completa del Reporte</th>
-                <th style="width: 200px;">Seguimiento / Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows || '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #999;">No se encontraron registros de quejas en el sistema.</td></tr>'}
-            </tbody>
-          </table>
-  
-          <div class="signature-section">
-            <div class="signature-box">
-              <p style="margin: 0;">Elaboró</p>
-              <p style="margin: 40px 0 0 0; color: #64748b;">Firma de Conformidad</p>
-            </div>
-            <div class="signature-box">
-              <p style="margin: 0;">Autorizó</p>
-              <p style="margin: 40px 0 0 0; color: #64748b;">Secretaría General</p>
-            </div>
-          </div>
-        </div>
-      </body>
-      </html>
-      `);
-      w.document.close();
-    } catch (e: any) {
-      toast.error('Error al generar el concentrado: ' + e.message);
-    }
   };
 
   const loadEvents = async () => {
@@ -429,6 +218,36 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
       await fetch('/api/attendance', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'deleteEvent',eventId:id}) });
       toast.success('Evento eliminado'); loadEvents();
     } catch { toast.error('Error'); }
+  };
+
+  const saveRename = async (eventId: string) => {
+    if (!editingEventName.trim()) {
+      toast.error('El nombre no puede estar vacío');
+      return;
+    }
+    try {
+      const res = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'renameEvent', eventId, name: editingEventName.trim() })
+      });
+      const d = await res.json();
+      if (d.success) {
+        toast.success('Evento renombrado');
+        setEditingEventId(null);
+        loadEvents();
+        if (viewEvent && viewEvent.id === eventId) {
+          setViewEvent({ ...viewEvent, name: editingEventName.trim() });
+        }
+        if (captureEvent && captureEvent.id === eventId) {
+          setCaptureEvent({ ...captureEvent, name: editingEventName.trim() });
+        }
+      } else {
+        toast.error('Error al renombrar el evento');
+      }
+    } catch {
+      toast.error('Error de red al renombrar el evento');
+    }
   };
 
   const loadAttendees = async (ev: EventRecord) => {
@@ -524,6 +343,79 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
     } catch { 
       toast.error('Error registrando'); 
     }
+  };
+
+  const MONTHS: Record<string, string> = {
+    ENE: '01', ENERO: '01',
+    FEB: '02', FEBRERO: '02',
+    MAR: '03', MARZO: '03',
+    ABR: '04', ABRIL: '04',
+    MAY: '05', MAYO: '05',
+    JUN: '06', JUNIO: '06',
+    JUL: '07', JULIO: '07',
+    AGO: '08', AGOSTO: '08',
+    SEP: '09', SEPTIEMBRE: '09',
+    OCT: '10', OCTUBRE: '10',
+    NOV: '11', NOVIEMBRE: '11',
+    DIC: '12', DICIEMBRE: '12'
+  };
+
+  const extractDateFromEventName = (name: string): string => {
+    if (!name) return '1970-01-01';
+    const upper = name.toUpperCase().trim();
+    
+    // 1. Check YYYY-MM-DD
+    const ymdMatch = upper.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+    if (ymdMatch) {
+      return ymdMatch[0];
+    }
+    
+    // 2. Check DD/MM/YYYY or DD/MM/YY
+    const dmyMatch = upper.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);
+    if (dmyMatch) {
+      let day = dmyMatch[1].padStart(2, '0');
+      let month = dmyMatch[2].padStart(2, '0');
+      let year = dmyMatch[3];
+      if (year.length === 2) {
+        year = '20' + year;
+      }
+      return `${year}-${month}-${day}`;
+    }
+    
+    // 3. Check Month-DD-YY or Month-DD-YYYY (e.g. AGO-28-25, ABRIL-10-2025, DIC/11/25)
+    const monthNames = Object.keys(MONTHS).join('|');
+    const monthDayYearRegex = new RegExp(`\\b(${monthNames})[-/\\s](\\d{1,2})[-/\\s](\\d{2,4})\\b`, 'i');
+    const mdyMatch = upper.match(monthDayYearRegex);
+    if (mdyMatch) {
+      const month = MONTHS[mdyMatch[1]];
+      const day = mdyMatch[2].padStart(2, '0');
+      let year = mdyMatch[3];
+      if (year.length === 2) {
+        year = '20' + year;
+      }
+      return `${year}-${month}-${day}`;
+    }
+
+    // 4. Check DD-Month-YY or DD-Month-YYYY (e.g. 18 FEB 2026)
+    const dayMonthYearRegex = new RegExp(`\\b(\\d{1,2})[-/\\s](${monthNames})[-/\\s](\\d{2,4})\\b`, 'i');
+    const dmyWordMatch = upper.match(dayMonthYearRegex);
+    if (dmyWordMatch) {
+      const day = dmyWordMatch[1].padStart(2, '0');
+      const month = MONTHS[dmyWordMatch[2]];
+      let year = dmyWordMatch[3];
+      if (year.length === 2) {
+        year = '20' + year;
+      }
+      return `${year}-${month}-${day}`;
+    }
+
+    // 5. Just a 4-digit year (e.g. SAMS 2025)
+    const yearMatch = upper.match(/\b(20\d{2}|19\d{2})\b/);
+    if (yearMatch) {
+      return `${yearMatch[1]}-01-01`;
+    }
+    
+    return '1970-01-01';
   };
 
   const getMemberTypeLabel = (type: string) => {
@@ -688,6 +580,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
           <td style="padding: 10px; font-weight: bold; text-transform: uppercase;">${m.fullName || 'N/A'}</td>
           <td style="padding: 10px; text-transform: uppercase; font-size: 10px; color: #475569;">${m.department || 'N/A'}</td>
           <td style="padding: 10px; text-transform: uppercase; font-size: 10px; color: #475569;">${m.position || 'N/A'}</td>
+          <td style="padding: 10px; text-transform: uppercase; font-size: 10px; color: #475569; text-align: center;">${getMemberTypeLabel(m.memberType || '')}</td>
           <td style="padding: 10px; text-align: center;">
             <span style="padding: 4px 8px; border-radius: 4px; font-size: 9px; font-weight: bold; ${
               m.status === 'ACTIVO' 
@@ -777,11 +670,12 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                 <th>Nombre del Trabajador</th>
                 <th>Secretaría / Dirección</th>
                 <th>Puesto Oficial</th>
+                <th>Tipo de Agremiado</th>
                 <th style="width: 100px;">Estatus</th>
               </tr>
             </thead>
             <tbody>
-              ${rows || '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #999;">No se encontraron registros para este reporte.</td></tr>'}
+              ${rows || '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #999;">No se encontraron registros para este reporte.</td></tr>'}
             </tbody>
           </table>
   
@@ -1036,80 +930,92 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
   };
 
   const reportsContent = (
-    <div className={inline ? "w-full bg-white border border-gray-200 shadow-xl rounded-[2rem] overflow-hidden flex flex-col-reverse md:flex-row h-[calc(100vh-140px)] min-h-[600px]" : "max-w-[95vw] md:max-w-6xl h-[90vh] md:h-[85vh] rounded-[2rem] border border-gray-200 shadow-2xl p-0 overflow-hidden bg-white flex flex-col-reverse md:flex-row"}>
+    <div className={onlyShowBirthdays 
+      ? "w-full bg-white flex flex-col h-full min-h-0 relative"
+      : (inline ? "w-full bg-white border border-gray-200 shadow-xl rounded-[2rem] overflow-hidden flex flex-col-reverse md:flex-row h-[calc(100vh-140px)] min-h-[600px]" : "max-w-[95vw] md:max-w-6xl h-[90vh] md:h-[85vh] rounded-[2rem] border border-gray-200 shadow-2xl p-0 overflow-hidden bg-white flex flex-col-reverse md:flex-row")
+    }>
       {/* Sidebar / Bottom Nav on mobile */}
-      <div className="w-full md:w-64 bg-[#1E293B] flex flex-row md:flex-col shrink-0 text-white shadow-2xl z-20">
-        <div className="hidden md:flex p-6 flex-col gap-1 border-b border-white/5">
-          {inline && (
-            onClose ? (
-              <Button onClick={onClose} variant="ghost" size="icon" className="rounded-full text-white hover:bg-white/10 hover:text-white mb-2 self-start -ml-2 h-9 w-9">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            ) : (
-              <Link href="/">
-                <Button variant="ghost" size="icon" className="rounded-full text-white hover:bg-white/10 hover:text-white mb-2 self-start -ml-2 h-9 w-9">
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-              </Link>
-            )
-          )}
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center p-1.5 backdrop-blur-sm border border-white/10">
-              <img src="/logos/logo.png" alt="" className="w-full h-full object-contain" />
-            </div>
-            <h2 className="text-xl font-black tracking-tighter uppercase italic">SICS</h2>
-          </div>
-          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest px-1">Gestión Integral SUTSMBJ</p>
-        </div>
-          <nav className="flex-1 px-2 py-2 md:mt-6 md:px-3 flex flex-row md:flex-col gap-2 justify-around md:justify-start overflow-x-auto">
-            {([
-              ['busqueda','Consultar',Search],
-              ['cumpleanos','Cumpleaños',Gift],
-              ['asistencia','Asistencia',ClipboardCheck],
-              ['top20','Top 20',Trophy]
-            ] as const).map(([k,l,Icon])=>(
-              <button key={k} onClick={()=>{setTab(k as TabType); if(k==='asistencia')loadEvents(); if(k==='top20')loadTop20();}}
-                className={`flex-1 md:w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-2 md:px-4 py-3 md:py-3.5 rounded-xl transition-all duration-300 ${tab===k?'bg-blue-600 text-white shadow-lg shadow-blue-900/40 md:translate-x-1':'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
-                <Icon className={`w-5 h-5 md:w-4 md:h-4 ${tab===k?'text-white':'text-gray-500 group-hover:text-white'}`} />
-                <span className="text-[10px] md:text-sm font-bold tracking-tight">{l}</span>
-              </button>
-            ))}
-          </nav>
-
-
-
-          <div className="hidden md:block p-6 border-t border-white/5">
-            <div className="bg-white/5 p-3 rounded-xl border border-white/10">
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter mb-1">Versión del Sistema</p>
-              <p className="text-xs text-blue-400 font-black">v2.6 PREMIUM BUILD</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 bg-white flex flex-col overflow-hidden relative min-h-0">
-          {inline && (
-            <div className="p-4 border-b border-gray-100 flex items-center md:hidden shrink-0">
-              {onClose ? (
-                <Button onClick={onClose} variant="ghost" size="icon" className="rounded-full text-slate-700 hover:bg-slate-100">
+      {!onlyShowBirthdays && (
+        <div className="w-full md:w-64 bg-[#1E293B] flex flex-row md:flex-col shrink-0 text-white shadow-2xl z-20">
+          <div className="hidden md:flex p-6 flex-col gap-1 border-b border-white/5">
+            {inline && (
+              onClose ? (
+                <Button onClick={onClose} variant="ghost" size="icon" className="rounded-full text-white hover:bg-white/10 hover:text-white mb-2 self-start -ml-2 h-9 w-9">
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
               ) : (
                 <Link href="/">
-                  <Button variant="ghost" size="icon" className="rounded-full text-slate-700 hover:bg-slate-100">
+                  <Button variant="ghost" size="icon" className="rounded-full text-white hover:bg-white/10 hover:text-white mb-2 self-start -ml-2 h-9 w-9">
                     <ArrowLeft className="w-5 h-5" />
                   </Button>
                 </Link>
-              )}
-              <span className="font-black text-slate-800 uppercase tracking-wider text-sm ml-2">Menú Principal</span>
+              )
+            )}
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center p-1.5 backdrop-blur-sm border border-white/10">
+                <img src="/logos/logo.png" alt="" className="w-full h-full object-contain" />
+              </div>
+              <h2 className="text-xl font-black tracking-tighter uppercase italic">SICS</h2>
             </div>
-          )}
-          <div className="absolute top-4 right-4 md:top-6 md:right-8 z-10 scale-75 md:scale-100 origin-top-right">
-            <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100 shadow-sm">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-[10px] font-black text-emerald-700 uppercase tracking-wider">Base de Datos 2026</span>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest px-1">Gestión Integral SUTSMBJ</p>
+          </div>
+            <nav className="flex-1 px-2 py-2 md:mt-6 md:px-3 flex flex-row md:flex-col gap-2 justify-around md:justify-start overflow-x-auto">
+              {([
+                ['busqueda','Consultar',Search],
+                ['asistencia','Asistencia',ClipboardCheck],
+                ['top20','Top 20',Trophy]
+              ] as const).map(([k,l,Icon])=>(
+                <button key={k} onClick={()=>{setTab(k as TabType); if(k==='asistencia')loadEvents(); if(k==='top20')loadTop20();}}
+                  className={`flex-1 md:w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-2 md:px-4 py-3 md:py-3.5 rounded-xl transition-all duration-300 ${tab===k?'bg-blue-600 text-white shadow-lg shadow-blue-900/40 md:translate-x-1':'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+                  <Icon className={`w-5 h-5 md:w-4 md:h-4 ${tab===k?'text-white':'text-gray-500 group-hover:text-white'}`} />
+                  <span className="text-[10px] md:text-sm font-bold tracking-tight">{l}</span>
+                </button>
+              ))}
+            </nav>
+
+            <div className="hidden md:block p-6 border-t border-white/5">
+              <div className="bg-white/5 p-3 rounded-xl border border-white/10">
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter mb-1">Versión del Sistema</p>
+                <p className="text-xs text-blue-400 font-black">v2.6 PREMIUM BUILD</p>
+              </div>
             </div>
           </div>
+      )}
+
+      {/* Content */}
+      <div className="flex-1 bg-white flex flex-col overflow-hidden relative min-h-0">
+        {inline && !onlyShowBirthdays && (
+          <div className="p-4 border-b border-gray-100 flex items-center md:hidden shrink-0">
+            {onClose ? (
+              <Button onClick={onClose} variant="ghost" size="icon" className="rounded-full text-slate-700 hover:bg-slate-100">
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+            ) : (
+              <Link href="/">
+                <Button variant="ghost" size="icon" className="rounded-full text-slate-700 hover:bg-slate-100">
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+              </Link>
+            )}
+            <span className="font-black text-slate-800 uppercase tracking-wider text-sm ml-2">Menú Principal</span>
+          </div>
+        )}
+        {onlyShowBirthdays && onClose && (
+          <Button 
+            onClick={onClose} 
+            variant="ghost" 
+            size="icon" 
+            className="absolute top-4 right-4 md:top-6 md:right-8 w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center hover:bg-red-50 hover:text-red-600 transition-all active:scale-95 z-30"
+          >
+            <X className="w-5 h-5" />
+          </Button>
+        )}
+        <div className={`absolute top-4 right-4 md:top-6 md:right-8 z-10 scale-75 md:scale-100 origin-top-right ${onlyShowBirthdays ? 'mr-12 md:mr-14' : ''}`}>
+          <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100 shadow-sm">
+            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+            <span className="text-[10px] font-black text-emerald-700 uppercase tracking-wider">Base de Datos 2026</span>
+          </div>
+        </div>
 
           {/* TAB: BÚSQUEDA */}
           {tab === 'busqueda' && (
@@ -1166,132 +1072,28 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                       <FileText className="w-4 h-4"/>Generar PDF
                     </Button>
                   </div>
-                  {/* Pestañas de Navegación de Perfil */}
-                  <div className="flex gap-2 border-b border-gray-100 pb-3 mb-4 mt-2">
-                    <button
-                      onClick={() => setProfileTab('asistencia')}
-                      className={`px-4 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-300 ${
-                        profileTab === 'asistencia'
-                          ? 'bg-blue-50 text-blue-600 border border-blue-100 shadow-sm'
-                          : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
-                      }`}
-                    >
-                      Historial de Asistencias
-                    </button>
-                    <button
-                      onClick={() => setProfileTab('quejas')}
-                      className={`px-4 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-300 ${
-                        profileTab === 'quejas'
-                          ? 'bg-blue-50 text-blue-600 border border-blue-100 shadow-sm'
-                          : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
-                      }`}
-                    >
-                      Reportes y Quejas
-                    </button>
+                  {/* Historial de Eventos Asistidos */}
+                  <div className="mt-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="font-bold text-slate-700 text-sm md:text-base">Historial de Eventos Asistidos</h4>
+                      <span className="text-[10px] md:text-xs font-medium text-blue-600 bg-blue-50 px-2 md:px-3 py-1 md:py-1.5 rounded-lg">Total: {attData.length}</span>
+                    </div>
+                    {attData.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                        {attData.map((e,i) => (
+                          <div key={i} className="flex items-center gap-2.5 p-2.5 rounded-lg border border-gray-100 bg-gray-50/50 hover:bg-blue-50/50 transition-colors">
+                            <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><ClipboardCheck className="w-4 h-4"/></div>
+                            <p className="font-semibold text-slate-700 text-[10px] md:text-xs">{e.name}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-xl">
+                        <ClipboardCheck className="w-8 h-8 md:w-10 md:h-10 text-gray-300 mx-auto mb-2"/>
+                        <p className="text-gray-400 text-xs md:text-sm">Sin registros de asistencia.</p>
+                      </div>
+                    )}
                   </div>
-
-                  {profileTab === 'asistencia' && (
-                    <>
-                      <div className="flex justify-between items-center mb-3">
-                        <h4 className="font-bold text-slate-700 text-sm md:text-base">Historial de Eventos Asistidos</h4>
-                        <span className="text-[10px] md:text-xs font-medium text-blue-600 bg-blue-50 px-2 md:px-3 py-1 md:py-1.5 rounded-lg">Total: {attData.length}</span>
-                      </div>
-                      {attData.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                          {attData.map((e,i) => (
-                            <div key={i} className="flex items-center gap-2.5 p-2.5 rounded-lg border border-gray-100 bg-gray-50/50 hover:bg-blue-50/50 transition-colors">
-                              <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><ClipboardCheck className="w-4 h-4"/></div>
-                              <p className="font-semibold text-slate-700 text-[10px] md:text-xs">{e.name}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-xl">
-                          <ClipboardCheck className="w-8 h-8 md:w-10 md:h-10 text-gray-300 mx-auto mb-2"/>
-                          <p className="text-gray-400 text-xs md:text-sm">Sin registros de asistencia.</p>
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  {profileTab === 'quejas' && (
-                    <>
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-2">
-                        <div className="flex flex-col">
-                          <h4 className="font-bold text-slate-700 text-sm md:text-base">Reportes y Quejas del Agremiado</h4>
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Historial de quejas levantadas y sus estatus</p>
-                        </div>
-                        <div className="flex items-center gap-2 w-full md:w-auto">
-                          <Button
-                            onClick={openNewComplaintForm}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase text-[10px] tracking-wider px-4 py-2.5 rounded-xl h-auto flex-1 md:flex-none"
-                          >
-                            Levantar Queja / Reporte
-                          </Button>
-                          <span className="text-[10px] md:text-xs font-medium text-blue-600 bg-blue-50 px-2.5 py-1.5 rounded-lg whitespace-nowrap">Total: {complaintsData.length}</span>
-                        </div>
-                      </div>
-
-                      {complaintsLoading ? (
-                        <div className="text-center py-8 text-gray-400 text-xs font-medium">Cargando reportes...</div>
-                      ) : complaintsData.length > 0 ? (
-                        <div className="space-y-3">
-                          {complaintsData.map((c, i) => (
-                            <div key={c.id || i} className="p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-slate-50 transition-all flex flex-col gap-2.5">
-                              <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">
-                                    {new Date(c.report_date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                                  </span>
-                                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Fecha de Levantamiento</span>
-                                </div>
-                                <div className="flex gap-3 shrink-0">
-                                  <button
-                                    onClick={() => printSingleComplaintPDF(c)}
-                                    className="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 hover:underline uppercase tracking-wider"
-                                  >
-                                    Imprimir Ficha
-                                  </button>
-                                  <button
-                                    onClick={() => openEditComplaintForm(c)}
-                                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline uppercase tracking-wider"
-                                  >
-                                    Editar
-                                  </button>
-                                  <button
-                                    onClick={() => deleteComplaint(c.id)}
-                                    className="text-[10px] font-bold text-red-500 hover:text-red-700 hover:underline uppercase tracking-wider"
-                                  >
-                                    Eliminar
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-1">
-                                <div className="flex flex-col">
-                                  <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-1">Descripción Completa:</span>
-                                  <p className="text-xs font-bold text-slate-800 bg-white p-3 rounded-lg border border-slate-100 whitespace-pre-wrap min-h-[60px] leading-relaxed shadow-sm">
-                                    {c.description || 'Sin descripción.'}
-                                  </p>
-                                </div>
-                                <div className="flex flex-col">
-                                  <span className="text-[9px] text-emerald-500 font-bold uppercase tracking-wider mb-1">Seguimiento / Estatus:</span>
-                                  <p className="text-xs font-bold text-emerald-800 bg-emerald-50/40 p-3 rounded-lg border border-emerald-100/60 whitespace-pre-wrap min-h-[60px] leading-relaxed shadow-sm">
-                                    {c.follow_up || 'Sin comentarios de seguimiento registrados.'}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-xl">
-                          <ClipboardCheck className="w-8 h-8 md:w-10 md:h-10 text-gray-300 mx-auto mb-2"/>
-                          <p className="text-gray-400 text-xs md:text-sm">Sin reportes o quejas registrados para este agremiado.</p>
-                        </div>
-                      )}
-                    </>
-                  )}
                 </div>
               )}
 
@@ -1381,13 +1183,57 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
               <div className="flex flex-col gap-2">
                 {events.map(ev => (
                   <div key={ev.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between group hover:border-blue-200 transition-all gap-4">
-                    <div className="cursor-pointer w-full md:flex-1" onClick={()=>loadAttendees(ev)}>
-                      <h4 className="font-bold text-slate-800 text-sm md:text-base group-hover:text-blue-600 transition-colors">{ev.name}</h4>
+                    <div className="w-full md:flex-1 flex flex-col gap-1">
+                      {editingEventId === ev.id ? (
+                        <div className="flex items-center gap-2 max-w-md w-full" onClick={e => e.stopPropagation()}>
+                          <Input 
+                            value={editingEventName} 
+                            onChange={e => setEditingEventName(e.target.value)} 
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') saveRename(ev.id);
+                              if (e.key === 'Escape') setEditingEventId(null);
+                            }}
+                            className="h-9 py-1 text-sm border-blue-200 focus-visible:ring-blue-500 font-semibold"
+                            autoFocus
+                          />
+                          <Button 
+                            size="sm" 
+                            className="h-9 w-9 p-0 bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 rounded-lg" 
+                            onClick={() => saveRename(ev.id)}
+                          >
+                            <Check className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-9 w-9 p-0 text-gray-500 hover:bg-gray-100 shrink-0 rounded-lg" 
+                            onClick={() => setEditingEventId(null)}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="cursor-pointer group/title flex items-center gap-2" onClick={()=>loadAttendees(ev)}>
+                          <h4 className="font-bold text-slate-800 text-sm md:text-base group-hover:text-blue-600 transition-colors">{ev.name}</h4>
+                          <button 
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              setEditingEventId(ev.id); 
+                              setEditingEventName(ev.name); 
+                            }} 
+                            className="opacity-0 group-hover/title:opacity-100 text-gray-400 hover:text-blue-600 transition-opacity p-1"
+                            title="Editar nombre"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                       <p className="text-[10px] md:text-xs text-gray-400">{ev.date} • {ev.attendee_count} asistentes</p>
                     </div>
                     <div className="flex gap-2 w-full md:w-auto justify-end">
                       <Button size="sm" variant="outline" onClick={()=>loadAttendees(ev)} className="flex-1 md:flex-none text-xs gap-1 border-blue-100 text-blue-600 hover:bg-blue-50"><Eye className="w-3.5 h-3.5"/>Lista</Button>
                       <Button size="sm" variant="outline" onClick={()=>{setCaptureEvent(ev);setCaptureList([]);setCaptureCount(ev.attendee_count);}} className="flex-1 md:flex-none text-xs gap-1"><Users className="w-3.5 h-3.5"/>Capturar</Button>
+                      <Button size="sm" variant="ghost" onClick={() => deleteEvent(ev.id)} className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-2 rounded-lg shrink-0" title="Eliminar evento"><Trash2 className="w-4 h-4"/></Button>
                     </div>
                   </div>
                 ))}
@@ -1648,7 +1494,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                             key={item.employeeId} 
                             onClick={() => { loadAtt(item.employeeId); setTab('busqueda'); }}
                             className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 group p-2 rounded-2xl hover:bg-slate-50/80 cursor-pointer hover:shadow-sm border border-transparent hover:border-blue-100 transition-all duration-200"
-                            title="Haz clic para ver reporte de asistencia y quejas"
+                            title="Haz clic para ver reporte de asistencia"
                           >
                             {/* Member Meta */}
                             <div className="flex items-center gap-3 w-full md:w-80 shrink-0">
@@ -1758,7 +1604,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                               key={item.employeeId} 
                               onClick={() => { loadAtt(item.employeeId); setTab('busqueda'); }}
                               className="hover:bg-blue-50/40 cursor-pointer transition-colors uppercase"
-                              title="Haz clic para ver reporte de asistencia y quejas"
+                              title="Haz clic para ver reporte de asistencia"
                             >
                               <td className="py-3 px-4 text-center font-bold text-slate-400">#{idx + 1}</td>
                               <td className="py-3 px-4 font-mono font-bold text-slate-900">{item.employeeId}</td>
@@ -1822,68 +1668,6 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
         <QRScanner onScan={handleQRResult} onClose={() => setShowQR(false)} />
       )}
 
-      {showComplaintForm && (
-        <Dialog open={showComplaintForm} onOpenChange={o => !o && setShowComplaintForm(false)}>
-          <DialogContent className="max-w-lg rounded-[2rem] border border-gray-200 shadow-2xl p-6 bg-white flex flex-col gap-4">
-            <div>
-              <h3 className="text-lg font-black text-blue-900 uppercase tracking-tighter">
-                {editingComplaint ? 'Editar Reporte / Queja' : 'Levantar Reporte / Queja'}
-              </h3>
-              <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">
-                Agremiado: {selMember?.fullName} (Nómina: {selMember?.employeeId})
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Fecha de Levantamiento</label>
-                <Input
-                  type="date"
-                  value={complaintDate}
-                  onChange={e => setComplaintDate(e.target.value)}
-                  className="rounded-lg h-11"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Descripción Completa del Reporte</label>
-                <textarea
-                  value={complaintDescription}
-                  onChange={e => setComplaintDescription(e.target.value)}
-                  placeholder="Detalla de forma completa la queja o reporte..."
-                  className="w-full min-h-[100px] p-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider block mb-1">Seguimiento / Observaciones</label>
-                <textarea
-                  value={complaintFollowUp}
-                  onChange={e => setComplaintFollowUp(e.target.value)}
-                  placeholder="Registra avances, resolución o notas de seguimiento..."
-                  className="w-full min-h-[100px] p-3 rounded-lg border border-emerald-100 bg-emerald-50/20 text-emerald-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 justify-end mt-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowComplaintForm(false)}
-                className="rounded-xl px-5 py-2.5 h-auto text-xs font-bold uppercase tracking-wider border-slate-200 text-slate-700"
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={saveComplaint}
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-2.5 h-auto text-xs font-bold uppercase tracking-wider"
-              >
-                Guardar Reporte
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
     </>
   );
 }

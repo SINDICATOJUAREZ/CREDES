@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   ArrowLeft, 
@@ -19,17 +19,397 @@ import {
   Search,
   Calendar,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Plus,
+  X,
+  User as UserIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { Member } from '@/types/member';
 import Link from 'next/link';
 
-export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inline?: boolean; onClose?: () => void }) {
+export function MemberReportsPanel({ 
+  inline = false, 
+  onClose = () => {},
+  initialReport = null
+}: { 
+  inline?: boolean; 
+  onClose?: () => void;
+  initialReport?: string | null;
+}) {
+  const getMemberTypeLabel = (type: string) => {
+    switch (type) {
+      case 'SECRETARIO GENERAL': return 'Secretario General';
+      case 'SECRETARIO_GENERAL': return 'Secretario General';
+      case 'DELEGADO': return 'Delegado';
+      case 'AGREMIADO': return 'Agremiado';
+      case 'ACTIVO': return 'Agremiado';
+      case 'ESPERA': return 'Lista de Espera';
+      case 'PENSIONADO': return 'Pensionado';
+      default: return type || 'Agremiado';
+    }
+  };
+
+
+
   // Caches for database records
   const [membersCache, setMembersCache] = useState<Member[] | null>(null);
   const [complaintsCache, setComplaintsCache] = useState<any[] | null>(null);
+
+  // States for Complaint management
+  const [showComplaintForm, setShowComplaintForm] = useState(false);
+  const [editingComplaint, setEditingComplaint] = useState<any | null>(null);
+  const [complaintEmployeeId, setComplaintEmployeeId] = useState('');
+  const [complaintDate, setComplaintDate] = useState('');
+  const [complaintDescription, setComplaintDescription] = useState('');
+  const [complaintFollowUp, setComplaintFollowUp] = useState('');
+  const [selectedMemberForComplaint, setSelectedMemberForComplaint] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (complaintEmployeeId.length >= 3 && !editingComplaint) {
+      const delayDebounceFn = setTimeout(async () => {
+        try {
+          const r = await fetch(`/api/attendance?employeeId=${encodeURIComponent(complaintEmployeeId)}`);
+          const d = await r.json();
+          if (d.success && d.member) {
+            setSelectedMemberForComplaint(d.member);
+          } else {
+            setSelectedMemberForComplaint(null);
+          }
+        } catch {
+          setSelectedMemberForComplaint(null);
+        }
+      }, 500);
+      return () => clearTimeout(delayDebounceFn);
+    } else if (!editingComplaint) {
+      setSelectedMemberForComplaint(null);
+    }
+  }, [complaintEmployeeId, editingComplaint]);
+
+  const editComplaint = (c: any) => {
+    setEditingComplaint(c);
+    setComplaintEmployeeId(c.employee_id);
+    setComplaintDate(c.report_date);
+    setComplaintDescription(c.description);
+    setComplaintFollowUp(c.follow_up || '');
+    setSelectedMemberForComplaint({
+      fullName: c.member_name,
+      employeeId: c.employee_id,
+      department: c.member_department,
+      status: c.member_status
+    });
+    setShowComplaintForm(true);
+  };
+
+  const openNewComplaintForm = () => {
+    setEditingComplaint(null);
+    setComplaintEmployeeId('');
+    setComplaintDate(new Date().toISOString().slice(0, 10));
+    setComplaintDescription('');
+    setComplaintFollowUp('');
+    setSelectedMemberForComplaint(null);
+    setShowComplaintForm(true);
+  };
+
+  const saveComplaint = async () => {
+    if (!complaintEmployeeId.trim() || !complaintDate.trim() || !complaintDescription.trim()) {
+      toast.error('La nómina, fecha y descripción son obligatorias.');
+      return;
+    }
+    if (!editingComplaint && !selectedMemberForComplaint) {
+      toast.error('Por favor, ingrese una nómina válida de un agremiado existente.');
+      return;
+    }
+
+    try {
+      const payload = {
+        id: editingComplaint?.id,
+        employeeId: complaintEmployeeId,
+        reportDate: complaintDate,
+        description: complaintDescription,
+        followUp: complaintFollowUp
+      };
+
+      const res = await fetch('/api/complaints', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const d = await res.json();
+      if (d.success) {
+        toast.success(editingComplaint ? 'Reporte actualizado con éxito' : 'Reporte guardado con éxito');
+        setShowComplaintForm(false);
+        // Refresh complaints list
+        const r = await fetch('/api/complaints');
+        const d2 = await r.json();
+        setComplaintsCache(d2.complaints || []);
+      } else {
+        toast.error('Error al guardar: ' + d.error);
+      }
+    } catch {
+      toast.error('Error guardando el reporte / queja');
+    }
+  };
+
+  const deleteComplaint = async (id: string) => {
+    if (!confirm('¿Estás seguro de eliminar este reporte?')) return;
+    try {
+      const res = await fetch(`/api/complaints?id=${id}`, { method: 'DELETE' });
+      const d = await res.json();
+      if (d.success) {
+        toast.success('Reporte eliminado con éxito');
+        // Refresh complaints list
+        const r = await fetch('/api/complaints');
+        const d2 = await r.json();
+        setComplaintsCache(d2.complaints || []);
+      } else {
+        toast.error('Error: ' + d.error);
+      }
+    } catch {
+      toast.error('Error al eliminar');
+    }
+  };
+
+  const printComplaintSheet = async (c: any) => {
+    toast.info('Cargando datos del agremiado...');
+    try {
+      const res = await fetch(`/api/attendance?employeeId=${encodeURIComponent(c.employee_id)}`);
+      const d = await res.json();
+      if (d.success && d.member) {
+        printSingleComplaintPDF(d.member, c);
+      } else {
+        toast.error('No se encontró información del agremiado.');
+      }
+    } catch (e) {
+      toast.error('Error al cargar la información del agremiado.');
+    }
+  };
+
+  const printSingleComplaintPDF = (selMember: any, c: any) => {
+    toast.info('Generando formato de apoyo...');
+
+    const w = window.open('', '_blank');
+    if (!w) { toast.error('Popup bloqueado. Por favor permite las ventanas emergentes.'); return; }
+
+    const formattedDate = new Date(c.report_date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const formattedIngreso = selMember.joinDate || selMember.altaSindicato || 'N/A';
+
+    const getAntiguedad = (dateStr: string) => {
+      if (!dateStr) return 'N/A';
+      const parts = dateStr.split('-');
+      if (parts.length !== 3) return 'N/A';
+      const dStr = parts[0].length === 4 ? `${parts[1]}/${parts[2]}/${parts[0]}` : `${parts[1]}/${parts[0]}/${parts[2]}`;
+      const diff = Date.now() - new Date(dStr).getTime();
+      const age = new Date(diff).getUTCFullYear() - 1970;
+      return isNaN(age) || age < 0 ? 'N/A' : `${age} años`;
+    };
+
+    w.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Formato de Apoyo - ${selMember.employeeId}</title>
+      <style>
+        body { font-family: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif; padding: 40px; color: #000; line-height: 1.3; background: #fff; }
+        .ficha-container { width: 100%; max-width: 800px; margin: 0 auto; box-sizing: border-box; }
+        
+        /* Header section styled exactly like image */
+        .header-section { text-align: center; margin-bottom: 25px; padding-bottom: 12px; border-bottom: 2px solid #000; }
+        .logo-img-full { height: 100px; width: auto; max-width: 100%; display: block; margin: 0 auto; }
+        
+        /* Form grid system replicating Excel style precisely */
+        .excel-form { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        .excel-form td { padding: 6px 10px; font-size: 11px; vertical-align: middle; box-sizing: border-box; }
+        .lbl { color: #475569; font-weight: normal; font-size: 11px; text-align: left; width: 15%; text-transform: uppercase; }
+        .lbl-noborder { border: none; font-size: 11px; }
+        .val-box { border: 1px solid #cbd5e1; font-weight: bold; text-transform: uppercase; font-size: 11.5px; background-color: #fff; height: 26px; }
+        .val-box-inline { border: 1px solid #cbd5e1; background-color: #fff; height: 26px; display: flex; align-items: center; padding: 0 10px; font-size: 11.5px; }
+        
+        /* Large Problem & Solution Blocks next to labels */
+        .excel-form-blocks { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 25px; }
+        .excel-form-blocks td { padding: 6px 10px; font-size: 11px; box-sizing: border-box; }
+        .lbl-block { color: #475569; font-size: 11px; text-align: left; width: 15%; vertical-align: top; padding-top: 12px; text-transform: uppercase; }
+        .val-block-desc { border: 1px solid #cbd5e1; font-weight: bold; font-size: 11.5px; background-color: #fff; min-height: 110px; height: 110px; vertical-align: top; padding: 12px; line-height: 1.5; white-space: pre-wrap; }
+        .val-block-sol { border: 1px solid #cbd5e1; font-weight: bold; font-size: 11.5px; background-color: #f8fafc; min-height: 110px; height: 110px; vertical-align: top; padding: 12px; line-height: 1.5; white-space: pre-wrap; }
+        
+        .signature-section { display: flex; justify-content: space-around; margin-top: 60px; page-break-inside: avoid; }
+        .signature-box { width: 220px; text-align: center; border-top: 1px solid #000; padding-top: 8px; font-size: 10px; font-weight: bold; text-transform: uppercase; color: #000; }
+        
+        @media print { 
+          .actions-bar { display: none !important; }
+          body { padding: 0; }
+          .ficha-container { max-width: 100%; margin: 0; }
+        }
+        .actions-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 100; }
+        .btn { border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); font-size: 14px; transition: all 0.2s; }
+        .btn-print { background: #1e3a8a; color: white; }
+        .btn-download { background: #059669; color: white; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 10px -1px rgba(0,0,0,0.15); }
+      </style>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+      <script>
+        function downloadPDF() {
+          const element = document.querySelector('.ficha-container');
+          const opt = {
+            margin: 10,
+            filename: 'Formato_Apoyo_${selMember.employeeId}_${c.id.slice(0,6)}.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+          };
+          html2pdf().set(opt).from(element).save();
+        }
+      </script>
+    </head>
+    <body>
+      <div class="actions-bar">
+        <button class="btn btn-download" onclick="downloadPDF()">Descargar PDF</button>
+        <button class="btn btn-print" onclick="window.print()">Imprimir Ficha</button>
+      </div>
+      <div class="ficha-container">
+        <div class="header-section">
+          <img src="/logos/logo2.png" class="logo-img-full">
+        </div>
+
+        <div style="display: flex; gap: 24px; align-items: flex-start; margin-bottom: 10px;">
+          <div style="flex: 1;">
+            <table class="excel-form" style="width: 100%; margin-bottom: 0;">
+              <!-- Top row: Date and Status -->
+              <tr>
+                <td class="lbl-noborder" style="width: 15%; font-weight: bold;">${formattedDate}</td>
+                <td class="lbl-noborder" style="width: 30%;"></td>
+                <td class="lbl-noborder" style="width: 5%;"></td>
+                <td class="lbl" style="width: 20%; text-align: right; font-weight: bold; padding-right: 15px;">STATUS:</td>
+                <td class="val-box font-bold" style="width: 30%; text-align: center; background-color: #f8fafc; border: 1px solid #cbd5e1;">${selMember.status || 'ACTIVO'}</td>
+              </tr>
+              
+              <!-- Spacer row -->
+              <tr style="height: 15px;">
+                <td colspan="5" class="lbl-noborder"></td>
+              </tr>
+
+              <!-- Nómina and Nombre -->
+              <tr>
+                <td class="lbl">nómina</td>
+                <td class="val-box" style="text-align: center; width: 30%;">${selMember.employeeId}</td>
+                <td class="lbl-noborder" style="width: 5%;"></td>
+                <td class="lbl">nombre</td>
+                <td class="val-box" style="text-align: left; padding-left: 12px; width: 50%;">${selMember.fullName}</td>
+              </tr>
+
+              <!-- Puesto and Departamento -->
+              <tr>
+                <td class="lbl">puesto</td>
+                <td class="val-box" style="text-align: left; padding-left: 12px;">${selMember.position || 'N/A'}</td>
+                <td class="lbl-noborder"></td>
+                <td class="lbl">departamento</td>
+                <td class="val-box" style="text-align: left; padding-left: 12px;">${selMember.department || 'N/A'}</td>
+              </tr>
+
+              <!-- Ingreso and Secretaría -->
+              <tr>
+                <td class="lbl">ingreso</td>
+                <td class="val-box" style="text-align: center;">${formattedIngreso}</td>
+                <td class="lbl-noborder"></td>
+                <td class="lbl">secretaria</td>
+                <td class="val-box font-bold" colspan="4" style="text-align: left; padding-left: 12px;">${selMember.secretariat || 'N/A'}</td>
+              </tr>
+
+              <!-- Antigüedad & Teléfono -->
+              <tr>
+                <td class="lbl">antigüedad</td>
+                <td class="val-box-inline">
+                  <span style="font-weight: bold;">${getAntiguedad(selMember.joinDate || selMember.altaSindicato).replace(' años', '')}</span>
+                  <span style="font-size: 9px; margin-left: 15px; color: #64748b; font-weight: normal; text-transform: uppercase;">Años</span>
+                </td>
+                <td class="lbl-noborder"></td>
+                <td class="lbl">teléfono</td>
+                <td class="val-box" style="text-align: center;">${selMember.phone || 'N/A'}</td>
+              </tr>
+
+              <!-- CURP & RFC -->
+              <tr>
+                <td class="lbl">CURP</td>
+                <td class="val-box" style="text-align: left; padding-left: 12px;">${selMember.curp || 'N/A'}</td>
+                <td class="lbl-noborder"></td>
+                <td class="lbl">RFC</td>
+                <td class="val-box" style="text-align: center;">${selMember.rfc || 'N/A'}</td>
+              </tr>
+
+              <!-- Domicilio & CP -->
+              <tr>
+                <td class="lbl">domicilio</td>
+                <td class="val-box" style="text-align: left; padding-left: 12px;">${selMember.address || 'N/A'}</td>
+                <td class="lbl-noborder"></td>
+                <td class="lbl">CP</td>
+                <td class="val-box" style="text-align: center;">${selMember.cp || 'N/A'}</td>
+              </tr>
+
+              <!-- Colonia & Ciudad -->
+              <tr>
+                <td class="lbl">colonia</td>
+                <td class="val-box" style="text-align: left; padding-left: 12px;">${selMember.colonia || 'N/A'}</td>
+                <td class="lbl-noborder"></td>
+                <td class="lbl">ciudad</td>
+                <td class="val-box" style="text-align: center;">${selMember.municipio || 'BENITO JUAREZ, N.L.'}</td>
+              </tr>
+            </table>
+          </div>
+          
+          <!-- Foto del Agremiado -->
+          <div style="width: 135px; display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 48px; shrink-0;">
+            <div style="width: 135px; height: 165px; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #fff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+              ${selMember.photoUrl ? `
+                <img src="${selMember.photoUrl}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div style="display: none; flex-direction: column; align-items: center; color: #94a3b8;"><svg style="width: 36px; height: 36px; fill: currentColor;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg></div>
+              ` : `
+                <div style="display: flex; flex-direction: column; align-items: center; color: #cbd5e1;">
+                  <svg style="width: 40px; height: 40px; fill: currentColor;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+                  <span style="font-size: 9px; font-weight: bold; margin-top: 6px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8;">Sin Foto</span>
+                </div>
+              `}
+            </div>
+          </div>
+        </div>
+
+        <!-- Problem and Solution Block layout matching the reference precisely -->
+        <table class="excel-form-blocks">
+          <tr>
+            <td class="lbl-block">problema</td>
+            <td class="val-block-desc" colspan="4">${c.description || 'Sin descripción detallada.'}</td>
+          </tr>
+          <tr style="height: 12px;">
+            <td colspan="5" class="lbl-noborder"></td>
+          </tr>
+          <tr>
+            <td class="lbl-block">solución</td>
+            <td class="val-block-sol" colspan="4">${c.follow_up || 'Pendiente de resolución.'}</td>
+          </tr>
+        </table>
+
+        <div class="signature-section">
+          <div class="signature-box">
+            <p style="margin: 0;">Firma del Trabajador</p>
+            <p style="margin: 45px 0 0 0; color: #94a3b8; font-weight: normal; font-size: 8px;">Nombre y Firma</p>
+          </div>
+          <div class="signature-box">
+            <p style="margin: 0;">Recibió</p>
+            <p style="margin: 45px 0 0 0; color: #94a3b8; font-weight: normal; font-size: 8px;">Secretaría de Conflictos / Organización</p>
+          </div>
+          <div class="signature-box">
+            <p style="margin: 0;">Autorizó</p>
+            <p style="margin: 45px 0 0 0; color: #94a3b8; font-weight: normal; font-size: 8px;">Secretaría General</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+    `);
+    w.document.close();
+  };
 
   // Selected Report (null = show cards grid, not-null = show intelligent list view)
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
@@ -190,6 +570,14 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
     }
   };
 
+  useEffect(() => {
+    if (initialReport) {
+      openReportList(initialReport);
+    } else {
+      setSelectedReport(null);
+    }
+  }, [initialReport]);
+
   // Get filtered items based on current toolbar filters
   const getFilteredItems = () => {
     if (!selectedReport) return [];
@@ -305,7 +693,10 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
     
     const dataRows = data.map(row => {
       return headers.map(h => {
-        const val = row[h.key] ?? '';
+        let val = row[h.key] ?? '';
+        if (h.key === 'memberType') {
+          val = getMemberTypeLabel(val);
+        }
         return `"${String(val).replace(/"/g, '""')}"`;
       }).join(',');
     });
@@ -339,6 +730,7 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
         <td style="padding: 10px; font-weight: bold; text-transform: uppercase;">${m.fullName || 'N/A'}</td>
         <td style="padding: 10px; text-transform: uppercase; font-size: 10px; color: #475569;">${m.department || 'N/A'}</td>
         <td style="padding: 10px; text-transform: uppercase; font-size: 10px; color: #475569;">${m.position || 'N/A'}</td>
+        <td style="padding: 10px; text-transform: uppercase; font-size: 10px; color: #475569; text-align: center;">${getMemberTypeLabel(m.memberType || '')}</td>
         <td style="padding: 10px; text-align: center;">
           <span style="padding: 4px 8px; border-radius: 4px; font-size: 9px; font-weight: bold; ${
             m.status === 'ACTIVO' 
@@ -428,11 +820,12 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
               <th>Nombre del Trabajador</th>
               <th>Secretaría / Dirección</th>
               <th>Puesto Oficial</th>
+              <th>Tipo de Agremiado</th>
               <th style="width: 100px;">Estatus</th>
             </tr>
           </thead>
           <tbody>
-            ${rows || '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #999;">No se encontraron registros para este reporte.</td></tr>'}
+            ${rows || '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #999;">No se encontraron registros para este reporte.</td></tr>'}
           </tbody>
         </table>
 
@@ -542,7 +935,7 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
         <div class="page-title">${reportTitle}</div>
 
         <div class="summary-box">
-          <div class="summary-item">Total quejas registradas: <span>${filtered.length}</span></div>
+          <div class="summary-item">Total apoyos registrados: <span>${filtered.length}</span></div>
           <div class="summary-item">Fecha de generación: <span>${new Date().toLocaleDateString('es-ES', {day:'2-digit', month:'2-digit', year:'numeric'})}</span></div>
         </div>
 
@@ -553,13 +946,13 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
               <th style="width: 80px;">Nómina</th>
               <th style="width: 180px;">Nombre del Trabajador</th>
               <th style="width: 150px;">Área / Departamento</th>
-              <th style="width: 90px;">Fecha Reporte</th>
-              <th>Descripción del Reporte</th>
+              <th style="width: 90px;">Fecha</th>
+              <th>Descripción del Apoyo</th>
               <th style="width: 200px;">Seguimiento</th>
             </tr>
           </thead>
           <tbody>
-            ${rows || '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #999;">No se encontraron registros de quejas en el sistema.</td></tr>'}
+            ${rows || '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #999;">No se encontraron formatos de apoyo en el sistema.</td></tr>'}
           </tbody>
         </table>
 
@@ -578,7 +971,7 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
     </html>
     `);
     w.document.close();
-    toast.success('Reporte de quejas generado');
+    toast.success('Reporte de formatos de apoyo generado');
   };
 
   const handleGeneratePDF = (items: any[]) => {
@@ -607,7 +1000,7 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
     if (selectedReport.id === 'complaints') {
       const statusName = complaintStatus === 'ALL' ? 'Todas' : complaintStatus === 'PENDIENTE' ? 'Pendientes' : 'Resueltas';
       const dateRange = (complaintDateStart && complaintDateEnd) ? `_${complaintDateStart}_a_${complaintDateEnd}` : '';
-      const filename = `Reporte_Quejas_${statusName}${dateRange}_seleccion.csv`;
+      const filename = `Reporte_Apoyo_${statusName}${dateRange}_seleccion.csv`;
       downloadCSV(items, complaintHeaders, filename);
     } else {
       const typeName = selectedReport.id === 'ALL' ? 'General' : selectedReport.title.replace(/\s+/g, '_');
@@ -665,8 +1058,8 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
     },
     {
       id: 'complaints',
-      title: 'Quejas de Agremiados',
-      description: 'Concentrado e historial de quejas y reportes de los miembros.',
+      title: 'FORMATO DE APOYO',
+      description: 'Concentrado e historial de formatos de apoyo de los miembros.',
       icon: FileWarning,
       color: 'bg-rose-600 shadow-rose-500/20 hover:border-rose-500',
       accentClass: 'via-rose-400',
@@ -719,7 +1112,7 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
                   Reportes de Agremiados
                 </h2>
                 <p className="text-[10px] md:text-xs text-gray-400 font-bold uppercase tracking-widest mt-1 italic">
-                  Generación de padrones generales y concentrados de quejas
+                  Generación de padrones generales y formatos de apoyo
                 </p>
               </div>
             </div>
@@ -727,7 +1120,7 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
             {/* Content / Cards Grid */}
             <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-gray-50/30 min-h-0">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {reportsList.map((item) => {
+                {reportsList.filter(item => item.id !== 'complaints').map((item) => {
                   const IconComponent = item.icon;
                   const isProcessing = selectedReport?.id === item.id && isLoadingData;
                   
@@ -805,6 +1198,15 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
 
               {/* Bulk Actions */}
               <div className="flex items-center gap-3 shrink-0">
+                {selectedReport.id === 'complaints' && (
+                  <Button
+                    onClick={openNewComplaintForm}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] md:text-xs uppercase tracking-wider rounded-2xl py-2.5 px-4 h-10 transition-all flex items-center gap-1.5 shadow-md shadow-indigo-100 active:scale-95"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Levantar Formato de Apoyo
+                  </Button>
+                )}
                 <Button
                   onClick={() => handleGeneratePDF(selectedItemsList)}
                   disabled={isLoadingData || selectedFilteredCount === 0}
@@ -940,12 +1342,14 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
                       {selectedReport.id === 'complaints' ? (
                         <>
                           <th className="px-4 py-4 w-28 text-center text-xs font-black uppercase tracking-wider">Fecha</th>
-                          <th className="px-4 py-4 text-xs font-black uppercase tracking-wider">Detalle Queja</th>
+                          <th className="px-4 py-4 text-xs font-black uppercase tracking-wider">Detalle Apoyo</th>
                           <th className="px-4 py-4 text-xs font-black uppercase tracking-wider">Seguimiento / Estatus</th>
+                          <th className="px-4 py-4 w-44 text-center text-xs font-black uppercase tracking-wider">Acciones</th>
                         </>
                       ) : (
                         <>
                           <th className="px-4 py-4 text-xs font-black uppercase tracking-wider">Puesto Oficial</th>
+                          <th className="px-4 py-4 text-xs font-black uppercase tracking-wider">Tipo de Agremiado</th>
                           <th className="px-4 py-4 w-24 text-center text-xs font-black uppercase tracking-wider">Estatus</th>
                         </>
                       )}
@@ -1001,11 +1405,21 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
                                   <span className="text-rose-700 bg-rose-50 px-2 py-1 rounded-md border border-rose-100 block w-max">PENDIENTE</span>
                                 )}
                               </td>
+                              <td className="px-4 py-3.5 text-center">
+                                <div className="flex justify-center gap-2">
+                                  <button onClick={() => printComplaintSheet(item)} className="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 hover:underline uppercase tracking-wider">Ficha</button>
+                                  <button onClick={() => editComplaint(item)} className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline uppercase tracking-wider">Editar</button>
+                                  <button onClick={() => deleteComplaint(item.id)} className="text-[10px] font-bold text-red-600 hover:text-red-800 hover:underline uppercase tracking-wider">Eliminar</button>
+                                </div>
+                              </td>
                             </>
                           ) : (
                             <>
                               <td className="px-4 py-3.5 text-xs text-slate-500 font-medium uppercase">
                                 {item.position || 'N/A'}
+                              </td>
+                              <td className="px-4 py-3.5 text-xs text-slate-600 font-bold uppercase">
+                                {getMemberTypeLabel(item.memberType || '')}
                               </td>
                               <td className="px-4 py-3.5 text-center">
                                 <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
@@ -1064,6 +1478,100 @@ export function MemberReportsPanel({ inline = false, onClose = () => {} }: { inl
               </div>
             )}
           </div>
+        )}
+
+        {/* COMPLAINT DIALOG */}
+        {showComplaintForm && (
+          <Dialog open={showComplaintForm} onOpenChange={o => !o && setShowComplaintForm(false)}>
+            <DialogContent className="max-w-lg rounded-[2rem] border border-gray-200 shadow-2xl p-6 bg-white flex flex-col gap-4">
+              <div>
+                <h3 className="text-lg font-black text-blue-900 uppercase tracking-tighter">
+                  {editingComplaint ? 'Editar Formato de Apoyo' : 'Levantar Formato de Apoyo'}
+                </h3>
+                <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">
+                  Ingresa los detalles a continuación.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Nómina del Agremiado</label>
+                  <Input
+                    type="text"
+                    value={complaintEmployeeId}
+                    onChange={e => setComplaintEmployeeId(e.target.value)}
+                    disabled={!!editingComplaint}
+                    placeholder="Ej. 8611"
+                    className="rounded-lg h-11"
+                  />
+                  {selectedMemberForComplaint && (
+                    <div className="mt-2 p-2.5 bg-blue-50/50 border border-blue-100 rounded-xl flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden shrink-0">
+                        {selectedMemberForComplaint.photoUrl ? (
+                          <img src={`${selectedMemberForComplaint.photoUrl}?t=${new Date().getTime()}`} alt="" className="w-full h-full object-cover"/>
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-400"><UserIcon className="w-5 h-5"/></div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-slate-800 uppercase truncate">{selectedMemberForComplaint.fullName}</p>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase">{selectedMemberForComplaint.department}</p>
+                      </div>
+                    </div>
+                  )}
+                  {!selectedMemberForComplaint && complaintEmployeeId.length >= 3 && !editingComplaint && (
+                    <p className="text-[10px] text-red-500 font-bold mt-1">No se encontró ningún agremiado con esta nómina.</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Fecha de Levantamiento</label>
+                  <Input
+                    type="date"
+                    value={complaintDate}
+                    onChange={e => setComplaintDate(e.target.value)}
+                    className="rounded-lg h-11"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Descripción del Apoyo Solicitado</label>
+                  <textarea
+                    value={complaintDescription}
+                    onChange={e => setComplaintDescription(e.target.value)}
+                    placeholder="Detalla de forma completa el formato de apoyo..."
+                    className="w-full min-h-[100px] p-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider block mb-1">Seguimiento / Observaciones</label>
+                  <textarea
+                    value={complaintFollowUp}
+                    onChange={e => setComplaintFollowUp(e.target.value)}
+                    placeholder="Registra avances, resolución o notas de seguimiento..."
+                    className="w-full min-h-[100px] p-3 rounded-lg border border-emerald-100 bg-emerald-50/20 text-emerald-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 justify-end mt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowComplaintForm(false)}
+                  className="rounded-xl px-5 py-2.5 h-auto text-xs font-bold uppercase tracking-wider border-slate-200 text-slate-700"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={saveComplaint}
+                  className="rounded-xl px-5 py-2.5 h-auto text-xs font-bold uppercase tracking-wider bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200"
+                >
+                  Guardar Cambios
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         )}
     </div>
   );

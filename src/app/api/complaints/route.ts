@@ -27,7 +27,8 @@ export async function GET(request: Request) {
   if (
     !await hasPermission('canSearchMember') && 
     !await hasPermission('canViewReports') &&
-    !await hasPermission('canViewMemberReports')
+    !await hasPermission('canViewMemberReports') &&
+    !await hasPermission('canViewComplaints')
   ) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
@@ -99,7 +100,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!await hasPermission('canViewReports') && !await hasPermission('canCreateMember')) {
+  if (
+    !await hasPermission('canViewReports') && 
+    !await hasPermission('canCreateMember') &&
+    !await hasPermission('canViewComplaints')
+  ) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
   try {
@@ -160,7 +165,11 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!await hasPermission('canViewReports') && !await hasPermission('canCreateMember')) {
+  if (
+    !await hasPermission('canViewReports') && 
+    !await hasPermission('canCreateMember') &&
+    !await hasPermission('canViewComplaints')
+  ) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
   try {

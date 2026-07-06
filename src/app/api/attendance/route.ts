@@ -19,6 +19,79 @@ function extractEmployeeId(text: string): string | null {
   return null;
 }
 
+const MONTHS: Record<string, string> = {
+  ENE: '01', ENERO: '01',
+  FEB: '02', FEBRERO: '02',
+  MAR: '03', MARZO: '03',
+  ABR: '04', ABRIL: '04',
+  MAY: '05', MAYO: '05',
+  JUN: '06', JUNIO: '06',
+  JUL: '07', JULIO: '07',
+  AGO: '08', AGOSTO: '08',
+  SEP: '09', SEPTIEMBRE: '09',
+  OCT: '10', OCTUBRE: '10',
+  NOV: '11', NOVIEMBRE: '11',
+  DIC: '12', DICIEMBRE: '12'
+};
+
+function extractDateFromEventName(name: string): string {
+  if (!name) return '1970-01-01';
+  const upper = name.toUpperCase().trim();
+  
+  // 1. Check YYYY-MM-DD
+  const ymdMatch = upper.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+  if (ymdMatch) {
+    return ymdMatch[0];
+  }
+  
+  // 2. Check DD/MM/YYYY or DD/MM/YY
+  const dmyMatch = upper.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);
+  if (dmyMatch) {
+    let day = dmyMatch[1].padStart(2, '0');
+    let month = dmyMatch[2].padStart(2, '0');
+    let year = dmyMatch[3];
+    if (year.length === 2) {
+      year = '20' + year;
+    }
+    return `${year}-${month}-${day}`;
+  }
+  
+  // 3. Check Month-DD-YY or Month-DD-YYYY (e.g. AGO-28-25, ABRIL-10-2025, DIC/11/25)
+  const monthNames = Object.keys(MONTHS).join('|');
+  const monthDayYearRegex = new RegExp(`\\b(${monthNames})[-/\\s](\\d{1,2})[-/\\s](\\d{2,4})\\b`, 'i');
+  const mdyMatch = upper.match(monthDayYearRegex);
+  if (mdyMatch) {
+    const month = MONTHS[mdyMatch[1]];
+    const day = mdyMatch[2].padStart(2, '0');
+    let year = mdyMatch[3];
+    if (year.length === 2) {
+      year = '20' + year;
+    }
+    return `${year}-${month}-${day}`;
+  }
+
+  // 4. Check DD-Month-YY or DD-Month-YYYY (e.g. 18 FEB 2026)
+  const dayMonthYearRegex = new RegExp(`\\b(\\d{1,2})[-/\\s](${monthNames})[-/\\s](\\d{2,4})\\b`, 'i');
+  const dmyWordMatch = upper.match(dayMonthYearRegex);
+  if (dmyWordMatch) {
+    const day = dmyWordMatch[1].padStart(2, '0');
+    const month = MONTHS[dmyWordMatch[2]];
+    let year = dmyWordMatch[3];
+    if (year.length === 2) {
+      year = '20' + year;
+    }
+    return `${year}-${month}-${day}`;
+  }
+
+  // 5. Just a 4-digit year (e.g. SAMS 2025)
+  const yearMatch = upper.match(/\b(20\d{2}|19\d{2})\b/);
+  if (yearMatch) {
+    return `${yearMatch[1]}-01-01`;
+  }
+  
+  return '1970-01-01';
+}
+
 
 export async function GET(request: Request) {
   if (!await hasPermission('canViewReports')) {
@@ -106,10 +179,18 @@ export async function GET(request: Request) {
       const actualEmployeeId = member ? member.employee_id : cleanId;
       const attendance = await sSelect('member_attendance', `select=*,events(id,name,date)&employee_id=eq.${encodeURIComponent(actualEmployeeId)}&order=created_at.desc`);
       const totalEventsArr = await sSelect('events', 'select=id');
+      const mappedAttendance = attendance.map((a: any) => ({ id: a.events?.id, name: a.events?.name, date: a.events?.date, created_at: a.created_at }));
+      // Sort in JS ascending by extracted date from event name
+      mappedAttendance.sort((a: any, b: any) => {
+        const dateA = extractDateFromEventName(a.name);
+        const dateB = extractDateFromEventName(b.name);
+        if (dateA !== dateB) return dateA.localeCompare(dateB);
+        return (a.created_at || '').localeCompare(b.created_at || '');
+      });
       return NextResponse.json({
         success: true,
         member: member ? mapToFrontend(member, MEMBER_MAPPING) : null,
-        attendance: attendance.map((a: any) => ({ id: a.events?.id, name: a.events?.name, date: a.events?.date, created_at: a.created_at })),
+        attendance: mappedAttendance,
         totalEvents: totalEventsArr.length,
         attendedEventsCount: attendance.length,
       });
@@ -169,7 +250,14 @@ export async function GET(request: Request) {
     }
 
     const actualEmployeeId = member ? member.employee_id : cleanId;
-    const attendance = db.prepare(`SELECT e.id, e.name, e.date, ma.created_at FROM member_attendance ma JOIN events e ON ma.event_id = e.id WHERE ma.employee_id = ? ORDER BY e.date DESC, ma.created_at DESC`).all(actualEmployeeId);
+    const attendance = db.prepare(`SELECT e.id, e.name, e.date, ma.created_at FROM member_attendance ma JOIN events e ON ma.event_id = e.id WHERE ma.employee_id = ?`).all(actualEmployeeId) as any[];
+    // Sort in JS ascending by extracted date from event name
+    attendance.sort((a: any, b: any) => {
+      const dateA = extractDateFromEventName(a.name);
+      const dateB = extractDateFromEventName(b.name);
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      return (a.created_at || '').localeCompare(b.created_at || '');
+    });
     const totalEvents = (db.prepare('SELECT COUNT(*) as count FROM events').get() as any).count;
     db.close();
     return NextResponse.json({
@@ -212,6 +300,10 @@ export async function POST(request: Request) {
         await sDelete('events', `id=eq.${data.eventId}`);
         return NextResponse.json({ success: true });
       }
+      if (data.action === 'renameEvent') {
+        await sUpdate('events', `id=eq.${data.eventId}`, { name: data.name });
+        return NextResponse.json({ success: true, name: data.name });
+      }
       return NextResponse.json({ error: 'Acción no válida' }, { status: 400 });
     }
 
@@ -244,6 +336,11 @@ export async function POST(request: Request) {
       db.prepare('DELETE FROM events WHERE id = ?').run(data.eventId);
       db.close();
       return NextResponse.json({ success: true });
+    }
+    if (data.action === 'renameEvent') {
+      db.prepare('UPDATE events SET name = ? WHERE id = ?').run(data.name, data.eventId);
+      db.close();
+      return NextResponse.json({ success: true, name: data.name });
     }
     db.close();
     return NextResponse.json({ error: 'Acción no válida' }, { status: 400 });
