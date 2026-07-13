@@ -72,6 +72,24 @@ export const MemberTable: React.FC<MemberTableProps> = ({
     setTempDepartamento(filterDepartamento);
   }, [filterNomina, filterNombre, filterPuesto, filterDepartamento]);
 
+  // Click outside to close dropdowns
+  useEffect(() => {
+    if (!activeFilterDropdown) return;
+
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('.filter-dropdown-container') || target.closest('.filter-trigger-btn')) {
+        return;
+      }
+      setActiveFilterDropdown(null);
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [activeFilterDropdown]);
+
   const renderTextFilterDropdown = (
     columnId: string,
     title: string,
@@ -83,7 +101,7 @@ export const MemberTable: React.FC<MemberTableProps> = ({
     if (activeFilterDropdown !== columnId) return null;
     return (
       <div 
-        className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-2xl shadow-xl p-4 z-50 w-64 text-slate-800 normal-case font-medium animate-in fade-in slide-in-from-top-2 duration-150"
+        className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-2xl shadow-xl p-4 z-50 w-64 text-slate-800 normal-case font-medium animate-in fade-in slide-in-from-top-2 duration-150 filter-dropdown-container"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-3 border-b border-gray-150 pb-2">
@@ -136,7 +154,7 @@ export const MemberTable: React.FC<MemberTableProps> = ({
     if (activeFilterDropdown !== columnId) return null;
     return (
       <div 
-        className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-2xl shadow-xl p-2 z-50 w-56 text-slate-800 normal-case font-medium animate-in fade-in slide-in-from-top-2 duration-150"
+        className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-2xl shadow-xl p-2 z-50 w-56 text-slate-800 normal-case font-medium animate-in fade-in slide-in-from-top-2 duration-150 filter-dropdown-container"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-3 py-2 border-b border-gray-150 mb-1">
@@ -173,14 +191,6 @@ export const MemberTable: React.FC<MemberTableProps> = ({
 
   return (
     <div className="space-y-8 h-full flex flex-col relative overflow-visible">
-      {/* Invisible backdrop to dismiss active dropdown */}
-      {activeFilterDropdown && (
-        <div 
-          className="fixed inset-0 z-40 bg-transparent" 
-          onClick={() => setActiveFilterDropdown(null)} 
-        />
-      )}
-
       <div className="rounded-[2rem] border border-gray-100 bg-white overflow-auto shadow-xl shadow-gray-200/50 flex-1 relative z-10">
         <Table>
           <TableHeader className="bg-gray-50/80 sticky top-0 z-10">
@@ -193,7 +203,7 @@ export const MemberTable: React.FC<MemberTableProps> = ({
                   <span>Nómina</span>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setActiveFilterDropdown(activeFilterDropdown === 'nomina' ? null : 'nomina'); }}
-                    className={`p-1 rounded-md hover:bg-gray-200 transition-colors ${filterNomina ? 'text-blue-600 bg-blue-50' : 'text-gray-400'}`}
+                    className={`filter-trigger-btn p-1 rounded-md hover:bg-gray-200 transition-colors ${filterNomina ? 'text-blue-600 bg-blue-50' : 'text-gray-400'}`}
                   >
                     <Filter className="w-3.5 h-3.5" />
                   </button>
@@ -207,7 +217,7 @@ export const MemberTable: React.FC<MemberTableProps> = ({
                   <span>Nombre Completo</span>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setActiveFilterDropdown(activeFilterDropdown === 'nombre' ? null : 'nombre'); }}
-                    className={`p-1 rounded-md hover:bg-gray-200 transition-colors ${filterNombre ? 'text-blue-600 bg-blue-50' : 'text-gray-400'}`}
+                    className={`filter-trigger-btn p-1 rounded-md hover:bg-gray-200 transition-colors ${filterNombre ? 'text-blue-600 bg-blue-50' : 'text-gray-400'}`}
                   >
                     <Filter className="w-3.5 h-3.5" />
                   </button>
@@ -221,7 +231,7 @@ export const MemberTable: React.FC<MemberTableProps> = ({
                   <span>Tipo de Agremiado</span>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setActiveFilterDropdown(activeFilterDropdown === 'tipo' ? null : 'tipo'); }}
-                    className={`p-1 rounded-md hover:bg-gray-200 transition-colors ${filterTipo ? 'text-blue-600 bg-blue-50' : 'text-gray-400'}`}
+                    className={`filter-trigger-btn p-1 rounded-md hover:bg-gray-200 transition-colors ${filterTipo ? 'text-blue-600 bg-blue-50' : 'text-gray-400'}`}
                   >
                     <Filter className="w-3.5 h-3.5" />
                   </button>
@@ -241,7 +251,7 @@ export const MemberTable: React.FC<MemberTableProps> = ({
                   <span>Estado</span>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setActiveFilterDropdown(activeFilterDropdown === 'estado' ? null : 'estado'); }}
-                    className={`p-1 rounded-md hover:bg-gray-200 transition-colors ${filterEstado ? 'text-blue-600 bg-blue-50' : 'text-gray-400'}`}
+                    className={`filter-trigger-btn p-1 rounded-md hover:bg-gray-200 transition-colors ${filterEstado ? 'text-blue-600 bg-blue-50' : 'text-gray-400'}`}
                   >
                     <Filter className="w-3.5 h-3.5" />
                   </button>
@@ -263,7 +273,7 @@ export const MemberTable: React.FC<MemberTableProps> = ({
                   <span>Puesto</span>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setActiveFilterDropdown(activeFilterDropdown === 'puesto' ? null : 'puesto'); }}
-                    className={`p-1 rounded-md hover:bg-gray-200 transition-colors ${filterPuesto ? 'text-blue-600 bg-blue-50' : 'text-gray-400'}`}
+                    className={`filter-trigger-btn p-1 rounded-md hover:bg-gray-200 transition-colors ${filterPuesto ? 'text-blue-600 bg-blue-50' : 'text-gray-400'}`}
                   >
                     <Filter className="w-3.5 h-3.5" />
                   </button>
@@ -277,7 +287,7 @@ export const MemberTable: React.FC<MemberTableProps> = ({
                   <span>Departamento</span>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setActiveFilterDropdown(activeFilterDropdown === 'departamento' ? null : 'departamento'); }}
-                    className={`p-1 rounded-md hover:bg-gray-200 transition-colors ${filterDepartamento ? 'text-blue-600 bg-blue-50' : 'text-gray-400'}`}
+                    className={`filter-trigger-btn p-1 rounded-md hover:bg-gray-200 transition-colors ${filterDepartamento ? 'text-blue-600 bg-blue-50' : 'text-gray-400'}`}
                   >
                     <Filter className="w-3.5 h-3.5" />
                   </button>
