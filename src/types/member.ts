@@ -48,8 +48,8 @@ export interface Member {
   socioId?: string;
   employeeId?: string;
   fullName: string;
-  memberType: 'AGREMIADO' | 'DELEGADO' | 'SECRETARIO GENERAL';
-  status?: 'ACTIVO' | 'BAJA' | 'LISTA DE ESPERA' | 'FINADO' | 'INCAPACITADO' | 'PENSIONADO';
+  memberType: 'AGREMIADO' | 'DELEGADO' | 'SECRETARIO GENERAL' | 'LISTA DE ESPERA';
+  status?: 'ACTIVO' | 'BAJA' | 'INCAPACITADO' | 'FINADO' | 'N/A';
   position?: string;
   department?: string; // DIRECCION in Excel
   secretariat?: string; // SECRETARIA in Excel

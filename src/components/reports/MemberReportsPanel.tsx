@@ -31,6 +31,32 @@ import { toast } from 'sonner';
 import { Member } from '@/types/member';
 import Link from 'next/link';
 
+const getIsPensioner = (item: any) => {
+  if (!item.joinDate) return false;
+  const today = new Date();
+  const parseDateStr = (dateStr: any) => {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? null : d;
+  };
+  const jDate = parseDateStr(item.joinDate);
+  const bDate = parseDateStr(item.birthDate);
+  if (!jDate) return false;
+  
+  let years = today.getFullYear() - jDate.getFullYear();
+  if (today < new Date(today.getFullYear(), jDate.getMonth(), jDate.getDate())) years--;
+  
+  if (item.status === 'INCAPACITADO') {
+    return years >= 10;
+  }
+  
+  if (!bDate) return false;
+  let age = today.getFullYear() - bDate.getFullYear();
+  if (today < new Date(today.getFullYear(), bDate.getMonth(), bDate.getDate())) age--;
+  
+  return age > 50 && years >= 15;
+};
+
 export function MemberReportsPanel({ 
   inline = false, 
   onClose = () => {},
@@ -48,6 +74,7 @@ export function MemberReportsPanel({
       case 'AGREMIADO': return 'Agremiado';
       case 'ACTIVO': return 'Agremiado';
       case 'ESPERA': return 'Lista de Espera';
+      case 'LISTA DE ESPERA': return 'Lista de Espera';
       case 'PENSIONADO': return 'Pensionado';
       default: return type || 'Agremiado';
     }
@@ -463,9 +490,9 @@ export function MemberReportsPanel({
       } else if (selectedReport.id === 'DELEGADO') {
         base = base.filter(m => m.memberType === 'DELEGADO' && m.status === 'ACTIVO');
       } else if (selectedReport.id === 'ESPERA') {
-        base = base.filter(m => m.status === 'LISTA DE ESPERA');
+        base = base.filter(m => m.memberType === 'LISTA DE ESPERA');
       } else if (selectedReport.id === 'PENSIONADO') {
-        base = base.filter(m => m.status === 'PENSIONADO');
+        base = base.filter(m => getIsPensioner(m));
       }
     }
     const depts = base.map(m => m.department?.trim()).filter(Boolean);
@@ -481,9 +508,9 @@ export function MemberReportsPanel({
       } else if (selectedReport.id === 'DELEGADO') {
         base = base.filter(m => m.memberType === 'DELEGADO' && m.status === 'ACTIVO');
       } else if (selectedReport.id === 'ESPERA') {
-        base = base.filter(m => m.status === 'LISTA DE ESPERA');
+        base = base.filter(m => m.memberType === 'LISTA DE ESPERA');
       } else if (selectedReport.id === 'PENSIONADO') {
-        base = base.filter(m => m.status === 'PENSIONADO');
+        base = base.filter(m => getIsPensioner(m));
       }
     }
     if (dept !== 'ALL') {
@@ -552,9 +579,9 @@ export function MemberReportsPanel({
         } else if (reportId === 'DELEGADO') {
           fetchedData = (data || []).filter((m: any) => m.memberType === 'DELEGADO' && m.status === 'ACTIVO');
         } else if (reportId === 'ESPERA') {
-          fetchedData = (data || []).filter((m: any) => m.status === 'LISTA DE ESPERA');
+          fetchedData = (data || []).filter((m: any) => m.memberType === 'LISTA DE ESPERA');
         } else if (reportId === 'PENSIONADO') {
-          fetchedData = (data || []).filter((m: any) => m.status === 'PENSIONADO');
+          fetchedData = (data || []).filter((m: any) => getIsPensioner(m));
         } else {
           fetchedData = data || [];
         }
@@ -621,9 +648,9 @@ export function MemberReportsPanel({
       } else if (selectedReport.id === 'DELEGADO') {
         base = base.filter(m => m.memberType === 'DELEGADO' && m.status === 'ACTIVO');
       } else if (selectedReport.id === 'ESPERA') {
-        base = base.filter(m => m.status === 'LISTA DE ESPERA');
+        base = base.filter(m => m.memberType === 'LISTA DE ESPERA');
       } else if (selectedReport.id === 'PENSIONADO') {
-        base = base.filter(m => m.status === 'PENSIONADO');
+        base = base.filter(m => getIsPensioner(m));
       }
 
       // Search query (Nómina or Nombre)

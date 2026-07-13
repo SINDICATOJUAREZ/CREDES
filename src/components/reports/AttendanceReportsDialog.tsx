@@ -63,6 +63,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
   const [top20Loading, setTop20Loading] = useState(false);
   const [top20Search, setTop20Search] = useState('');
   const [top20TypeFilter, setTop20TypeFilter] = useState('ALL');
+  const [top20SubTab, setTop20SubTab] = useState<'general' | 'espera'>('general');
 
   useEffect(() => { 
     if ((isOpen || inline) && tab === 'top20') {
@@ -84,17 +85,59 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
     }
   };
 
-  const chartData = top20Data
-    .filter((m: any) => m.status === 'ACTIVO' || m.status === 'LISTA DE ESPERA')
-    .slice(0, 20);
+  const getIsPensioner = (item: any) => {
+    if (!item.joinDate) return false;
+    const today = new Date();
+    const parseDateStr = (dateStr: any) => {
+      if (!dateStr) return null;
+      const d = new Date(dateStr);
+      return isNaN(d.getTime()) ? null : d;
+    };
+    const jDate = parseDateStr(item.joinDate);
+    const bDate = parseDateStr(item.birthDate);
+    if (!jDate) return false;
+    
+    let years = today.getFullYear() - jDate.getFullYear();
+    if (today < new Date(today.getFullYear(), jDate.getMonth(), jDate.getDate())) years--;
+    
+    if (item.status === 'INCAPACITADO') {
+      return years >= 10;
+    }
+    
+    if (!bDate) return false;
+    let age = today.getFullYear() - bDate.getFullYear();
+    if (today < new Date(today.getFullYear(), bDate.getMonth(), bDate.getDate())) age--;
+    
+    return age > 50 && years >= 15;
+  };
 
-  const filteredAllAttendees = top20Data.filter((item: any) => {
+  const currentTop20Data = top20Data.filter((m: any) => {
+    if (top20SubTab === 'espera') {
+      return m.memberType === 'LISTA DE ESPERA';
+    } else {
+      return m.memberType !== 'LISTA DE ESPERA';
+    }
+  });
+
+  const chartData = currentTop20Data.slice(0, 20);
+
+  const filteredAllAttendees = currentTop20Data.filter((item: any) => {
     const query = top20Search.toLowerCase().trim();
     const matchesSearch = !query || 
       item.fullName.toLowerCase().includes(query) || 
       item.employeeId.toLowerCase().includes(query);
-    const matchesType = top20TypeFilter === 'ALL' || item.memberType === top20TypeFilter;
-    return matchesSearch && matchesType;
+      
+    if (top20SubTab === 'espera') {
+      return matchesSearch;
+    }
+
+    if (top20TypeFilter === 'ALL') return matchesSearch;
+    if (top20TypeFilter === 'ACTIVO') return matchesSearch && item.status === 'ACTIVO';
+    if (top20TypeFilter === 'DELEGADO') return matchesSearch && item.memberType === 'DELEGADO';
+    if (top20TypeFilter === 'BAJA') return matchesSearch && item.status === 'BAJA' && !getIsPensioner(item);
+    if (top20TypeFilter === 'PENSIONADO') return matchesSearch && getIsPensioner(item);
+    
+    return matchesSearch;
   });
 
   const downloadTop20CSV = () => {
@@ -426,6 +469,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
       case 'AGREMIADO': return 'Agremiado';
       case 'ACTIVO': return 'Agremiado';
       case 'ESPERA': return 'Lista de Espera';
+      case 'LISTA DE ESPERA': return 'Lista de Espera';
       case 'PENSIONADO': return 'Pensionado';
       default: return type || 'Agremiado';
     }
@@ -556,13 +600,13 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
           filtered = allMembers.filter(m => m.memberType === 'AGREMIADO' && m.status === 'ACTIVO');
           title = 'PADRÓN GENERAL DE AGREMIADOS';
         } else if (typeFilter === 'ESPERA') {
-          filtered = allMembers.filter(m => m.status === 'LISTA DE ESPERA');
+          filtered = allMembers.filter(m => m.memberType === 'LISTA DE ESPERA');
           title = 'PADRÓN EN LISTA DE ESPERA';
         } else if (typeFilter === 'DELEGADO') {
           filtered = allMembers.filter(m => m.memberType === 'DELEGADO' && m.status === 'ACTIVO');
           title = 'PADRÓN DE DELEGADOS SINDICALES';
         } else if (typeFilter === 'PENSIONADO') {
-          filtered = allMembers.filter(m => m.status === 'PENSIONADO');
+          filtered = allMembers.filter(m => getIsPensioner(m));
           title = 'PADRÓN DE JUBILADOS Y PENSIONADOS';
         }
       }
@@ -1447,14 +1491,39 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                   <p className="text-gray-400 text-xs md:text-sm font-medium">Agremiados y Lista de Espera con mayor asistencia registrada</p>
                 </div>
                 
-                <Button
-                  onClick={downloadTop20CSV}
-                  disabled={top20Data.length === 0}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest px-5 py-2.5 rounded-xl shadow-lg shadow-emerald-100 flex items-center gap-2 self-start md:self-auto text-xs"
-                >
-                  <Download className="w-4 h-4" />
-                  Exportar CSV
-                </Button>
+                <div className="flex items-center gap-3 self-start md:self-auto">
+                  <div className="flex gap-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm text-xs font-bold uppercase">
+                    <button
+                      onClick={() => { setTop20SubTab('general'); setTop20TypeFilter('ALL'); }}
+                      className={`px-3 py-1.5 rounded-lg transition-all duration-200 ${
+                        top20SubTab === 'general'
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-gray-500 hover:text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      General
+                    </button>
+                    <button
+                      onClick={() => { setTop20SubTab('espera'); setTop20TypeFilter('ALL'); }}
+                      className={`px-3 py-1.5 rounded-lg transition-all duration-200 ${
+                        top20SubTab === 'espera'
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-gray-500 hover:text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      Lista de Espera
+                    </button>
+                  </div>
+
+                  <Button
+                    onClick={downloadTop20CSV}
+                    disabled={top20Data.length === 0}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest px-5 py-2.5 rounded-xl shadow-lg shadow-emerald-100 flex items-center gap-2 text-xs"
+                  >
+                    <Download className="w-4 h-4" />
+                    Exportar CSV
+                  </Button>
+                </div>
               </div>
 
               {top20Loading ? (
@@ -1517,12 +1586,12 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                                 <div className="flex items-center gap-2 mt-0.5">
                                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Nómina: {item.employeeId}</span>
                                   <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${
-                                    item.status === 'LISTA DE ESPERA' ? 'bg-amber-100 text-amber-800' : 
+                                    item.memberType === 'LISTA DE ESPERA' ? 'bg-amber-100 text-amber-800' : 
                                     item.memberType === 'DELEGADO' ? 'bg-purple-100 text-purple-800' :
                                     item.memberType === 'SECRETARIO GENERAL' ? 'bg-indigo-100 text-indigo-800' :
                                     'bg-emerald-100 text-emerald-800'
                                   }`}>
-                                    {item.status === 'LISTA DE ESPERA' ? 'Lista de Espera' : getMemberTypeLabel(item.memberType)}
+                                    {getMemberTypeLabel(item.memberType)}
                                   </span>
                                 </div>
                               </div>
@@ -1570,18 +1639,19 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                         </div>
                         
                         {/* Filter dropdown */}
-                        <select
-                          value={top20TypeFilter}
-                          onChange={(e) => setTop20TypeFilter(e.target.value)}
-                          className="bg-gray-50 border border-gray-200 text-slate-800 rounded-xl px-3 py-1 text-xs font-bold uppercase h-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="ALL">Todos los roles</option>
-                          <option value="ACTIVO">Activos</option>
-                          <option value="ESPERA">Lista de Espera</option>
-                          <option value="PENSIONADO">Pensionados</option>
-                          <option value="DELEGADO">Delegados</option>
-                          <option value="BAJA">Bajas</option>
-                        </select>
+                        {top20SubTab === 'general' && (
+                          <select
+                            value={top20TypeFilter}
+                            onChange={(e) => setTop20TypeFilter(e.target.value)}
+                            className="bg-gray-50 border border-gray-200 text-slate-800 rounded-xl px-3 py-1 text-xs font-bold uppercase h-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="ALL">Todos los roles</option>
+                            <option value="ACTIVO">Activos</option>
+                            <option value="PENSIONADO">Pensionados</option>
+                            <option value="DELEGADO">Delegados</option>
+                            <option value="BAJA">Bajas</option>
+                          </select>
+                        )}
                       </div>
                     </div>
                     
@@ -1622,12 +1692,12 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                               <td className="py-3 px-4 text-center">
                                 <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
                                   item.status === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800' : 
-                                  item.status === 'PENSIONADO' ? 'bg-blue-100 text-blue-800' :
-                                  item.status === 'LISTA DE ESPERA' ? 'bg-orange-100 text-orange-800' :
                                   item.status === 'INCAPACITADO' ? 'bg-amber-100 text-amber-800' :
+                                  item.status === 'N/A' ? 'bg-orange-100 text-orange-800' :
+                                  getIsPensioner(item) ? 'bg-blue-100 text-blue-800' :
                                   'bg-red-100 text-red-800'
                                 }`}>
-                                  {item.status}
+                                  {item.status === 'N/A' ? 'N/A' : (getIsPensioner(item) ? 'PENSIONADO' : item.status)}
                                 </span>
                               </td>
                               <td className="py-3 px-4 text-center font-black text-blue-900 text-sm">{item.count}</td>

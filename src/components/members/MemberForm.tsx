@@ -220,13 +220,24 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-black text-blue-900 uppercase tracking-widest">Estado</Label>
-                <select {...register('status')} className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-gray-50/30 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500">
+                <select 
+                  {...register('status')} 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setValue('status', val as any);
+                    if (val === 'N/A') {
+                      setValue('memberType', 'LISTA DE ESPERA');
+                    } else if (watch('memberType') === 'LISTA DE ESPERA') {
+                      setValue('memberType', 'AGREMIADO');
+                    }
+                  }}
+                  className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-gray-50/30 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500"
+                >
                   <option value="ACTIVO">ACTIVO</option>
                   <option value="BAJA">BAJA</option>
-                  <option value="LISTA DE ESPERA">LISTA DE ESPERA</option>
-                  <option value="FINADO">FINADO</option>
                   <option value="INCAPACITADO">INCAPACITADO</option>
-                  <option value="PENSIONADO">PENSIONADO</option>
+                  <option value="FINADO">FINADO</option>
+                  <option value="N/A">N/A</option>
                 </select>
               </div>
               <div className="space-y-2 col-span-2">
@@ -235,10 +246,23 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-black text-blue-900 uppercase tracking-widest">Tipo de Miembro</Label>
-                <select {...register('memberType')} className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-gray-50/30 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500">
+                <select 
+                  {...register('memberType')} 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setValue('memberType', val as any);
+                    if (val === 'LISTA DE ESPERA') {
+                      setValue('status', 'N/A');
+                    } else if (watch('status') === 'N/A') {
+                      setValue('status', 'ACTIVO');
+                    }
+                  }}
+                  className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-gray-50/30 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500"
+                >
                   <option value="AGREMIADO">Agremiado</option>
                   <option value="DELEGADO">Delegado</option>
                   <option value="SECRETARIO GENERAL">Secretario General</option>
+                  <option value="LISTA DE ESPERA">Lista de Espera</option>
                 </select>
               </div>
               <div className="space-y-2">

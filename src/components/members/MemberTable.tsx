@@ -67,13 +67,18 @@ export const MemberTable: React.FC<MemberTableProps> = ({ members, onView, onEdi
                       <div className="flex gap-2 mt-1">
                         {/* Member Type Badge */}
                         {member.memberType === 'SECRETARIO GENERAL' && (
-                          <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full border border-amber-200">
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full border border-indigo-200">
                             Secretario General
                           </span>
                         )}
                         {member.memberType === 'DELEGADO' && (
                           <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full border border-purple-200">
                             Delegado
+                          </span>
+                        )}
+                        {member.memberType === 'LISTA DE ESPERA' && (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full border border-orange-200">
+                            Lista de Espera
                           </span>
                         )}
                         {member.memberType === 'AGREMIADO' && (
@@ -83,21 +88,28 @@ export const MemberTable: React.FC<MemberTableProps> = ({ members, onView, onEdi
                         )}
 
                         {/* Status Badges (if not normal ACTIVO status) */}
-                        {member.status === 'BAJA' && (
-                          <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-red-100 text-red-700 rounded-full border border-red-200">
-                            Baja
-                          </span>
-                        )}
-                        {member.status === 'LISTA DE ESPERA' && (
-                          <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full border border-orange-200">
-                            Lista de Espera
-                          </span>
-                        )}
-                        {member.status === 'PENSIONADO' && (
-                          <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full border border-blue-200">
-                            Pensionado
-                          </span>
-                        )}
+                        {member.status === 'BAJA' && (() => {
+                          const today = new Date();
+                          const parseDate = (dStr: any) => {
+                            if (!dStr) return null;
+                            const d = new Date(dStr);
+                            return isNaN(d.getTime()) ? null : d;
+                          };
+                          const jDate = parseDate(member.joinDate);
+                          const bDate = parseDate(member.birthDate);
+                          let years = jDate ? today.getFullYear() - jDate.getFullYear() : 0;
+                          let age = bDate ? today.getFullYear() - bDate.getFullYear() : 0;
+                          const isPensioned = (age > 50 && years >= 15);
+                          return isPensioned ? (
+                            <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full border border-blue-200">
+                              Pensionado
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-red-100 text-red-700 rounded-full border border-red-200">
+                              Baja
+                            </span>
+                          );
+                        })()}
                         {member.status === 'FINADO' && (
                           <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full border border-slate-200">
                             Finado

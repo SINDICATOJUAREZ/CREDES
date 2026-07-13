@@ -105,7 +105,7 @@ export async function GET(request: Request) {
     if (isProduction) {
       if (action === 'top20') {
         const attendance = await sSelect('member_attendance', 'select=employee_id');
-        const members = await sSelect('members', 'select=employee_id,full_name,member_type,status,department,photo_url');
+        const members = await sSelect('members', 'select=employee_id,full_name,member_type,status,department,photo_url,birth_date,join_date');
         
         const counts: Record<string, number> = {};
         for (const a of attendance) {
@@ -128,6 +128,8 @@ export async function GET(request: Request) {
             status: m.status || 'UNKNOWN',
             department: m.department || 'N/A',
             photoUrl: m.photo_url || null,
+            birthDate: m.birth_date || null,
+            joinDate: m.join_date || null,
             count
           };
         });
@@ -204,7 +206,8 @@ export async function GET(request: Request) {
     if (action === 'top20') {
       const rows = db.prepare(`
         SELECT ma.employee_id as employeeId, COUNT(*) as count, m.full_name as fullName, 
-               m.member_type as memberType, m.status, m.department, m.photo_url as photoUrl
+               m.member_type as memberType, m.status, m.department, m.photo_url as photoUrl,
+               m.birth_date as birthDate, m.join_date as joinDate
         FROM member_attendance ma
         LEFT JOIN members m ON m.employee_id = ma.employee_id
         GROUP BY ma.employee_id
@@ -217,7 +220,9 @@ export async function GET(request: Request) {
         fullName: r.fullName || `Nómina ${r.employeeId}`,
         memberType: r.memberType || 'UNKNOWN',
         status: r.status || 'UNKNOWN',
-        department: r.department || 'N/A'
+        department: r.department || 'N/A',
+        birthDate: r.birthDate || null,
+        joinDate: r.joinDate || null
       }));
       
       return NextResponse.json({ success: true, data: result });

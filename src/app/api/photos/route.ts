@@ -47,7 +47,7 @@ export async function GET() {
           const items = await res.json();
           const photos = items.map((item: any) => ({
             name: item.name,
-            url: `${url}/storage/v1/object/public/photos/${encodeURIComponent(item.name)}`,
+            url: `/api/photos/${encodeURIComponent(item.name)}`,
             size: item.metadata?.size || 0,
             updatedAt: item.updated_at || new Date().toISOString()
           }));
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
         throw new Error(`Supabase Storage upload failed: ${errText}`);
       }
 
-      publicUrl = `${url}/storage/v1/object/public/photos/${encodeURIComponent(fileName)}`;
+      publicUrl = `/api/photos/${encodeURIComponent(fileName)}`;
     } else {
       // Save locally only for local development
       ensureLocalDir();
