@@ -23,6 +23,14 @@ export function MemberDirectoryPanel({ inline = false, onClose = () => {} }: { i
   const [editingMember, setEditingMember] = useState<Member | undefined>(undefined);
   const [user, setUser] = useState<any>(null);
 
+  // Column Filters
+  const [filterNomina, setFilterNomina] = useState('');
+  const [filterNombre, setFilterNombre] = useState('');
+  const [filterTipo, setFilterTipo] = useState('');
+  const [filterEstado, setFilterEstado] = useState('');
+  const [filterPuesto, setFilterPuesto] = useState('');
+  const [filterDepartamento, setFilterDepartamento] = useState('');
+
   useEffect(() => {
     const localUser = localStorage.getItem('user');
     if (localUser) {
@@ -43,10 +51,20 @@ export function MemberDirectoryPanel({ inline = false, onClose = () => {} }: { i
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  const { data, error, mutate } = useSWR(
-    `/api/members?page=${page}&limit=50&search=${encodeURIComponent(debouncedSearch)}`,
-    fetcher
-  );
+  // Reset page when column filters change
+  useEffect(() => {
+    setPage(1);
+  }, [filterNomina, filterNombre, filterTipo, filterEstado, filterPuesto, filterDepartamento]);
+
+  let fetchUrl = `/api/members?page=${page}&limit=50&search=${encodeURIComponent(debouncedSearch)}`;
+  if (filterNomina) fetchUrl += `&employeeId=${encodeURIComponent(filterNomina)}`;
+  if (filterNombre) fetchUrl += `&fullName=${encodeURIComponent(filterNombre)}`;
+  if (filterTipo) fetchUrl += `&memberType=${encodeURIComponent(filterTipo)}`;
+  if (filterEstado) fetchUrl += `&status=${encodeURIComponent(filterEstado)}`;
+  if (filterPuesto) fetchUrl += `&position=${encodeURIComponent(filterPuesto)}`;
+  if (filterDepartamento) fetchUrl += `&department=${encodeURIComponent(filterDepartamento)}`;
+
+  const { data, error, mutate } = useSWR(fetchUrl, fetcher);
 
   const members = data?.data || [];
   const meta = data?.meta || { total: 0, totalPages: 1 };
@@ -144,6 +162,18 @@ export function MemberDirectoryPanel({ inline = false, onClose = () => {} }: { i
               onDelete={handleDeleteMember}
               canEdit={canCreate}
               canDelete={canCreate}
+              filterNomina={filterNomina}
+              setFilterNomina={setFilterNomina}
+              filterNombre={filterNombre}
+              setFilterNombre={setFilterNombre}
+              filterTipo={filterTipo}
+              setFilterTipo={setFilterTipo}
+              filterEstado={filterEstado}
+              setFilterEstado={setFilterEstado}
+              filterPuesto={filterPuesto}
+              setFilterPuesto={setFilterPuesto}
+              filterDepartamento={filterDepartamento}
+              setFilterDepartamento={setFilterDepartamento}
             />
           )}
 
