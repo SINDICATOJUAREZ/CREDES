@@ -61,7 +61,7 @@ export async function GET(request: Request) {
         query += `&limit=${limit}&offset=${offset}`;
       }
       if (search) {
-        const s = encodeURIComponent(`%${search}%`);
+        const s = encodeURIComponent(`*${search}*`);
         query += `&or=(full_name.ilike.${s},employee_id.ilike.${s},department.ilike.${s},socio_id.ilike.${s})`;
       } else if (!status) {
         query += `&status=neq.BAJA`;
@@ -77,16 +77,16 @@ export async function GET(request: Request) {
         }
       }
       if (employeeId) {
-        query += `&employee_id=ilike.%${encodeURIComponent(employeeId)}%`;
+        query += `&employee_id=ilike.*${encodeURIComponent(employeeId)}*`;
       }
       if (fullName) {
-        query += `&full_name=ilike.%${encodeURIComponent(fullName)}%`;
+        query += `&full_name=ilike.*${encodeURIComponent(fullName)}*`;
       }
       if (position) {
-        query += `&position=ilike.%${encodeURIComponent(position)}%`;
+        query += `&position=ilike.*${encodeURIComponent(position)}*`;
       }
       if (department) {
-        query += `&department=ilike.%${encodeURIComponent(department)}%`;
+        query += `&department=ilike.*${encodeURIComponent(department)}*`;
       }
       const { data: members, count: total } = await sSelectCount('members', query);
       

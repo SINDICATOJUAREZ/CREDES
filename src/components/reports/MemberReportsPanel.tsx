@@ -688,6 +688,15 @@ export function MemberReportsPanel({
     const items = getFilteredItems();
     if (selectedReport?.id === 'complaints') {
       return items.sort((a, b) => (b.report_date || '').localeCompare(a.report_date || ''));
+    } else if (selectedReport?.id === 'ESPERA') {
+      return items.sort((a, b) => {
+        const dateA = a.joinDate || '';
+        const dateB = b.joinDate || '';
+        if (!dateA && !dateB) return (a.fullName || '').localeCompare(b.fullName || '');
+        if (!dateA) return 1; // Put empty/N/A dates at the end
+        if (!dateB) return -1;
+        return dateA.localeCompare(dateB);
+      });
     } else {
       return items.sort((a, b) => (a.fullName || '').localeCompare(b.fullName || ''));
     }
