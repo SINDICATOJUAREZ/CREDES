@@ -30,6 +30,18 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { Member } from '@/types/member';
 import Link from 'next/link';
+const formatDate = (dateStr?: string) => {
+  if (!dateStr) return 'N/A';
+  const clean = dateStr.split('T')[0];
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    if (parts[0].length === 4) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return `${parts[0]}/${parts[1]}/${parts[2]}`;
+  }
+  return dateStr;
+};
 
 const getIsPensioner = (item: any) => {
   if (!item.joinDate) return false;
@@ -750,11 +762,14 @@ export function MemberReportsPanel({
       return; 
     }
 
+    const isEspera = selectedReport?.id === 'ESPERA';
+
     const rows = filtered.map((m, idx) => `
       <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
         <td style="padding: 10px; font-weight: bold; color: #64748b; text-align: center;">${idx + 1}</td>
         <td style="padding: 10px; font-family: monospace; font-weight: bold; text-align: center;">${m.employeeId || 'N/A'}</td>
         <td style="padding: 10px; font-weight: bold; text-transform: uppercase;">${m.fullName || 'N/A'}</td>
+        ${isEspera ? `<td style="padding: 10px; text-align: center; font-weight: bold; color: #334155;">${formatDate(m.joinDate)}</td>` : ''}
         <td style="padding: 10px; text-transform: uppercase; font-size: 10px; color: #475569;">${m.department || 'N/A'}</td>
         <td style="padding: 10px; text-transform: uppercase; font-size: 10px; color: #475569;">${m.position || 'N/A'}</td>
         <td style="padding: 10px; text-transform: uppercase; font-size: 10px; color: #475569; text-align: center;">${getMemberTypeLabel(m.memberType || '')}</td>
@@ -845,6 +860,7 @@ export function MemberReportsPanel({
               <th style="width: 50px;">No.</th>
               <th style="width: 100px;">Nómina</th>
               <th>Nombre del Trabajador</th>
+              ${isEspera ? '<th>Fecha de Espera</th>' : ''}
               <th>Secretaría / Dirección</th>
               <th>Puesto Oficial</th>
               <th>Tipo de Agremiado</th>
@@ -852,7 +868,7 @@ export function MemberReportsPanel({
             </tr>
           </thead>
           <tbody>
-            ${rows || '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #999;">No se encontraron registros para este reporte.</td></tr>'}
+            ${rows || `<tr><td colspan="${isEspera ? '8' : '7'}" style="text-align: center; padding: 20px; color: #999;">No se encontraron registros para este reporte.</td></tr>`}
           </tbody>
         </table>
 
@@ -1033,7 +1049,20 @@ export function MemberReportsPanel({
       const typeName = selectedReport.id === 'ALL' ? 'General' : selectedReport.title.replace(/\s+/g, '_');
       const deptName = selectedDept === 'ALL' ? 'Todos' : selectedDept.replace(/\s+/g, '_');
       const filename = `Padron_${typeName}_${deptName}_seleccion.csv`;
-      downloadCSV(items, memberHeaders, filename);
+      
+      let headers = [...memberHeaders];
+      if (selectedReport.id === 'ESPERA') {
+        headers = [
+          { key: 'employeeId', label: 'Nómina' },
+          { key: 'fullName', label: 'Nombre del Trabajador' },
+          { key: 'joinDate', label: 'Fecha de Espera' },
+          { key: 'department', label: 'Secretaría / Dirección' },
+          { key: 'position', label: 'Puesto Oficial' },
+          { key: 'memberType', label: 'Tipo de Agremiado' },
+          { key: 'status', label: 'Estatus' }
+        ];
+      }
+      downloadCSV(items, headers, filename);
     }
   };
 
@@ -1364,6 +1393,9 @@ export function MemberReportsPanel({
                       <th className="px-4 py-4 w-16 text-center text-xs font-black uppercase tracking-wider">No.</th>
                       <th className="px-4 py-4 w-24 text-center text-xs font-black uppercase tracking-wider">Nómina</th>
                       <th className="px-4 py-4 text-xs font-black uppercase tracking-wider">Nombre del Trabajador</th>
+                      {selectedReport.id === 'ESPERA' && (
+                        <th className="px-4 py-4 text-xs font-black uppercase tracking-wider">Fecha de Espera</th>
+                      )}
                       <th className="px-4 py-4 text-xs font-black uppercase tracking-wider">Secretaría / Dirección</th>
                       
                       {selectedReport.id === 'complaints' ? (
@@ -1412,7 +1444,11 @@ export function MemberReportsPanel({
                           <td className="px-4 py-3.5 text-xs font-black text-slate-800 uppercase">
                             {selectedReport.id === 'complaints' ? item.member_name : item.fullName || 'N/A'}
                           </td>
-                          
+                          {selectedReport.id === 'ESPERA' && (
+                            <td className="px-4 py-3.5 text-xs font-bold text-slate-600">
+                              {formatDate(item.joinDate)}
+                            </td>
+                          )}
                           <td className="px-4 py-3.5 text-xs text-slate-600 font-bold uppercase">
                             {selectedReport.id === 'complaints' ? item.member_department : item.department || 'N/A'}
                           </td>
