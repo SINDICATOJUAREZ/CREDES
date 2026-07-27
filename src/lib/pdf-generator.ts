@@ -127,7 +127,7 @@ export const generateVectorialCredentialPDF = async (
 
       // Photo Container (Only if there is no photo element and we want default template photo)
       const hasPhotoElement = config.elements.some(el => (el.field as string) === 'foto' || (el.field as string) === 'photoUrl' || el.type === 'image');
-      if (!hasPhotoElement && member.photoUrl) {
+      if (!hasPhotoElement && member.photoUrl && isFirstPage) {
         pdf.setFillColor(249, 250, 251); // gray-50
         pdf.setDrawColor(config.primaryColor || '#003366');
         pdf.setLineWidth(0.8);
@@ -153,7 +153,7 @@ export const generateVectorialCredentialPDF = async (
         pdf.setFontSize(6);
         pdf.text(`SOCIO: ${member.socioId || '0000'}`, 16, 48.5, { align: 'center' });
       }
-    } else if (member.photoUrl) {
+    } else if (member.photoUrl && isFirstPage) {
       const hasPhotoElement = config.elements.some(el => (el.field as string) === 'foto' || (el.field as string) === 'photoUrl' || el.type === 'image');
       if (!hasPhotoElement) {
         const photoBase64 = await fetchImageAsBase64(member.photoUrl || '');
