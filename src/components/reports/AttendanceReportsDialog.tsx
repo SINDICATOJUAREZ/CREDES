@@ -8,6 +8,7 @@ import { Member } from '@/types/member';
 import { toast } from 'sonner';
 import { QRScanner } from './QRScanner';
 import Link from 'next/link';
+import * as XLSX from 'xlsx';
 
 interface Props { isOpen?: boolean; onClose?: () => void; initialTab?: TabType; inline?: boolean; onlyShowBirthdays?: boolean; }
 type TabType = 'busqueda' | 'cumpleanos' | 'asistencia' | 'top20';
@@ -788,12 +789,16 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
     return new Date().toLocaleDateString('es-ES', { month: 'long' });
   };
 
-  const exportBdaysToCSV = () => {
+  const exportBdaysToExcel = () => {
     if (bdays.length === 0) {
       toast.error('No hay cumpleañeros para exportar');
       return;
     }
-    const headers = ['Nómina', 'Nombre Completo', 'Fecha de Nacimiento', 'Día de Cumpleaños', 'Edad', 'Tipo de Agremiado', 'Puesto', 'Departamento', 'Estado'];
+
+    const mes = new Date().toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
+    const anio = new Date().getFullYear();
+
+    const headers = ['NÓMINA', 'NOMBRE COMPLETO', 'FECHA DE NACIMIENTO', 'DÍA DE CUMPLEAÑOS', 'EDAD', 'TIPO DE AGREMIADO', 'PUESTO', 'DEPARTAMENTO', 'ESTADO'];
     const rows = bdays.map(m => {
       const birthDate = m.birthDate || '';
       const [, mo, d] = birthDate.split('-');
@@ -812,21 +817,38 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
       ];
     });
 
-    const csvContent = '\uFEFF' + [
-      headers.map(h => `"${h.replace(/"/g, '""')}"`).join(','),
-      ...rows.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
-    ].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    const mes = new Date().toLocaleDateString('es-ES', { month: 'long' });
-    link.setAttribute('download', `Cumpleaneros_${mes}_${new Date().getFullYear()}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success('Lista de cumpleañeros descargada');
+    const titleRow1 = [`REPORTE DE AGREMIADOS CUMPLEAÑEROS - MES DE ${mes} ${anio}`];
+    const titleRow2 = [`Fecha de generación: ${new Date().toLocaleDateString('es-ES')}`];
+    const wsData = [
+      titleRow1,
+      titleRow2,
+      [],
+      headers,
+      ...rows
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } }
+    ];
+
+    const colWidths = headers.map((header, i) => {
+      let maxLen = header.length;
+      rows.forEach(row => {
+        const val = String(row[i] || '');
+        if (val.length > maxLen) maxLen = val.length;
+      });
+      return { wch: maxLen + 3 };
+    });
+    ws['!cols'] = colWidths;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Cumpleañeros');
+    
+    XLSX.writeFile(wb, `Cumpleaneros_${mes.toLowerCase()}_${anio}.xlsx`);
+    toast.success('Lista de cumpleañeros descargada en Excel');
   };
 
   const getAntiguedad = (dateStr?: string) => {
@@ -1254,7 +1276,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                 </div>
                 {bdays.length > 0 && (
                   <Button 
-                    onClick={exportBdaysToCSV} 
+                    onClick={exportBdaysToExcel} 
                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 text-xs uppercase tracking-wider shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all shrink-0"
                   >
                     <Download className="w-4 h-4"/>
