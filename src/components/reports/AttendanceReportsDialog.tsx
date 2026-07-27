@@ -179,18 +179,17 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
       const r = await fetch('/api/members?limit=3000');
       const d = await r.json();
       const allMembers: Member[] = d.data || [];
-      const today = new Date(); const yr = today.getFullYear();
+      const today = new Date();
+      const currentMonth = today.getMonth() + 1;
       const up = allMembers.filter(m => {
         if (!m.birthDate || m.status !== 'ACTIVO') return false;
-        const [y,mo,d] = m.birthDate.split('-');
+        const [,mo,d] = m.birthDate.split('-');
         if (!mo||!d) return false;
-        const bd = new Date(yr, +mo-1, +d);
-        if (bd < new Date(yr, today.getMonth(), today.getDate())) bd.setFullYear(yr+1);
-        const diff = Math.ceil((bd.getTime()-today.getTime())/(864e5));
-        return diff >= 0 && diff <= 7;
+        return parseInt(mo, 10) === currentMonth;
       }).sort((a,b) => {
-        const g = (m:Member) => { const [,mo,d]=m.birthDate!.split('-'); const bd=new Date(yr,+mo-1,+d); if(bd<new Date(yr,today.getMonth(),today.getDate()))bd.setFullYear(yr+1); return bd.getTime(); };
-        return g(a)-g(b);
+        const [, , dA] = a.birthDate!.split('-');
+        const [, , dB] = b.birthDate!.split('-');
+        return parseInt(dA, 10) - parseInt(dB, 10);
       });
       setBdays(up);
     } catch (e) {
@@ -746,10 +745,82 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
   const getAge = (bd: string) => { const t=new Date(),b=new Date(bd); let a=t.getFullYear()-b.getFullYear(); const m=t.getMonth()-b.getMonth(); if(m<0||(m===0&&t.getDate()<b.getDate()))a--; return a; };
   const getBdayText = (bd: string) => {
     const t=new Date(),yr=t.getFullYear(),[,mo,d]=bd.split('-');
-    const b=new Date(yr,+mo-1,+d); if(b<new Date(yr,t.getMonth(),t.getDate()))b.setFullYear(yr+1);
-    const diff=Math.ceil((b.getTime()-t.getTime())/864e5);
+    const b=new Date(yr,+mo-1,+d);
     const ds=b.toLocaleDateString('es-ES',{day:'numeric',month:'long'});
-    if(diff===0)return`Hoy (${ds})`; if(diff===1)return`Mañana (${ds})`; return`En ${diff} días (${ds})`;
+    const todayDay = t.getDate();
+    const todayMonth = t.getMonth() + 1;
+    if (+mo === todayMonth) {
+      if (+d === todayDay) return `Hoy 🎉 (${ds})`;
+      if (+d === todayDay + 1) return `Mañana (${ds})`;
+      if (+d < todayDay) return `Pasó el ${ds}`;
+    }
+    return `${ds}`;
+  };
+
+  const getAgeText = (bd: string) => {
+    const today = new Date();
+    const [y, mo, d] = bd.split('-');
+    const birthYear = parseInt(y, 10);
+    const birthDay = parseInt(d, 10);
+    const ageThisYear = today.getFullYear() - birthYear;
+    if (birthDay < today.getDate()) {
+      return `Cumplió ${ageThisYear} años`;
+    } else if (birthDay === today.getDate()) {
+      return `Cumple ${ageThisYear} años hoy 🎉`;
+    } else {
+      return `Cumple ${ageThisYear} años`;
+    }
+  };
+
+  const isTodayBday = (bd: string) => {
+    const today = new Date();
+    const [, mo, d] = bd.split('-');
+    return parseInt(mo, 10) === (today.getMonth() + 1) && parseInt(d, 10) === today.getDate();
+  };
+
+  const getMesActualText = () => {
+    return new Date().toLocaleDateString('es-ES', { month: 'long' });
+  };
+
+  const exportBdaysToCSV = () => {
+    if (bdays.length === 0) {
+      toast.error('No hay cumpleañeros para exportar');
+      return;
+    }
+    const headers = ['Nómina', 'Nombre Completo', 'Fecha de Nacimiento', 'Día de Cumpleaños', 'Edad', 'Tipo de Agremiado', 'Puesto', 'Departamento', 'Estado'];
+    const rows = bdays.map(m => {
+      const birthDate = m.birthDate || '';
+      const [, mo, d] = birthDate.split('-');
+      const ds = birthDate ? new Date(new Date().getFullYear(), +mo - 1, +d).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' }) : '';
+      const age = birthDate ? new Date().getFullYear() - new Date(birthDate).getFullYear() : '';
+      return [
+        m.employeeId || '',
+        m.fullName || '',
+        birthDate,
+        ds,
+        age,
+        m.memberType || '',
+        m.position || '',
+        m.department || '',
+        m.status || ''
+      ];
+    });
+
+    const csvContent = '\uFEFF' + [
+      headers.map(h => `"${h.replace(/"/g, '""')}"`).join(','),
+      ...rows.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    const mes = new Date().toLocaleDateString('es-ES', { month: 'long' });
+    link.setAttribute('download', `Cumpleaneros_${mes}_${new Date().getFullYear()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Lista de cumpleañeros descargada');
   };
 
   const getAntiguedad = (dateStr?: string) => {
@@ -1044,16 +1115,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
             <span className="font-black text-slate-800 uppercase tracking-wider text-sm ml-2">Menú Principal</span>
           </div>
         )}
-        {onlyShowBirthdays && onClose && (
-          <Button 
-            onClick={onClose} 
-            variant="ghost" 
-            size="icon" 
-            className="absolute top-4 right-4 md:top-6 md:right-8 w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center hover:bg-red-50 hover:text-red-600 transition-all active:scale-95 z-30"
-          >
-            <X className="w-5 h-5" />
-          </Button>
-        )}
+        {/* Se removió la tacha redundante interna para usar la tacha global del Dialog de shadcn */}
         <div className={`absolute top-4 right-4 md:top-6 md:right-8 z-10 scale-75 md:scale-100 origin-top-right ${onlyShowBirthdays ? 'mr-12 md:mr-14' : ''}`}>
           <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100 shadow-sm">
             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
@@ -1174,32 +1236,46 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
           {/* TAB: CUMPLEAÑOS */}
           {tab === 'cumpleanos' && (
             <div className="p-4 md:p-10 flex-1 overflow-y-auto">
-              <div className="mb-6 md:mb-10 flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
-                <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-amber-100 flex items-center justify-center shadow-inner border border-amber-200 shrink-0">
-                  <Gift className="w-6 h-6 md:w-8 md:h-8 text-amber-600"/>
-                </div>
-                <div>
-                  <h2 className="text-3xl font-black text-blue-900 tracking-tighter uppercase mb-1">Cumpleaños de la Semana</h2>
-                  <p className="text-gray-400 text-sm font-medium italic">Celebrando a nuestros agremiados activos • Próximos 7 días</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {bdays.map((m,i) => (
-                  <div key={m.id} className={`bg-white p-4 rounded-xl shadow-sm border ${i===0?'border-blue-300 bg-blue-50/30':'border-gray-100'} flex gap-3 items-center`}>
-                    <div className="w-14 h-14 rounded-lg bg-gray-100 overflow-hidden shrink-0">
-                      {m.photoUrl?<img src={`${m.photoUrl}?t=${new Date().getTime()}`} alt="" className="w-full h-full object-cover"/>:<div className="w-full h-full flex items-center justify-center text-gray-400"><UserIcon className="w-7 h-7"/></div>}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start mb-0.5">
-                        <h4 className="font-bold text-slate-800 text-sm truncate pr-2">{m.fullName}</h4>
-                        <span className={`text-[10px] font-medium whitespace-nowrap ${i===0?'text-blue-600':'text-slate-500'}`}>{getBdayText(m.birthDate!)}</span>
-                      </div>
-                      <p className="text-[10px] text-gray-500 mb-1">Nómina: {m.employeeId} • {m.memberType}</p>
-                      <p className="text-xs font-medium text-blue-600">Cumple {getAge(m.birthDate!)+1} años</p>
-                    </div>
+              <div className="mb-6 md:mb-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+                <div className="flex items-center gap-4 md:gap-6">
+                  <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-amber-100 flex items-center justify-center shadow-inner border border-amber-200 shrink-0">
+                    <Gift className="w-6 h-6 md:w-8 md:h-8 text-amber-600"/>
                   </div>
-                ))}
-                {bdays.length===0 && <div className="col-span-2 text-center py-10 text-gray-400">No hay cumpleaños en los próximos 7 días.</div>}
+                  <div>
+                    <h2 className="text-3xl font-black text-blue-900 tracking-tighter uppercase mb-1">Cumpleañeros del Mes</h2>
+                    <p className="text-gray-400 text-sm font-medium italic">Celebrando a nuestros agremiados activos • Mes de {getMesActualText()}</p>
+                  </div>
+                </div>
+                {bdays.length > 0 && (
+                  <Button 
+                    onClick={exportBdaysToCSV} 
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 text-xs uppercase tracking-wider shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all shrink-0"
+                  >
+                    <Download className="w-4 h-4"/>
+                    Exportar Excel
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
+                {bdays.map((m) => {
+                  const isToday = isTodayBday(m.birthDate!);
+                  return (
+                    <div key={m.id} className={`bg-white p-4 rounded-xl shadow-sm border ${isToday ? 'border-amber-300 bg-amber-50/40 ring-1 ring-amber-200' : 'border-gray-100'} flex gap-3 items-center hover:border-blue-200 transition-colors`}>
+                      <div className="w-14 h-14 rounded-lg bg-gray-100 overflow-hidden shrink-0">
+                        {m.photoUrl?<img src={`${m.photoUrl}?t=${new Date().getTime()}`} alt="" className="w-full h-full object-cover"/>:<div className="w-full h-full flex items-center justify-center text-gray-400"><UserIcon className="w-7 h-7"/></div>}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start mb-0.5">
+                          <h4 className="font-bold text-slate-800 text-sm truncate pr-2">{m.fullName}</h4>
+                          <span className={`text-[10px] font-bold whitespace-nowrap px-2 py-0.5 rounded-md ${isToday ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-slate-600'}`}>{getBdayText(m.birthDate!)}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 mb-1">Nómina: {m.employeeId} • {m.memberType}</p>
+                        <p className={`text-xs font-bold ${isToday ? 'text-amber-600' : 'text-blue-600'}`}>{getAgeText(m.birthDate!)}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+                {bdays.length===0 && <div className="col-span-2 text-center py-10 text-gray-400">No hay cumpleañeros en este mes.</div>}
               </div>
             </div>
           )}
