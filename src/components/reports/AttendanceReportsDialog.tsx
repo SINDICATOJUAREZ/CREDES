@@ -134,8 +134,9 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
     if (top20TypeFilter === 'ALL') return matchesSearch;
     if (top20TypeFilter === 'ACTIVO') return matchesSearch && item.status === 'ACTIVO';
     if (top20TypeFilter === 'DELEGADO') return matchesSearch && item.memberType === 'DELEGADO';
-    if (top20TypeFilter === 'BAJA') return matchesSearch && item.status === 'BAJA' && !getIsPensioner(item);
-    if (top20TypeFilter === 'PENSIONADO') return matchesSearch && getIsPensioner(item);
+    if (top20TypeFilter === 'BAJA') return matchesSearch && item.status === 'BAJA' && !getIsPensioner(item) && item.status !== 'JUBILADO/PENSIONADO';
+    if (top20TypeFilter === 'PENSIONADO') return matchesSearch && (getIsPensioner(item) || item.status === 'JUBILADO/PENSIONADO');
+    if (top20TypeFilter === 'JUBILADO/PENSIONADO') return matchesSearch && item.status === 'JUBILADO/PENSIONADO';
     
     return matchesSearch;
   });
@@ -1724,6 +1725,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                             <option value="ALL">Todos los roles</option>
                             <option value="ACTIVO">Activos</option>
                             <option value="PENSIONADO">Pensionados</option>
+                            <option value="JUBILADO/PENSIONADO">Jubilados/Pensionados</option>
                             <option value="DELEGADO">Delegados</option>
                             <option value="BAJA">Bajas</option>
                           </select>
@@ -1769,11 +1771,12 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                                 <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
                                   item.status === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800' : 
                                   item.status === 'INCAPACITADO' ? 'bg-amber-100 text-amber-800' :
+                                  item.status === 'JUBILADO/PENSIONADO' ? 'bg-indigo-100 text-indigo-800' :
                                   item.status === 'N/A' ? 'bg-orange-100 text-orange-800' :
                                   getIsPensioner(item) ? 'bg-blue-100 text-blue-800' :
                                   'bg-red-100 text-red-800'
                                 }`}>
-                                  {item.status === 'N/A' ? 'N/A' : (getIsPensioner(item) ? 'PENSIONADO' : item.status)}
+                                  {item.status === 'N/A' ? 'N/A' : (item.status === 'JUBILADO/PENSIONADO' ? 'JUBILADO/PENSIONADO' : (getIsPensioner(item) ? 'PENSIONADO' : item.status))}
                                 </span>
                               </td>
                               <td className="py-3 px-4 text-center font-black text-blue-900 text-sm">{item.count}</td>

@@ -236,6 +236,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
                   <option value="ACTIVO">ACTIVO</option>
                   <option value="BAJA">BAJA</option>
                   <option value="INCAPACITADO">INCAPACITADO</option>
+                  <option value="JUBILADO/PENSIONADO">JUBILADO/PENSIONADO</option>
                   <option value="FINADO">FINADO</option>
                   <option value="N/A">N/A</option>
                 </select>

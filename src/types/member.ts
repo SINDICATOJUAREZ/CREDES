@@ -49,7 +49,7 @@ export interface Member {
   employeeId?: string;
   fullName: string;
   memberType: 'AGREMIADO' | 'DELEGADO' | 'SECRETARIO GENERAL' | 'LISTA DE ESPERA';
-  status?: 'ACTIVO' | 'BAJA' | 'INCAPACITADO' | 'FINADO' | 'N/A';
+  status?: 'ACTIVO' | 'BAJA' | 'INCAPACITADO' | 'JUBILADO/PENSIONADO' | 'FINADO' | 'N/A';
   position?: string;
   department?: string; // DIRECCION in Excel
   secretariat?: string; // SECRETARIA in Excel

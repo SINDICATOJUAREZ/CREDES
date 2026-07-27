@@ -504,7 +504,7 @@ export function MemberReportsPanel({
       } else if (selectedReport.id === 'ESPERA') {
         base = base.filter(m => m.memberType === 'LISTA DE ESPERA');
       } else if (selectedReport.id === 'PENSIONADO') {
-        base = base.filter(m => getIsPensioner(m));
+        base = base.filter(m => getIsPensioner(m) || m.status === 'JUBILADO/PENSIONADO');
       }
     }
     const depts = base.map(m => m.department?.trim()).filter(Boolean);
@@ -522,7 +522,7 @@ export function MemberReportsPanel({
       } else if (selectedReport.id === 'ESPERA') {
         base = base.filter(m => m.memberType === 'LISTA DE ESPERA');
       } else if (selectedReport.id === 'PENSIONADO') {
-        base = base.filter(m => getIsPensioner(m));
+        base = base.filter(m => getIsPensioner(m) || m.status === 'JUBILADO/PENSIONADO');
       }
     }
     if (dept !== 'ALL') {
@@ -662,7 +662,7 @@ export function MemberReportsPanel({
       } else if (selectedReport.id === 'ESPERA') {
         base = base.filter(m => m.memberType === 'LISTA DE ESPERA');
       } else if (selectedReport.id === 'PENSIONADO') {
-        base = base.filter(m => getIsPensioner(m));
+        base = base.filter(m => getIsPensioner(m) || m.status === 'JUBILADO/PENSIONADO');
       }
 
       // Search query (Nómina or Nombre)
@@ -784,9 +784,11 @@ export function MemberReportsPanel({
         <td style="padding: 10px; text-transform: uppercase; font-size: 10px; color: #475569; text-align: center;">${getMemberTypeLabel(m.memberType || '')}</td>
         <td style="padding: 10px; text-align: center;">
           <span style="padding: 4px 8px; border-radius: 4px; font-size: 9px; font-weight: bold; ${
-            m.status === 'ACTIVO' 
-              ? 'background-color: #dcfce7; color: #15803d;' 
-              : 'background-color: #fee2e2; color: #b91c1c;'
+            m.status === 'ACTIVO' ? 'background-color: #dcfce7; color: #15803d;' :
+            m.status === 'JUBILADO/PENSIONADO' ? 'background-color: #e0e7ff; color: #3730a3;' :
+            m.status === 'INCAPACITADO' ? 'background-color: #fef3c7; color: #92400e;' :
+            m.status === 'FINADO' ? 'background-color: #f1f5f9; color: #475569;' :
+            'background-color: #fee2e2; color: #b91c1c;'
           }">${m.status || 'ACTIVO'}</span>
         </td>
       </tr>
@@ -1495,9 +1497,11 @@ export function MemberReportsPanel({
                               </td>
                               <td className="px-4 py-3.5 text-center">
                                 <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                  item.status === 'ACTIVO' 
-                                    ? 'bg-emerald-105 bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                                    : 'bg-rose-100 text-rose-800 border border-rose-200'
+                                  item.status === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                                  item.status === 'JUBILADO/PENSIONADO' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
+                                  item.status === 'INCAPACITADO' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                                  item.status === 'FINADO' ? 'bg-slate-100 text-slate-800 border border-slate-200' :
+                                  'bg-rose-100 text-rose-800 border border-rose-200'
                                 }`}>
                                   {item.status || 'ACTIVO'}
                                 </span>

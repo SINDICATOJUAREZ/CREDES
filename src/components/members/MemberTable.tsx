@@ -261,6 +261,7 @@ export const MemberTable: React.FC<MemberTableProps> = ({
                   { value: 'ACTIVO', label: 'Activo' },
                   { value: 'BAJA', label: 'Baja' },
                   { value: 'INCAPACITADO', label: 'Incapacitado' },
+                  { value: 'JUBILADO/PENSIONADO', label: 'Jubilado/Pensionado' },
                   { value: 'FINADO', label: 'Finado' },
                   { value: 'N/A', label: 'N/A' },
                   { value: 'PENSIONADO', label: 'Pensionado' },
@@ -381,6 +382,11 @@ export const MemberTable: React.FC<MemberTableProps> = ({
                     {member.status === 'ACTIVO' && (
                       <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full border border-emerald-200">
                         Activo
+                      </span>
+                    )}
+                    {member.status === 'JUBILADO/PENSIONADO' && (
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full border border-indigo-200">
+                        Jubilado/Pensionado
                       </span>
                     )}
                     {member.status === 'FINADO' && (
