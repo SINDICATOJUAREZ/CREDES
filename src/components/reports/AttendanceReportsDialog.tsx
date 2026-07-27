@@ -512,8 +512,8 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
         
         .history-bar { background: #1e40af; color: white; padding: 15px 20px; font-weight: bold; font-size: 18px; text-transform: uppercase; margin-top: 10px; }
         
-        .attendance-list { list-style: none; padding: 25px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; border: 1px solid #e5e7eb; border-top: none; }
-        .attendance-list li { font-size: 14px; font-weight: bold; color: #1f2937; display: flex; align-items: center; gap: 8px; }
+        .attendance-list { list-style: none; padding: 25px; columns: 2; column-gap: 30px; border: 1px solid #e5e7eb; border-top: none; }
+        .attendance-list li { font-size: 14px; font-weight: bold; color: #1f2937; display: flex; align-items: center; gap: 8px; break-inside: avoid; padding: 4px 0; }
         .attendance-list li::before { content: "✓"; color: #059669; font-size: 18px; }
         
         @media print { 
@@ -579,7 +579,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
 
         <div class="history-bar">HISTORIAL DE PARTICIPACIÓN</div>
         <ul class="attendance-list">
-          ${evtList || '<li style="grid-column: span 2; text-align: center; color: #999">No se encontraron registros de asistencia.</li>'}
+          ${evtList || '<li style="column-span: all; text-align: center; color: #999">No se encontraron registros de asistencia.</li>'}
         </ul>
       </div>
     </body>
@@ -1189,9 +1189,9 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                       <span className="text-[10px] md:text-xs font-medium text-blue-600 bg-blue-50 px-2 md:px-3 py-1 md:py-1.5 rounded-lg">Total: {attData.length}</span>
                     </div>
                     {attData.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      <div className="columns-1 md:columns-2 lg:columns-3 gap-2.5">
                         {attData.map((e,i) => (
-                          <div key={i} className="flex items-center gap-2.5 p-2.5 rounded-lg border border-gray-100 bg-gray-50/50 hover:bg-blue-50/50 transition-colors">
+                          <div key={i} className="break-inside-avoid mb-2.5 flex items-center gap-2.5 p-2.5 rounded-lg border border-gray-100 bg-gray-50/50 hover:bg-blue-50/50 transition-colors">
                             <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><ClipboardCheck className="w-4 h-4"/></div>
                             <p className="font-semibold text-slate-700 text-[10px] md:text-xs">{e.name}</p>
                           </div>
