@@ -12,7 +12,7 @@ import { motion } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCredentialConfig } from '@/hooks/useCredentialConfig';
 import { CredentialCard } from '@/components/credential/CredentialCard';
-import { generateCredentialPDF, generateVectorialCredentialPDF } from '@/lib/pdf-generator';
+import { generateCredentialPDF, generateVectorialCredentialPDF, mapDesignToConfig } from '@/lib/pdf-generator';
 import { PhotoUploadDialog } from './PhotoUploadDialog';
 
 interface MemberFormProps {
@@ -28,6 +28,41 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
   const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
   const [showQRUpdateDialog, setShowQRUpdateDialog] = useState(false);
   const [pendingPrintFn, setPendingPrintFn] = useState<((update: boolean) => Promise<void>) | null>(null);
+
+  // Active DB Designs for printing
+  const [activeFrontConfig, setActiveFrontConfig] = useState<any>(null);
+  const [activeBackConfig, setActiveBackConfig] = useState<any>(null);
+  const [printOption, setPrintOption] = useState<'frente' | 'ambas'>('ambas');
+  const [isDesignsLoading, setIsDesignsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadActiveDesigns = async () => {
+      try {
+        const res = await fetch('/api/settings/designs');
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const front = data.find((d: any) => d.section === 'frente' && d.is_active);
+          const back = data.find((d: any) => d.section === 'reverso' && d.is_active);
+          
+          if (front) {
+            setActiveFrontConfig(mapDesignToConfig(front));
+          } else {
+            setActiveFrontConfig(config);
+          }
+
+          if (back) {
+            setActiveBackConfig(mapDesignToConfig(back));
+          }
+        }
+      } catch (e) {
+        console.error('Error loading active designs:', e);
+        setActiveFrontConfig(config);
+      } finally {
+        setIsDesignsLoading(false);
+      }
+    };
+    loadActiveDesigns();
+  }, [config]);
   
   const { register, control, handleSubmit, reset, watch, setValue, getValues } = useForm<Member>({
     defaultValues: initialData || {
@@ -451,7 +486,20 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
           Descartar Cambios
         </Button>
         
-        <div className="flex gap-4">
+        <div className="flex items-center gap-4">
+          {/* Selector de tipo de impresión */}
+          <div className="flex items-center gap-2 bg-white px-3.5 py-2.5 rounded-2xl border border-gray-200 shadow-sm h-14">
+            <span className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Impresión:</span>
+            <select
+              value={printOption}
+              onChange={(e) => setPrintOption(e.target.value as 'frente' | 'ambas')}
+              className="text-xs font-black uppercase text-slate-700 bg-transparent outline-none cursor-pointer pr-1"
+            >
+              <option value="frente">Solo Frente</option>
+              <option value="ambas">Ambas Caras</option>
+            </select>
+          </div>
+
           {initialData && (
             <Button 
               type="button" 
@@ -474,7 +522,13 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
                       console.error('Error updating member QR:', e);
                     }
                   }
-                  await generateVectorialCredentialPDF(memberData, config, `Credencial_${watch('fullName')}`);
+                  const backConfig = printOption === 'ambas' ? activeBackConfig : null;
+                  await generateVectorialCredentialPDF(
+                    memberData, 
+                    activeFrontConfig || config, 
+                    backConfig, 
+                    `Credencial_${watch('fullName')}`
+                  );
                   setIsPrinting(false);
                 };
 
@@ -483,7 +537,13 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
                   setShowQRUpdateDialog(true);
                 } else {
                   setIsPrinting(true);
-                  await generateVectorialCredentialPDF(watch(), config, `Credencial_${watch('fullName')}`);
+                  const backConfig = printOption === 'ambas' ? activeBackConfig : null;
+                  await generateVectorialCredentialPDF(
+                    watch(), 
+                    activeFrontConfig || config, 
+                    backConfig, 
+                    `Credencial_${watch('fullName')}`
+                  );
                   setIsPrinting(false);
                 }
               }}
@@ -509,7 +569,13 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
                 const data = getValues();
                 setIsPrinting(true);
                 await onSubmit(data); // This might close the form, so we print first or hope it stays
-                await generateVectorialCredentialPDF(data, config, `Credencial_${data.fullName}`);
+                const backConfig = printOption === 'ambas' ? activeBackConfig : null;
+                await generateVectorialCredentialPDF(
+                  data, 
+                  activeFrontConfig || config, 
+                  backConfig, 
+                  `Credencial_${data.fullName}`
+                );
                 setIsPrinting(false);
               }}
               className="bg-green-600 hover:bg-green-700 text-white font-black px-8 h-14 rounded-2xl shadow-xl transition-all active:scale-95 uppercase tracking-widest text-xs flex gap-2"

@@ -809,7 +809,7 @@ export const CredentialDesignPanel: React.FC = () => {
           <div>
             <div className="flex items-center justify-between mb-2">
               <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-1">
-                <ImageIcon className="w-3 h-3" /> Diseño Activo
+                <ImageIcon className="w-3 h-3" /> Selector de Diseño
               </Label>
               <div className="flex gap-1">
                 <Button variant={activeDesign.section === 'frente' ? 'default' : 'outline'} size="sm" onClick={() => switchSection('frente')} className="h-6 text-[9px] px-2 uppercase font-black">Frente</Button>
@@ -818,18 +818,58 @@ export const CredentialDesignPanel: React.FC = () => {
             </div>
             <div className="flex gap-2">
               <Select value={activeDesign.id} onValueChange={v => { const d = designs.find(x => x.id === v); if (d) { setActiveDesign(d); setHistory({ past: [], future: [] }); } }}>
-                <SelectTrigger className="h-10 rounded-xl text-sm font-bold flex-1"><SelectValue /></SelectTrigger>
-                <SelectContent>{designs.map(d => <SelectItem key={d.id} value={d.id}>{d.name} ({d.section})</SelectItem>)}</SelectContent>
+                <SelectTrigger className="h-10 rounded-xl text-xs font-bold flex-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {designs.map(d => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name} {d.is_active ? '★ (Activo)' : ''} ({d.section})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
-              <Button variant="ghost" size="icon" onClick={deleteDesign} className="h-10 w-10 text-gray-400 hover:text-red-500 rounded-xl border border-gray-200">
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={() => createNewDesign(activeDesign.section as 'frente' | 'reverso')} 
+                className="h-10 w-10 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl border border-gray-200 shrink-0"
+                title="Crear nuevo diseño"
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={deleteDesign} 
+                className="h-10 w-10 text-gray-400 hover:text-red-500 rounded-xl border border-gray-200 shrink-0"
+                title="Eliminar diseño actual"
+              >
                 <Trash2 className="w-4 h-4" />
               </Button>
             </div>
           </div>
 
-          <div className="flex items-center justify-between px-1">
-            <Label className="text-[10px] font-bold text-gray-500 uppercase">Plantilla Base (Logo/Foto)</Label>
-            <Switch checked={(activeDesign.show_template as any) !== false && (activeDesign.show_template as any) !== 0} onCheckedChange={v => updateActiveDesignWithHistory({ ...activeDesign, show_template: v })} />
+          {/* Design Name Input */}
+          <div className="space-y-1.5">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Nombre del Diseño</Label>
+            <Input 
+              value={activeDesign.name} 
+              onChange={e => updateActiveDesignWithHistory({ ...activeDesign, name: e.target.value })} 
+              className="h-10 rounded-xl text-sm font-bold border-gray-200 focus-visible:ring-blue-500 bg-gray-50/20 animate-none"
+              placeholder="Ej. Diseño Azul"
+            />
+          </div>
+
+          {/* Configuration Switches */}
+          <div className="space-y-3 pt-1 border-t border-gray-50">
+            <div className="flex items-center justify-between px-1">
+              <Label className="text-[10px] font-bold text-gray-500 uppercase">Plantilla Base (Logo/Foto)</Label>
+              <Switch checked={(activeDesign.show_template as any) !== false && (activeDesign.show_template as any) !== 0} onCheckedChange={v => updateActiveDesignWithHistory({ ...activeDesign, show_template: v })} />
+            </div>
+
+            <div className="flex items-center justify-between px-1">
+              <Label className="text-[10px] font-bold text-blue-900 uppercase">Activar para Impresión</Label>
+              <Switch checked={!!activeDesign.is_active} onCheckedChange={v => updateActiveDesignWithHistory({ ...activeDesign, is_active: v })} />
+            </div>
           </div>
 
           {/* Add Element */}
