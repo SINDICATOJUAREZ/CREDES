@@ -112,6 +112,9 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
   };
 
   const currentTop20Data = top20Data.filter((m: any) => {
+    // Omite los agremiados dados de baja y finados
+    if (m.status === 'BAJA' || m.status === 'FINADO') return false;
+
     if (top20SubTab === 'espera') {
       return m.memberType === 'LISTA DE ESPERA';
     } else {
@@ -1079,7 +1082,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
               {([
                 ['busqueda','Consultar',Search],
                 ['asistencia','Asistencia',ClipboardCheck],
-                ['top20','Top 20',Trophy]
+                ['top20','Dashboard Asistencias',Trophy]
               ] as const).map(([k,l,Icon])=>(
                 <button key={k} onClick={()=>{setTab(k as TabType); if(k==='asistencia')loadEvents(); if(k==='top20')loadTop20();}}
                   className={`flex-1 md:w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-2 md:px-4 py-3 md:py-3.5 rounded-xl transition-all duration-300 ${tab===k?'bg-blue-600 text-white shadow-lg shadow-blue-900/40 md:translate-x-1':'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
@@ -1564,7 +1567,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
             <div className="p-4 md:p-10 flex-1 overflow-y-auto min-h-0 bg-slate-50/50">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-8 animate-in fade-in slide-in-from-top-4 duration-300">
                 <div>
-                  <h2 className="text-2xl md:text-3xl font-black text-blue-900 tracking-tighter uppercase mb-1">Top 20 Asistencias</h2>
+                  <h2 className="text-2xl md:text-3xl font-black text-blue-900 tracking-tighter uppercase mb-1">Dashboard de Asistencias</h2>
                   <p className="text-gray-400 text-xs md:text-sm font-medium">Agremiados y Lista de Espera con mayor asistencia registrada</p>
                 </div>
                 
@@ -1611,21 +1614,51 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
               ) : top20Data.length === 0 ? (
                 <div className="text-center py-20 text-gray-400 italic">No hay registros de asistencia en el sistema.</div>
               ) : (
-                <div className="space-y-10 animate-in fade-in zoom-in duration-300">
+                <div className="space-y-6 animate-in fade-in zoom-in duration-300">
                   
-                  {/* CHART CARD */}
-                  <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm">
-                    <h3 className="font-black text-blue-900 uppercase text-sm tracking-wider mb-6 flex items-center gap-2">
-                      <BarChart3 className="w-5 h-5 text-blue-600" />
-                      Gráfica de Rendimiento (Top 20)
-                    </h3>
+                  {/* CHART CARD / UNIFIED LIST */}
+                  <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm space-y-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-50 pb-5">
+                      <h3 className="font-black text-blue-900 uppercase text-sm tracking-wider flex items-center gap-2">
+                        <BarChart3 className="w-5 h-5 text-blue-600" />
+                        Gráfica de Asistencias ({top20SubTab === 'espera' ? 'Lista de Espera' : 'General'})
+                      </h3>
+
+                      <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                        {/* Search input */}
+                        <div className="relative flex-1 sm:w-64">
+                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                          <Input
+                            placeholder="Buscar por nombre o nómina..."
+                            value={top20Search}
+                            onChange={(e) => setTop20Search(e.target.value)}
+                            className="pl-10 text-xs font-semibold uppercase bg-gray-50 border-gray-200 focus:bg-white rounded-xl h-9"
+                          />
+                        </div>
+                        
+                        {/* Filter dropdown */}
+                        {top20SubTab === 'general' && (
+                          <select
+                            value={top20TypeFilter}
+                            onChange={(e) => setTop20TypeFilter(e.target.value)}
+                            className="bg-gray-50 border border-gray-200 text-slate-800 rounded-xl px-3 py-1 text-xs font-bold uppercase h-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="ALL">Todos los roles</option>
+                            <option value="ACTIVO">Activos</option>
+                            <option value="PENSIONADO">Pensionados</option>
+                            <option value="JUBILADO/PENSIONADO">Jubilados/Pensionados</option>
+                            <option value="DELEGADO">Delegados</option>
+                          </select>
+                        )}
+                      </div>
+                    </div>
                     
-                    <div className="space-y-4">
-                      {chartData.map((item, idx) => {
-                        const maxCount = chartData[0]?.count || 1;
+                    <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+                      {filteredAllAttendees.map((item, idx) => {
+                        const maxCount = currentTop20Data[0]?.count || 1;
                         const pct = Math.max(8, (item.count / maxCount) * 100);
                         
-                        // Top 3 distinct ranking designs
+                        // Top 3 ranking designs
                         const rankColors = [
                           'bg-amber-400 text-amber-950 ring-4 ring-amber-100', // Gold
                           'bg-slate-300 text-slate-900 ring-4 ring-slate-100', // Silver
@@ -1639,7 +1672,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                           <div 
                             key={item.employeeId} 
                             onClick={() => { loadAtt(item.employeeId); setTab('busqueda'); }}
-                            className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 group p-2 rounded-2xl hover:bg-slate-50/80 cursor-pointer hover:shadow-sm border border-transparent hover:border-blue-100 transition-all duration-200"
+                            className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 group p-2.5 rounded-2xl hover:bg-slate-50/80 cursor-pointer hover:shadow-sm border border-transparent hover:border-blue-100 transition-all duration-200"
                             title="Haz clic para ver reporte de asistencia"
                           >
                             {/* Member Meta */}
@@ -1689,108 +1722,9 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                           </div>
                         );
                       })}
-                      {chartData.length === 0 && (
-                        <div className="text-center py-10 text-gray-400 italic">No hay agremiados o lista de espera con asistencia.</div>
+                      {filteredAllAttendees.length === 0 && (
+                        <div className="text-center py-12 text-gray-400 italic">No se encontraron asistentes con los filtros aplicados.</div>
                       )}
-                    </div>
-                  </div>
-                  
-                  {/* ALL ATTENDEES TABLE */}
-                  <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-300">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                      <h3 className="font-black text-blue-900 uppercase text-sm tracking-wider flex items-center gap-2">
-                        <Users className="w-5 h-5 text-blue-600" />
-                        Listado General de Asistentes
-                      </h3>
-                      
-                      <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                        {/* Search input */}
-                        <div className="relative flex-1 sm:w-64">
-                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                          <Input
-                            placeholder="Buscar por nombre o nómina..."
-                            value={top20Search}
-                            onChange={(e) => setTop20Search(e.target.value)}
-                            className="pl-10 text-xs font-semibold uppercase bg-gray-50 border-gray-200 focus:bg-white rounded-xl h-9"
-                          />
-                        </div>
-                        
-                        {/* Filter dropdown */}
-                        {top20SubTab === 'general' && (
-                          <select
-                            value={top20TypeFilter}
-                            onChange={(e) => setTop20TypeFilter(e.target.value)}
-                            className="bg-gray-50 border border-gray-200 text-slate-800 rounded-xl px-3 py-1 text-xs font-bold uppercase h-9 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            <option value="ALL">Todos los roles</option>
-                            <option value="ACTIVO">Activos</option>
-                            <option value="PENSIONADO">Pensionados</option>
-                            <option value="JUBILADO/PENSIONADO">Jubilados/Pensionados</option>
-                            <option value="DELEGADO">Delegados</option>
-                            <option value="BAJA">Bajas</option>
-                          </select>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="overflow-x-auto border border-gray-100 rounded-2xl">
-                      <table className="w-full border-collapse text-left">
-                        <thead>
-                          <tr className="bg-slate-50/80 border-b border-gray-100 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                            <th className="py-3 px-4 text-center w-16">Pos.</th>
-                            <th className="py-3 px-4 w-24">Nómina</th>
-                            <th className="py-3 px-4">Nombre Completo</th>
-                            <th className="py-3 px-4 w-32">Tipo Miembro</th>
-                            <th className="py-3 px-4 w-44">Secretaría / Dirección</th>
-                            <th className="py-3 px-4 w-28 text-center">Estatus</th>
-                            <th className="py-3 px-4 w-32 text-center">Asistencias</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50 text-xs font-medium text-slate-700">
-                          {filteredAllAttendees.map((item, idx) => (
-                            <tr 
-                              key={item.employeeId} 
-                              onClick={() => { loadAtt(item.employeeId); setTab('busqueda'); }}
-                              className="hover:bg-blue-50/40 cursor-pointer transition-colors uppercase"
-                              title="Haz clic para ver reporte de asistencia"
-                            >
-                              <td className="py-3 px-4 text-center font-bold text-slate-400">#{idx + 1}</td>
-                              <td className="py-3 px-4 font-mono font-bold text-slate-900">{item.employeeId}</td>
-                              <td className="py-3 px-4 font-bold text-slate-900">{item.fullName}</td>
-                              <td className="py-3 px-4">
-                                <span className={`px-2.5 py-1 rounded-full text-[9px] font-black tracking-wider ${
-                                  item.memberType === 'AGREMIADO' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                                  item.memberType === 'DELEGADO' ? 'bg-purple-50 text-purple-700 border border-purple-100' :
-                                  'bg-amber-50 text-amber-700 border border-amber-100'
-                                }`}>
-                                  {getMemberTypeLabel(item.memberType)}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4 text-slate-500 truncate max-w-[170px]">{item.department}</td>
-                              <td className="py-3 px-4 text-center">
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
-                                  item.status === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800' : 
-                                  item.status === 'INCAPACITADO' ? 'bg-amber-100 text-amber-800' :
-                                  item.status === 'JUBILADO/PENSIONADO' ? 'bg-indigo-100 text-indigo-800' :
-                                  item.status === 'N/A' ? 'bg-orange-100 text-orange-800' :
-                                  getIsPensioner(item) ? 'bg-blue-100 text-blue-800' :
-                                  'bg-red-100 text-red-800'
-                                }`}>
-                                  {item.status === 'N/A' ? 'N/A' : (item.status === 'JUBILADO/PENSIONADO' ? 'JUBILADO/PENSIONADO' : (getIsPensioner(item) ? 'PENSIONADO' : item.status))}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4 text-center font-black text-blue-900 text-sm">{item.count}</td>
-                            </tr>
-                          ))}
-                          {filteredAllAttendees.length === 0 && (
-                            <tr>
-                              <td colSpan={7} className="py-12 text-center text-gray-400 italic">
-                                No se encontraron asistentes con los filtros aplicados.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
                     </div>
                   </div>
                 </div>
