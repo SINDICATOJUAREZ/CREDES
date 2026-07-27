@@ -505,9 +505,11 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
         
         .page-title { text-align: center; font-size: 26px; font-weight: bold; margin: 40px 0; text-transform: uppercase; border-bottom: 1px solid #eee; padding-bottom: 10px; }
         
-        .data-grid { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        .data-grid td { padding: 12px 0; font-size: 17px; width: 50%; font-weight: bold; }
-        .label { color: #333; }
+        .data-grid { width: 100%; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed; }
+        .data-grid td { padding: 12px 0; font-size: 17px; width: 50%; font-weight: bold; box-sizing: border-box; }
+        .data-grid td:first-child { padding-right: 30px; }
+        .data-grid td:last-child { padding-left: 30px; }
+        .label { color: #555; margin-right: 6px; }
         .val { text-transform: uppercase; color: #000; }
         
         .history-bar { background: #1e40af; color: white; padding: 15px 20px; font-weight: bold; font-size: 18px; text-transform: uppercase; margin-top: 10px; }
