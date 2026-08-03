@@ -56,6 +56,7 @@ export const CredentialDesignPanel: React.FC = () => {
   const [isMouseDragging, setIsMouseDragging] = useState(false);
   const [showGuides, setShowGuides] = useState(true);
   const [isReady, setIsReady] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<'elements' | 'style'>('elements');
   const { config, setConfig } = useCredentialConfig();
   const stateRef = React.useRef({ activeDesign, selectedElementId, selectedElementIds });
 
@@ -920,10 +921,10 @@ export const CredentialDesignPanel: React.FC = () => {
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Left Controls */}
       <div className="w-[380px] h-full flex flex-col border-r border-gray-100 bg-gray-50/30">
-        <div className="p-4 border-b border-gray-100 space-y-3 bg-white flex-shrink-0">
+        <div className="p-3 border-b border-gray-100 space-y-2 bg-white flex-shrink-0">
           {/* Design Selector */}
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1.5">
               <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-1">
                 <ImageIcon className="w-3 h-3" /> Selector de Diseño
               </Label>
@@ -934,7 +935,7 @@ export const CredentialDesignPanel: React.FC = () => {
             </div>
             <div className="flex gap-2">
               <Select value={activeDesign.id} onValueChange={v => { const d = designs.find(x => x.id === v); if (d) { setActiveDesign(d); setHistory({ past: [], future: [] }); } }}>
-                <SelectTrigger className="h-10 rounded-xl text-xs font-bold flex-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 rounded-xl text-xs font-bold flex-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {designs.map(d => (
                     <SelectItem key={d.id} value={d.id}>
@@ -947,7 +948,7 @@ export const CredentialDesignPanel: React.FC = () => {
                 variant="outline" 
                 size="icon" 
                 onClick={() => createNewDesign(activeDesign.section as 'frente' | 'reverso')} 
-                className="h-10 w-10 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl border border-gray-200 shrink-0"
+                className="h-9 w-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl border border-gray-200 shrink-0"
                 title="Crear nuevo diseño"
               >
                 <Plus className="w-4 h-4" />
@@ -956,7 +957,7 @@ export const CredentialDesignPanel: React.FC = () => {
                 variant="outline" 
                 size="icon" 
                 onClick={deleteDesign} 
-                className="h-10 w-10 text-gray-400 hover:text-red-500 rounded-xl border border-gray-200 shrink-0"
+                className="h-9 w-9 text-gray-400 hover:text-red-500 rounded-xl border border-gray-200 shrink-0"
                 title="Eliminar diseño actual"
               >
                 <Trash2 className="w-4 h-4" />
@@ -964,210 +965,269 @@ export const CredentialDesignPanel: React.FC = () => {
             </div>
           </div>
 
-          {/* Design Name Input */}
-          <div className="space-y-1.5">
-            <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Nombre del Diseño</Label>
-            <Input 
-              value={activeDesign.name} 
-              onChange={e => updateActiveDesignWithHistory({ ...activeDesign, name: e.target.value })} 
-              className="h-10 rounded-xl text-sm font-bold border-gray-200 focus-visible:ring-blue-500 bg-gray-50/20 animate-none"
-              placeholder="Ej. Diseño Azul"
-            />
-          </div>
-
-          {/* Configuration Switches */}
-          <div className="space-y-3 pt-1 border-t border-gray-50">
-            <div className="flex items-center justify-between px-1">
-              <Label className="text-[10px] font-bold text-blue-900 uppercase">Activar para Impresión</Label>
+          {/* Design Name Input & Active switch */}
+          <div className="flex items-center gap-2 pt-1 border-t border-gray-50">
+            <div className="flex-1">
+              <Input 
+                value={activeDesign.name} 
+                onChange={e => updateActiveDesignWithHistory({ ...activeDesign, name: e.target.value })} 
+                className="h-8 rounded-xl text-xs font-bold border-gray-200 focus-visible:ring-blue-500 bg-gray-50/20"
+                placeholder="Nombre del Diseño"
+              />
+            </div>
+            <div className="flex items-center gap-1.5 bg-blue-50/50 px-2 py-1 rounded-xl border border-blue-100/50 shrink-0">
+              <Label className="text-[9px] font-bold text-blue-900 uppercase">Activo</Label>
               <Switch checked={!!activeDesign.is_active} onCheckedChange={v => updateActiveDesignWithHistory({ ...activeDesign, is_active: v })} />
             </div>
           </div>
 
-          {/* Add Element */}
-          <div>
-            <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Agregar Elemento</Label>
-            <div className="flex gap-2">
-              <Select value={newFieldType} onValueChange={(val) => setNewFieldType(val as string || '')}>
-                <SelectTrigger className="h-10 rounded-xl text-xs font-bold flex-1"><SelectValue /></SelectTrigger>
-                <SelectContent>{FIELD_CATALOG.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}</SelectContent>
-              </Select>
-              <Button onClick={addElement} size="icon" className="h-10 w-10 rounded-xl bg-emerald-600 hover:bg-emerald-700"><Plus className="w-5 h-5" /></Button>
-            </div>
+          {/* Sidebar Navigation Tabs */}
+          <div className="grid grid-cols-2 gap-1 p-1 bg-gray-100/80 rounded-xl border border-gray-200/50 pt-1">
+            <Button
+              variant={sidebarTab === 'elements' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setSidebarTab('elements')}
+              className={`h-7 text-[9px] uppercase font-black rounded-lg ${sidebarTab === 'elements' ? 'bg-blue-900 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-200/50'}`}
+            >
+              <Type className="w-3 h-3 mr-1" /> Elementos ({activeDesign.elements.length})
+            </Button>
+            <Button
+              variant={sidebarTab === 'style' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setSidebarTab('style')}
+              className={`h-7 text-[9px] uppercase font-black rounded-lg ${sidebarTab === 'style' ? 'bg-blue-900 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-200/50'}`}
+            >
+              <ImageIcon className="w-3 h-3 mr-1" /> Fondo y Estilos
+            </Button>
           </div>
-
-          {/* Save Button */}
-          <Button onClick={handleSaveDesign} className="w-full h-11 bg-blue-900 hover:bg-blue-800 text-white font-bold rounded-xl gap-2 uppercase tracking-widest text-[10px]">
-            <Save className="w-4 h-4" /> Guardar Diseño
-          </Button>
         </div>
 
-        {/* Elements List & Advanced Settings (Scrollable) */}
-        <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4 bg-gray-50/30">
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto min-h-0 p-3 space-y-3 bg-gray-50/30">
           
-          {/* Card Visual Configuration */}
-          <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm space-y-4">
-            <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block border-b border-gray-50 pb-2">Configuración Estética</Label>
-            
-            {/* Colors */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-[9px] font-bold uppercase text-gray-400">Primario</Label>
-                <div className="flex gap-1 mt-1">
-                  <Input type="color" value={activeDesign.primary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, primary_color: e.target.value })} className="w-8 h-8 p-0.5 rounded-lg shrink-0" />
-                  <Input value={activeDesign.primary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, primary_color: e.target.value })} className="h-8 text-[10px] rounded-lg flex-1" />
-                </div>
-              </div>
-              <div>
-                <Label className="text-[9px] font-bold uppercase text-gray-400">Secundario</Label>
-                <div className="flex gap-1 mt-1">
-                  <Input type="color" value={activeDesign.secondary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, secondary_color: e.target.value })} className="w-8 h-8 p-0.5 rounded-lg shrink-0" />
-                  <Input value={activeDesign.secondary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, secondary_color: e.target.value })} className="h-8 text-[10px] rounded-lg flex-1" />
-                </div>
-              </div>
-            </div>
-
-            {/* Background Image */}
-            <div>
-              <Label className="text-[9px] font-bold uppercase text-gray-400 mb-1 block">Imagen Fondo (JPG)</Label>
-              <div className="flex gap-2">
-                <div className="flex-1 relative">
-                  <Input type="file" accept="image/*" onChange={handleBackgroundUpload} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-                  <Button variant="outline" className="w-full h-8 rounded-xl border-dashed border-2 text-[10px] text-gray-400 gap-1">
-                    <Upload className="w-3 h-3" /> Seleccionar archivo
-                  </Button>
-                </div>
-                {activeDesign.background_url && (
-                  <Button variant="ghost" size="icon" onClick={() => updateActiveDesignWithHistory({ ...activeDesign, background_url: undefined })} className="h-8 w-8 text-red-400 hover:text-red-600 rounded-xl">
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {/* Alineación y Distribución */}
-            <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100/50 space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-blue-950 flex items-center gap-1.5">
-                Alineación y Distribución
-              </Label>
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCenterSelectedX}
-                  disabled={!selectedElementId && selectedElementIds.length === 0}
-                  className="h-8 text-[8px] px-1 uppercase font-black tracking-wider text-gray-700 bg-white border-gray-200 flex gap-0.5 items-center justify-center hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-gray-700 active:scale-95 shrink-0"
-                  title="Centrar horizontalmente"
-                >
-                  <AlignCenter className="w-3.5 h-3.5 text-blue-600" /> Centrar X
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDistributeSelectedY}
-                  disabled={selectedElementIds.length < 3}
-                  className="h-8 text-[8px] px-1 uppercase font-black tracking-wider text-gray-700 bg-white border-gray-200 flex gap-0.5 items-center justify-center hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-gray-700 active:scale-95 shrink-0"
-                  title="Distribuir verticalmente de extremo a extremo"
-                >
-                  <MoveVertical className="w-3.5 h-3.5 text-blue-600" /> Distribuir Y
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSetEqualDistanceY}
-                  disabled={selectedElementIds.length < 2}
-                  className="h-8 text-[8px] px-1 uppercase font-black tracking-wider text-gray-700 bg-white border-gray-200 flex gap-0.5 items-center justify-center hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-gray-700 active:scale-95 shrink-0"
-                  title="Ajustar la misma distancia entre los elementos seleccionados"
-                >
-                  <AlignVerticalSpaceAround className="w-3.5 h-3.5 text-blue-600" /> Distancia
-                </Button>
-              </div>
-            </div>
-
-            {/* Import / Export Buttons */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="relative">
-                <Input 
-                  type="file" 
-                  accept=".json" 
-                  onChange={handleImportDesign}
-                  className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                />
-                <Button type="button" variant="outline" className="w-full h-8 rounded-xl text-[9px] uppercase font-black tracking-wider text-gray-600 border-gray-200 flex gap-1.5 items-center justify-center hover:bg-gray-50 active:scale-95">
-                  <Upload className="w-3.5 h-3.5 text-blue-600" /> Importar
-                </Button>
-              </div>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleExportDesign}
-                className="w-full h-8 rounded-xl text-[9px] uppercase font-black tracking-wider text-gray-600 border-gray-200 flex gap-1.5 items-center justify-center hover:bg-gray-50 active:scale-95"
-              >
-                <Download className="w-3.5 h-3.5 text-blue-600" /> Exportar
-              </Button>
-            </div>
-          </div>
-
-          <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block px-1">Elementos del Diseño</Label>
-          {activeDesign.elements.map((el, idx) => (
-            <div 
-              key={el.id} 
-              className={`bg-white rounded-xl border overflow-hidden flex-shrink-0 cursor-pointer transition-colors ${selectedElementIds.includes(el.id) ? 'border-blue-500 shadow-md ring-1 ring-blue-500' : 'border-gray-100 hover:border-blue-200'}`}
-              onClick={(e) => handleSelectElement(el.id, e.ctrlKey || e.shiftKey)}
-            >
-              <div className={`flex items-center justify-between px-3 py-2 ${selectedElementIds.includes(el.id) ? 'bg-blue-50' : 'border-b border-gray-50'}`}>
-                <div className="flex items-center gap-2">
-                  <GripVertical className="w-4 h-4 text-gray-300" />
-                  <span className={`text-[10px] font-black uppercase ${selectedElementIds.includes(el.id) ? 'text-blue-700' : 'text-gray-600'}`}>{el.label}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Switch checked={!!el.is_visible} onCheckedChange={v => updateElement(idx, { is_visible: v as any })} />
-                  <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); removeElement(idx); }} className="w-7 h-7 text-gray-300 hover:text-red-500">
-                    <Trash2 className="w-3 h-3" />
+          {sidebarTab === 'elements' ? (
+            <>
+              {/* Add Element */}
+              <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm space-y-2">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-gray-400 block">Agregar Elemento al Diseño</Label>
+                <div className="flex gap-2">
+                  <Select value={newFieldType} onValueChange={(val) => setNewFieldType(val as string || '')}>
+                    <SelectTrigger className="h-8 rounded-xl text-xs font-bold flex-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>{FIELD_CATALOG.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <Button onClick={addElement} size="sm" className="h-8 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 font-bold text-xs gap-1">
+                    <Plus className="w-4 h-4" /> Agregar
                   </Button>
                 </div>
               </div>
-              {el.is_visible && selectedElementId === el.id && (
-                <div className="p-3 grid grid-cols-4 gap-2 bg-white" onClick={(e) => e.stopPropagation()}>
-                  <div><Label className="text-[8px] font-bold text-gray-400">X (mm)</Label>
-                    <Input type="number" step="0.1" value={el.x} onChange={e => updateElement(idx, { x: Number(e.target.value) })} className="h-7 text-[10px] rounded-lg" /></div>
-                  <div><Label className="text-[8px] font-bold text-gray-400">Y (mm)</Label>
-                    <Input type="number" step="0.1" value={el.y} onChange={e => updateElement(idx, { y: Number(e.target.value) })} className="h-7 text-[10px] rounded-lg" /></div>
-                  <div><Label className="text-[8px] font-bold text-gray-400">W (mm)</Label>
-                    <Input type="number" step="0.1" value={el.w} onChange={e => updateElement(idx, { w: Number(e.target.value) })} className="h-7 text-[10px] rounded-lg" /></div>
-                  <div><Label className="text-[8px] font-bold text-gray-400">H (mm)</Label>
-                    <Input type="number" step="0.1" value={el.h} onChange={e => updateElement(idx, { h: Number(e.target.value) })} className="h-7 text-[10px] rounded-lg" /></div>
-                  <div><Label className="text-[8px] font-bold text-gray-400">Font</Label>
-                    <Input type="number" value={el.font_size} onChange={e => updateElement(idx, { font_size: Number(e.target.value) })} className="h-7 text-[10px] rounded-lg" /></div>
-                  <div><Label className="text-[8px] font-bold text-gray-400">Color</Label>
-                    <Input type="color" value={el.color} onChange={e => updateElement(idx, { color: e.target.value })} className="h-7 p-0.5 rounded-lg w-full" /></div>
-                  <div className="col-span-2">
-                    <Label className="text-[8px] font-bold text-gray-400">Peso</Label>
-                    <Select value={el.font_weight} onValueChange={v => updateElement(idx, { font_weight: (v as string) || 'normal' })}>
-                      <SelectTrigger className="h-7 text-[10px] rounded-lg"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                         <SelectItem value="normal">Normal</SelectItem>
-                         <SelectItem value="bold">Bold</SelectItem>
-                         <SelectItem value="black">Black</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {el.campo_bd === 'fixed_text' && (
-                    <div className="col-span-4 mt-1 border-t border-gray-100 pt-2">
-                      <Label className="text-[8px] font-bold text-gray-400 uppercase">Contenido del Texto Fijo</Label>
-                      <Input 
-                        type="text"
-                        value={el.fixed_text || ''} 
-                        onChange={e => updateElement(idx, { fixed_text: e.target.value })} 
-                        className="h-8 text-[10px] rounded-lg mt-1"
-                        placeholder="Escribe el texto aquí..."
-                      />
+
+              {/* Alineación y Distribución */}
+              <div className="bg-blue-50/50 rounded-xl p-2.5 border border-blue-100/50 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-blue-950 flex items-center gap-1">
+                    Alineación y Distribución
+                  </Label>
+                  <span className="text-[8px] font-bold text-blue-600 bg-blue-100/60 px-1.5 py-0.5 rounded">
+                    {selectedElementIds.length} Seleccionado(s)
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCenterSelectedX}
+                    disabled={!selectedElementId && selectedElementIds.length === 0}
+                    className="h-7 text-[8px] px-1 uppercase font-black tracking-wider text-gray-700 bg-white border-gray-200 flex gap-0.5 items-center justify-center hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:hover:bg-white shrink-0"
+                    title="Centrar horizontalmente"
+                  >
+                    <AlignCenter className="w-3 h-3 text-blue-600" /> Centrar X
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDistributeSelectedY}
+                    disabled={selectedElementIds.length < 3}
+                    className="h-7 text-[8px] px-1 uppercase font-black tracking-wider text-gray-700 bg-white border-gray-200 flex gap-0.5 items-center justify-center hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:hover:bg-white shrink-0"
+                    title="Distribuir verticalmente de extremo a extremo"
+                  >
+                    <MoveVertical className="w-3 h-3 text-blue-600" /> Distribuir Y
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSetEqualDistanceY}
+                    disabled={selectedElementIds.length < 2}
+                    className="h-7 text-[8px] px-1 uppercase font-black tracking-wider text-gray-700 bg-white border-gray-200 flex gap-0.5 items-center justify-center hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:hover:bg-white shrink-0"
+                    title="Ajustar la misma distancia entre los elementos seleccionados"
+                  >
+                    <AlignVerticalSpaceAround className="w-3 h-3 text-blue-600" /> Distancia
+                  </Button>
+                </div>
+              </div>
+
+              {/* Element List with X, Y, W, H inputs */}
+              <div className="space-y-2">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-gray-400 block px-1">
+                  Lista de Elementos
+                </Label>
+                {activeDesign.elements.map((el, idx) => {
+                  const isSelected = selectedElementIds.includes(el.id) || selectedElementId === el.id;
+                  return (
+                    <div 
+                      key={el.id} 
+                      className={`bg-white rounded-xl border overflow-hidden flex-shrink-0 transition-all ${isSelected ? 'border-blue-500 shadow-sm ring-1 ring-blue-500' : 'border-gray-200 hover:border-blue-200'}`}
+                    >
+                      <div 
+                        className={`flex items-center justify-between px-3 py-2 cursor-pointer ${isSelected ? 'bg-blue-50/80' : 'bg-white border-b border-gray-50'}`}
+                        onClick={(e) => handleSelectElement(el.id, e.ctrlKey || e.shiftKey)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <GripVertical className="w-4 h-4 text-gray-400" />
+                          <span className={`text-[10px] font-black uppercase ${isSelected ? 'text-blue-800' : 'text-gray-700'}`}>
+                            {el.label} {isSelected ? '★' : ''}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Switch checked={!!el.is_visible} onCheckedChange={v => updateElement(idx, { is_visible: v as any })} />
+                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); removeElement(idx); }} className="w-6 h-6 text-gray-300 hover:text-red-500">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Always show X, Y, W, H parameters when element is visible */}
+                      {el.is_visible && (
+                        <div className="p-2.5 grid grid-cols-4 gap-1.5 bg-white border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
+                          <div>
+                            <Label className="text-[8px] font-bold text-gray-500 uppercase">X (mm)</Label>
+                            <Input type="number" step="0.1" value={el.x} onChange={e => updateElement(idx, { x: Number(e.target.value) })} className="h-7 text-[10px] rounded-lg font-bold border-gray-200 focus-visible:ring-blue-500" />
+                          </div>
+                          <div>
+                            <Label className="text-[8px] font-bold text-gray-500 uppercase">Y (mm)</Label>
+                            <Input type="number" step="0.1" value={el.y} onChange={e => updateElement(idx, { y: Number(e.target.value) })} className="h-7 text-[10px] rounded-lg font-bold border-gray-200 focus-visible:ring-blue-500" />
+                          </div>
+                          <div>
+                            <Label className="text-[8px] font-bold text-gray-500 uppercase">W (mm)</Label>
+                            <Input type="number" step="0.1" value={el.w} onChange={e => updateElement(idx, { w: Number(e.target.value) })} className="h-7 text-[10px] rounded-lg border-gray-200" />
+                          </div>
+                          <div>
+                            <Label className="text-[8px] font-bold text-gray-500 uppercase">H (mm)</Label>
+                            <Input type="number" step="0.1" value={el.h} onChange={e => updateElement(idx, { h: Number(e.target.value) })} className="h-7 text-[10px] rounded-lg border-gray-200" />
+                          </div>
+                          <div>
+                            <Label className="text-[8px] font-bold text-gray-500 uppercase">Font</Label>
+                            <Input type="number" value={el.font_size} onChange={e => updateElement(idx, { font_size: Number(e.target.value) })} className="h-7 text-[10px] rounded-lg border-gray-200" />
+                          </div>
+                          <div>
+                            <Label className="text-[8px] font-bold text-gray-500 uppercase">Color</Label>
+                            <Input type="color" value={el.color} onChange={e => updateElement(idx, { color: e.target.value })} className="h-7 p-0.5 rounded-lg w-full cursor-pointer" />
+                          </div>
+                          <div className="col-span-2">
+                            <Label className="text-[8px] font-bold text-gray-500 uppercase">Peso</Label>
+                            <Select value={el.font_weight} onValueChange={v => updateElement(idx, { font_weight: (v as string) || 'normal' })}>
+                              <SelectTrigger className="h-7 text-[10px] rounded-lg border-gray-200"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                 <SelectItem value="normal">Normal</SelectItem>
+                                 <SelectItem value="bold">Bold</SelectItem>
+                                 <SelectItem value="black">Black</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {el.campo_bd === 'fixed_text' && (
+                            <div className="col-span-4 mt-1 border-t border-gray-100 pt-1.5">
+                              <Label className="text-[8px] font-bold text-gray-500 uppercase">Contenido del Texto Fijo</Label>
+                              <Input 
+                                type="text"
+                                value={el.fixed_text || ''} 
+                                onChange={e => updateElement(idx, { fixed_text: e.target.value })} 
+                                className="h-7 text-[10px] rounded-lg mt-1 border-gray-200"
+                                placeholder="Escribe el texto aquí..."
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            /* Style Tab Content */
+            <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm space-y-4">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block border-b border-gray-50 pb-2">Estilos y Fondo</Label>
+              
+              {/* Colors */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-[9px] font-bold uppercase text-gray-400">Color Primario</Label>
+                  <div className="flex gap-1 mt-1">
+                    <Input type="color" value={activeDesign.primary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, primary_color: e.target.value })} className="w-8 h-8 p-0.5 rounded-lg shrink-0 cursor-pointer" />
+                    <Input value={activeDesign.primary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, primary_color: e.target.value })} className="h-8 text-[10px] rounded-lg flex-1" />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-[9px] font-bold uppercase text-gray-400">Color Secundario</Label>
+                  <div className="flex gap-1 mt-1">
+                    <Input type="color" value={activeDesign.secondary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, secondary_color: e.target.value })} className="w-8 h-8 p-0.5 rounded-lg shrink-0 cursor-pointer" />
+                    <Input value={activeDesign.secondary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, secondary_color: e.target.value })} className="h-8 text-[10px] rounded-lg flex-1" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Background Image */}
+              <div>
+                <Label className="text-[9px] font-bold uppercase text-gray-400 mb-1 block">Imagen Fondo (JPG)</Label>
+                <div className="flex gap-2">
+                  <div className="flex-1 relative">
+                    <Input type="file" accept="image/*" onChange={handleBackgroundUpload} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+                    <Button variant="outline" className="w-full h-8 rounded-xl border-dashed border-2 text-[10px] text-gray-400 gap-1">
+                      <Upload className="w-3 h-3" /> Seleccionar archivo
+                    </Button>
+                  </div>
+                  {activeDesign.background_url && (
+                    <Button variant="ghost" size="icon" onClick={() => updateActiveDesignWithHistory({ ...activeDesign, background_url: undefined })} className="h-8 w-8 text-red-400 hover:text-red-600 rounded-xl">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   )}
                 </div>
-              )}
+              </div>
 
+              {/* Import / Export Buttons */}
+              <div className="pt-2 border-t border-gray-50 space-y-2">
+                <Label className="text-[9px] font-bold uppercase text-gray-400 block">Respaldar Plantilla</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="relative">
+                    <Input 
+                      type="file" 
+                      accept=".json" 
+                      onChange={handleImportDesign}
+                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                    />
+                    <Button type="button" variant="outline" className="w-full h-8 rounded-xl text-[9px] uppercase font-black tracking-wider text-gray-600 border-gray-200 flex gap-1.5 items-center justify-center hover:bg-gray-50 active:scale-95">
+                      <Upload className="w-3.5 h-3.5 text-blue-600" /> Importar
+                    </Button>
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={handleExportDesign}
+                    className="w-full h-8 rounded-xl text-[9px] uppercase font-black tracking-wider text-gray-600 border-gray-200 flex gap-1.5 items-center justify-center hover:bg-gray-50 active:scale-95"
+                  >
+                    <Download className="w-3.5 h-3.5 text-blue-600" /> Exportar
+                  </Button>
+                </div>
+              </div>
             </div>
-          ))}
+          )}
+
+        </div>
+
+        {/* Fixed Save Button at the bottom */}
+        <div className="p-3 bg-white border-t border-gray-100 flex-shrink-0">
+          <Button onClick={handleSaveDesign} className="w-full h-10 bg-blue-900 hover:bg-blue-800 text-white font-bold rounded-xl gap-2 uppercase tracking-widest text-[10px]">
+            <Save className="w-4 h-4" /> Guardar Diseño
+          </Button>
         </div>
       </div>
 
