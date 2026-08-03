@@ -151,6 +151,64 @@ export const CredentialDesignPanel: React.FC = () => {
 
   useEffect(() => { fetchDesigns(); }, []);
 
+  // Keyboard navigation for selected elements
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if editing text fields
+      const activeEl = document.activeElement;
+      if (
+        activeEl && 
+        (activeEl.tagName === 'INPUT' || 
+         activeEl.tagName === 'TEXTAREA' || 
+         activeEl.tagName === 'SELECT' ||
+         activeEl.getAttribute('contenteditable') === 'true')
+      ) {
+        return;
+      }
+
+      const { activeDesign: currentDesign, selectedElementIds: currentIds } = stateRef.current;
+      if (!currentDesign || currentIds.length === 0) return;
+
+      const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+      if (!keys.includes(e.key)) return;
+
+      // Prevent window scroll
+      e.preventDefault();
+
+      // Step: 0.1mm default, 1.0mm with Shift
+      const step = e.shiftKey ? 1.0 : 0.1;
+
+      const updatedElements = currentDesign.elements.map(el => {
+        if (!currentIds.includes(el.id)) return el;
+
+        let newX = el.x;
+        let newY = el.y;
+
+        if (e.key === 'ArrowUp') {
+          newY = Math.max(0, parseFloat((el.y - step).toFixed(2)));
+        } else if (e.key === 'ArrowDown') {
+          newY = parseFloat((el.y + step).toFixed(2));
+        } else if (e.key === 'ArrowLeft') {
+          newX = Math.max(0, parseFloat((el.x - step).toFixed(2)));
+        } else if (e.key === 'ArrowRight') {
+          newX = parseFloat((el.x + step).toFixed(2));
+        }
+
+        return { ...el, x: newX, y: newY };
+      });
+
+      updateActiveDesignWithHistory({
+        ...currentDesign,
+        elements: updatedElements
+      });
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [updateActiveDesignWithHistory]);
+
   // Delay rendering of Rnd components until animations finish (prevent layout offsets)
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -804,7 +862,7 @@ export const CredentialDesignPanel: React.FC = () => {
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Left Controls */}
       <div className="w-[380px] h-full flex flex-col border-r border-gray-100 bg-gray-50/30">
-        <div className="p-6 border-b border-gray-100 space-y-4 bg-white flex-shrink-0">
+        <div className="p-4 border-b border-gray-100 space-y-3 bg-white flex-shrink-0">
           {/* Design Selector */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -862,11 +920,6 @@ export const CredentialDesignPanel: React.FC = () => {
           {/* Configuration Switches */}
           <div className="space-y-3 pt-1 border-t border-gray-50">
             <div className="flex items-center justify-between px-1">
-              <Label className="text-[10px] font-bold text-gray-500 uppercase">Plantilla Base (Logo/Foto)</Label>
-              <Switch checked={(activeDesign.show_template as any) !== false && (activeDesign.show_template as any) !== 0} onCheckedChange={v => updateActiveDesignWithHistory({ ...activeDesign, show_template: v })} />
-            </div>
-
-            <div className="flex items-center justify-between px-1">
               <Label className="text-[10px] font-bold text-blue-900 uppercase">Activar para Impresión</Label>
               <Switch checked={!!activeDesign.is_active} onCheckedChange={v => updateActiveDesignWithHistory({ ...activeDesign, is_active: v })} />
             </div>
@@ -888,97 +941,103 @@ export const CredentialDesignPanel: React.FC = () => {
           <Button onClick={handleSaveDesign} className="w-full h-11 bg-blue-900 hover:bg-blue-800 text-white font-bold rounded-xl gap-2 uppercase tracking-widest text-[10px]">
             <Save className="w-4 h-4" /> Guardar Diseño
           </Button>
-
-          {/* Alineación y Distribución */}
-          <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100/50 space-y-2">
-            <Label className="text-[10px] font-black uppercase tracking-widest text-blue-950 flex items-center gap-1.5">
-              Alineación y Distribución
-            </Label>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCenterSelectedX}
-                disabled={!selectedElementId && selectedElementIds.length === 0}
-                className="h-8 text-[9px] uppercase font-black tracking-wider text-gray-700 bg-white border-gray-200 flex gap-1 items-center justify-center hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-gray-700 active:scale-95"
-              >
-                <AlignCenter className="w-3.5 h-3.5 text-blue-600" /> Centrar X
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDistributeSelectedY}
-                disabled={selectedElementIds.length < 3}
-                className="h-8 text-[9px] uppercase font-black tracking-wider text-gray-700 bg-white border-gray-200 flex gap-1 items-center justify-center hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-gray-700 active:scale-95"
-              >
-                <MoveVertical className="w-3.5 h-3.5 text-blue-600" /> Distribuir Y
-              </Button>
-            </div>
-          </div>
-
-          {/* Import / Export Buttons */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="relative">
-              <Input 
-                type="file" 
-                accept=".json" 
-                onChange={handleImportDesign}
-                className="absolute inset-0 opacity-0 cursor-pointer z-10"
-              />
-              <Button type="button" variant="outline" className="w-full h-10 rounded-xl text-[9px] uppercase font-black tracking-wider text-gray-600 border-gray-200 flex gap-1.5 items-center justify-center hover:bg-gray-50 active:scale-95">
-                <Upload className="w-3.5 h-3.5 text-blue-600" /> Importar
-              </Button>
-            </div>
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={handleExportDesign}
-              className="w-full h-10 rounded-xl text-[9px] uppercase font-black tracking-wider text-gray-600 border-gray-200 flex gap-1.5 items-center justify-center hover:bg-gray-50 active:scale-95"
-            >
-              <Download className="w-3.5 h-3.5 text-blue-600" /> Exportar
-            </Button>
-          </div>
-
-
-          {/* Colors */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-[9px] font-bold uppercase text-gray-400">Primario</Label>
-              <div className="flex gap-1 mt-1">
-                <Input type="color" value={activeDesign.primary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, primary_color: e.target.value })} className="w-9 h-9 p-0.5 rounded-lg" />
-                <Input value={activeDesign.primary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, primary_color: e.target.value })} className="h-9 text-[10px] rounded-lg flex-1" />
-              </div>
-            </div>
-            <div>
-              <Label className="text-[9px] font-bold uppercase text-gray-400">Secundario</Label>
-              <div className="flex gap-1 mt-1">
-                <Input type="color" value={activeDesign.secondary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, secondary_color: e.target.value })} className="w-9 h-9 p-0.5 rounded-lg" />
-                <Input value={activeDesign.secondary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, secondary_color: e.target.value })} className="h-9 text-[10px] rounded-lg flex-1" />
-              </div>
-            </div>
-          </div>
-
-          {/* Background Image */}
-          <div>
-            <Label className="text-[9px] font-bold uppercase text-gray-400 mb-1 block">Imagen Fondo (JPG)</Label>
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
-                <Input type="file" accept="image/*" onChange={handleBackgroundUpload} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-                <Button variant="outline" className="w-full h-9 rounded-xl border-dashed border-2 text-[10px] text-gray-400 gap-1">
-                  <Upload className="w-3 h-3" /> Seleccionar archivo
-                </Button>
-              </div>
-              {activeDesign.background_url && (
-                <Button variant="ghost" size="icon" onClick={() => updateActiveDesignWithHistory({ ...activeDesign, background_url: undefined })} className="h-9 w-9 text-red-400 hover:text-red-600 rounded-xl">
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              )}
-            </div>
-          </div>
         </div>
 
-        {/* Elements List */}
-        <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-2">
+        {/* Elements List & Advanced Settings (Scrollable) */}
+        <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4 bg-gray-50/30">
+          
+          {/* Card Visual Configuration */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm space-y-4">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block border-b border-gray-50 pb-2">Configuración Estética</Label>
+            
+            {/* Colors */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-[9px] font-bold uppercase text-gray-400">Primario</Label>
+                <div className="flex gap-1 mt-1">
+                  <Input type="color" value={activeDesign.primary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, primary_color: e.target.value })} className="w-8 h-8 p-0.5 rounded-lg shrink-0" />
+                  <Input value={activeDesign.primary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, primary_color: e.target.value })} className="h-8 text-[10px] rounded-lg flex-1" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-[9px] font-bold uppercase text-gray-400">Secundario</Label>
+                <div className="flex gap-1 mt-1">
+                  <Input type="color" value={activeDesign.secondary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, secondary_color: e.target.value })} className="w-8 h-8 p-0.5 rounded-lg shrink-0" />
+                  <Input value={activeDesign.secondary_color} onChange={e => updateActiveDesignWithHistory({ ...activeDesign, secondary_color: e.target.value })} className="h-8 text-[10px] rounded-lg flex-1" />
+                </div>
+              </div>
+            </div>
+
+            {/* Background Image */}
+            <div>
+              <Label className="text-[9px] font-bold uppercase text-gray-400 mb-1 block">Imagen Fondo (JPG)</Label>
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <Input type="file" accept="image/*" onChange={handleBackgroundUpload} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+                  <Button variant="outline" className="w-full h-8 rounded-xl border-dashed border-2 text-[10px] text-gray-400 gap-1">
+                    <Upload className="w-3 h-3" /> Seleccionar archivo
+                  </Button>
+                </div>
+                {activeDesign.background_url && (
+                  <Button variant="ghost" size="icon" onClick={() => updateActiveDesignWithHistory({ ...activeDesign, background_url: undefined })} className="h-8 w-8 text-red-400 hover:text-red-600 rounded-xl">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Alineación y Distribución */}
+            <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100/50 space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-blue-950 flex items-center gap-1.5">
+                Alineación y Distribución
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCenterSelectedX}
+                  disabled={!selectedElementId && selectedElementIds.length === 0}
+                  className="h-8 text-[9px] uppercase font-black tracking-wider text-gray-700 bg-white border-gray-200 flex gap-1 items-center justify-center hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-gray-700 active:scale-95"
+                >
+                  <AlignCenter className="w-3.5 h-3.5 text-blue-600" /> Centrar X
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDistributeSelectedY}
+                  disabled={selectedElementIds.length < 3}
+                  className="h-8 text-[9px] uppercase font-black tracking-wider text-gray-700 bg-white border-gray-200 flex gap-1 items-center justify-center hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-gray-700 active:scale-95"
+                >
+                  <MoveVertical className="w-3.5 h-3.5 text-blue-600" /> Distribuir Y
+                </Button>
+              </div>
+            </div>
+
+            {/* Import / Export Buttons */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="relative">
+                <Input 
+                  type="file" 
+                  accept=".json" 
+                  onChange={handleImportDesign}
+                  className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                />
+                <Button type="button" variant="outline" className="w-full h-8 rounded-xl text-[9px] uppercase font-black tracking-wider text-gray-600 border-gray-200 flex gap-1.5 items-center justify-center hover:bg-gray-50 active:scale-95">
+                  <Upload className="w-3.5 h-3.5 text-blue-600" /> Importar
+                </Button>
+              </div>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleExportDesign}
+                className="w-full h-8 rounded-xl text-[9px] uppercase font-black tracking-wider text-gray-600 border-gray-200 flex gap-1.5 items-center justify-center hover:bg-gray-50 active:scale-95"
+              >
+                <Download className="w-3.5 h-3.5 text-blue-600" /> Exportar
+              </Button>
+            </div>
+          </div>
+
+          <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block px-1">Elementos del Diseño</Label>
           {activeDesign.elements.map((el, idx) => (
             <div 
               key={el.id} 
