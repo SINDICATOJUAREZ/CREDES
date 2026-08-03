@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Save, Upload, Trash2, Move, Type, GripVertical, Image as ImageIcon, Download, Undo, Redo, AlignCenter, MoveVertical } from 'lucide-react';
+import { Plus, Save, Upload, Trash2, Move, Type, GripVertical, Image as ImageIcon, Download, Undo, Redo, AlignCenter, MoveVertical, AlignVerticalSpaceAround } from 'lucide-react';
 
 import { toast } from 'sonner';
 import { CredentialCard } from '../credential/CredentialCard';
@@ -481,18 +481,34 @@ export const CredentialDesignPanel: React.FC = () => {
 
   const { x: guidesX, y: guidesY } = getActiveGuides();
 
-  const handleDragStart = useCallback((id: string) => {
+  const handleDragStart = useCallback((id: string, e?: any) => {
     setIsDraggingOrResizing(true);
     setIsMouseDragging(true);
     
     const { activeDesign: currentDesign, selectedElementIds: currentIds } = stateRef.current;
     if (!currentDesign) return;
 
+    // Blur active inputs to return keyboard focus back to the canvas/window immediately
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT' || activeEl.tagName === 'TEXTAREA')) {
+      (activeEl as HTMLElement).blur();
+    }
+
+    const isMultiSelect = e ? (e.ctrlKey || e.shiftKey || e.metaKey) : false;
     let nextIds = currentIds;
-    if (!currentIds.includes(id)) {
-      nextIds = [id];
-      setSelectedElementIds([id]);
-      setSelectedElementId(id);
+
+    if (isMultiSelect) {
+      nextIds = currentIds.includes(id) 
+        ? currentIds.filter(x => x !== id) 
+        : [...currentIds, id];
+      setSelectedElementIds(nextIds);
+      setSelectedElementId(nextIds.length > 0 ? nextIds[nextIds.length - 1] : null);
+    } else {
+      if (!currentIds.includes(id)) {
+        nextIds = [id];
+        setSelectedElementIds([id]);
+        setSelectedElementId(id);
+      }
     }
 
     // Cache the DOM elements and initial translations of other selected elements to update directly
@@ -854,6 +870,48 @@ export const CredentialDesignPanel: React.FC = () => {
     toast.success('Elementos distribuidos verticalmente con espacios iguales');
   };
 
+  // Ajustar la misma distancia (gap) consecutiva entre elementos seleccionados
+  const handleSetEqualDistanceY = () => {
+    if (!activeDesign) return;
+    const idsToDistribute = selectedElementIds.length > 0 ? selectedElementIds : [];
+    if (idsToDistribute.length < 2) {
+      toast.info('Selecciona al menos 2 elementos para ajustar la distancia');
+      return;
+    }
+
+    const gapInput = prompt('Ingresa la separación vertical entre elementos en milímetros (mm):', '2.0');
+    if (gapInput === null) return; // cancelado
+    
+    const gap = parseFloat(gapInput);
+    if (isNaN(gap)) {
+      toast.error('Por favor ingresa un número válido');
+      return;
+    }
+
+    // Ordenar elementos de arriba a abajo
+    const sortedSelected = activeDesign.elements
+      .filter(el => idsToDistribute.includes(el.id))
+      .sort((a, b) => a.y - b.y);
+
+    const distributedPositions: { [id: string]: number } = {};
+    let currentY = sortedSelected[0].y; // Mantener la posición y del primer elemento
+
+    sortedSelected.forEach((el) => {
+      distributedPositions[el.id] = Number(currentY.toFixed(1));
+      currentY += (el.h || 3) + gap;
+    });
+
+    const newElements = activeDesign.elements.map(el => {
+      if (idsToDistribute.includes(el.id)) {
+        return { ...el, y: distributedPositions[el.id] };
+      }
+      return el;
+    });
+
+    updateActiveDesignWithHistory({ ...activeDesign, elements: newElements });
+    toast.success('Distancia entre elementos ajustada correctamente');
+  };
+
   if (!activeDesign) {
     return <div className="flex items-center justify-center h-full text-gray-400 font-bold">Cargando diseños...</div>;
   }
@@ -991,13 +1049,14 @@ export const CredentialDesignPanel: React.FC = () => {
               <Label className="text-[10px] font-black uppercase tracking-widest text-blue-950 flex items-center gap-1.5">
                 Alineación y Distribución
               </Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleCenterSelectedX}
                   disabled={!selectedElementId && selectedElementIds.length === 0}
-                  className="h-8 text-[9px] uppercase font-black tracking-wider text-gray-700 bg-white border-gray-200 flex gap-1 items-center justify-center hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-gray-700 active:scale-95"
+                  className="h-8 text-[8px] px-1 uppercase font-black tracking-wider text-gray-700 bg-white border-gray-200 flex gap-0.5 items-center justify-center hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-gray-700 active:scale-95 shrink-0"
+                  title="Centrar horizontalmente"
                 >
                   <AlignCenter className="w-3.5 h-3.5 text-blue-600" /> Centrar X
                 </Button>
@@ -1006,9 +1065,20 @@ export const CredentialDesignPanel: React.FC = () => {
                   size="sm"
                   onClick={handleDistributeSelectedY}
                   disabled={selectedElementIds.length < 3}
-                  className="h-8 text-[9px] uppercase font-black tracking-wider text-gray-700 bg-white border-gray-200 flex gap-1 items-center justify-center hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-gray-700 active:scale-95"
+                  className="h-8 text-[8px] px-1 uppercase font-black tracking-wider text-gray-700 bg-white border-gray-200 flex gap-0.5 items-center justify-center hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-gray-700 active:scale-95 shrink-0"
+                  title="Distribuir verticalmente de extremo a extremo"
                 >
                   <MoveVertical className="w-3.5 h-3.5 text-blue-600" /> Distribuir Y
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSetEqualDistanceY}
+                  disabled={selectedElementIds.length < 2}
+                  className="h-8 text-[8px] px-1 uppercase font-black tracking-wider text-gray-700 bg-white border-gray-200 flex gap-0.5 items-center justify-center hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-gray-700 active:scale-95 shrink-0"
+                  title="Ajustar la misma distancia entre los elementos seleccionados"
+                >
+                  <AlignVerticalSpaceAround className="w-3.5 h-3.5 text-blue-600" /> Distancia
                 </Button>
               </div>
             </div>
@@ -1176,7 +1246,7 @@ export const CredentialDesignPanel: React.FC = () => {
               bounds="parent"
               size={{ width: el.w * MM, height: el.h * MM }}
               position={{ x: el.x * MM, y: el.y * MM }}
-              onDragStart={() => handleDragStart(el.id)}
+              onDragStart={(e) => handleDragStart(el.id, e)}
               onDrag={(e, d) => handleDrag(el.id, d)}
               onDragStop={(e, d) => handleDragStop(el.id, d)}
               onResizeStart={() => setIsDraggingOrResizing(true)}
