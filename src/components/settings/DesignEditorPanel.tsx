@@ -496,21 +496,18 @@ export const CredentialDesignPanel: React.FC = () => {
     }
 
     const isMultiSelect = e ? (e.ctrlKey || e.shiftKey || e.metaKey) : false;
-    let nextIds = currentIds;
+    let nextIds: string[];
 
     if (isMultiSelect) {
       nextIds = currentIds.includes(id) 
         ? currentIds.filter(x => x !== id) 
         : [...currentIds, id];
-      setSelectedElementIds(nextIds);
-      setSelectedElementId(nextIds.length > 0 ? nextIds[nextIds.length - 1] : null);
     } else {
-      if (!currentIds.includes(id)) {
-        nextIds = [id];
-        setSelectedElementIds([id]);
-        setSelectedElementId(id);
-      }
+      nextIds = (currentIds.includes(id) && currentIds.length > 1) ? currentIds : [id];
     }
+
+    setSelectedElementIds(nextIds);
+    setSelectedElementId(nextIds.length > 0 ? nextIds[nextIds.length - 1] : null);
 
     // Cache the DOM elements and initial translations of other selected elements to update directly
     const domElements: { el: HTMLElement; startX: number; startY: number }[] = [];
@@ -1082,9 +1079,18 @@ export const CredentialDesignPanel: React.FC = () => {
                         onClick={(e) => handleSelectElement(el.id, e.ctrlKey || e.shiftKey)}
                       >
                         <div className="flex items-center gap-2">
-                          <GripVertical className="w-4 h-4 text-gray-400" />
-                          <span className={`text-[10px] font-black uppercase ${isSelected ? 'text-blue-800' : 'text-gray-700'}`}>
-                            {el.label} {isSelected ? '★' : ''}
+                          <input 
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleSelectElement(el.id, true);
+                            }}
+                            className="w-4 h-4 accent-blue-600 rounded cursor-pointer shrink-0"
+                            title="Seleccionar elemento para alineación o movimiento en bloque"
+                          />
+                          <span className={`text-[10px] font-black uppercase ${isSelected ? 'text-blue-800 font-extrabold' : 'text-gray-700'}`}>
+                            {el.label}
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5">
@@ -1302,7 +1308,7 @@ export const CredentialDesignPanel: React.FC = () => {
           {isReady && activeDesign.elements.map((el, idx) => el.is_visible && (
             <Rnd
               id={`rnd-${el.id}`}
-              key={`${el.id}-${el.x}-${el.y}`}
+              key={el.id}
               bounds="parent"
               size={{ width: el.w * MM, height: el.h * MM }}
               position={{ x: el.x * MM, y: el.y * MM }}
@@ -1321,10 +1327,6 @@ export const CredentialDesignPanel: React.FC = () => {
               }}
               className={`group ${selectedElementIds.includes(el.id) ? 'ring-1 ring-blue-500 z-50' : 'z-10'}`}
               style={{ position: 'absolute' }}
-              onClick={(e: any) => {
-                e.stopPropagation();
-                handleSelectElement(el.id, e.ctrlKey || e.shiftKey);
-              }}
             >
               <div className={`absolute inset-0 border border-transparent group-hover:border-blue-400 group-hover:bg-blue-400/10 cursor-move transition-colors ${selectedElementIds.includes(el.id) ? 'border-blue-500 bg-blue-500/5' : ''}`} />
               <div 
