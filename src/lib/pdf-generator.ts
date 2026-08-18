@@ -62,7 +62,197 @@ export const mapDesignToConfig = (design: any): CredentialConfig => {
   };
 };
 
-// Vectorial Generator
+// Helper to render a card face on a PDF instance
+const drawFaceOnPdf = async (
+  pdf: jsPDF, 
+  member: Member, 
+  config: CredentialConfig, 
+  isFirstPageOfDoc: boolean, 
+  isFirstPageOfMemberCard: boolean,
+  qrType: 'new' | 'legacy' = 'new'
+) => {
+  if (!isFirstPageOfDoc) {
+    pdf.addPage([85.6, 54], 'landscape');
+  }
+
+  // Background
+  if (config.backgroundUrl) {
+    const bgBase64 = await fetchImageAsBase64(config.backgroundUrl);
+    if (bgBase64) {
+      const format = bgBase64.includes('image/png') ? 'PNG' : 'JPEG';
+      pdf.addImage(bgBase64, format, 0, 0, 85.6, 54);
+    }
+  } else {
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, 85.6, 54, 'F');
+  }
+
+  const showTemplate = (config.showTemplate as any) !== false && (config.showTemplate as any) !== 0 && (config.showTemplate as any) !== 'false';
+
+  if (showTemplate) {
+    pdf.setFillColor(config.primaryColor || '#003366');
+    pdf.rect(0, 0, 85.6, 13, 'F');
+    pdf.setDrawColor(234, 179, 8); // border-yellow-500
+    pdf.setLineWidth(0.5);
+    pdf.line(0, 13, 85.6, 13);
+
+    const logo1 = await fetchImageAsBase64('/logos/logo.png');
+    if (logo1) {
+      pdf.setFillColor(255, 255, 255);
+      pdf.circle(8, 6.5, 5, 'F');
+      pdf.addImage(logo1, 'PNG', 4, 2.5, 8, 8);
+    }
+
+    const logo2 = await fetchImageAsBase64('/logos/logo2.png');
+    if (logo2) {
+      pdf.setFillColor(255, 255, 255);
+      pdf.circle(77.6, 6.5, 5, 'F');
+      pdf.addImage(logo2, 'PNG', 73.6, 2.5, 8, 8);
+    }
+
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(5.5);
+    pdf.text('Sindicato Único de Trabajadores de', 42.8, 4.5, { align: 'center' });
+    pdf.setFontSize(10);
+    pdf.text('Ciudad Benito Juárez', 42.8, 8.5, { align: 'center' });
+    pdf.setFont('helvetica', 'italic');
+    pdf.setFontSize(5);
+    pdf.text('"Unidad, Trabajo y Justicia Social"', 42.8, 11.5, { align: 'center' });
+
+    // Photo Container (Only if there is no photo element and we want default template photo)
+    const hasPhotoElement = config.elements.some(el => (el.field as string) === 'foto' || (el.field as string) === 'photoUrl' || el.type === 'image');
+    if (!hasPhotoElement && member.photoUrl && isFirstPageOfMemberCard) {
+      pdf.setFillColor(249, 250, 251); // gray-50
+      pdf.setDrawColor(config.primaryColor || '#003366');
+      pdf.setLineWidth(0.8);
+      pdf.rect(4, 16, 24, 28, 'FD'); // FD = fill and stroke
+      
+      const photoBase64 = await fetchImageAsBase64(member.photoUrl);
+      if (photoBase64) {
+        const format = photoBase64.includes('image/png') ? 'PNG' : 'JPEG';
+        pdf.addImage(photoBase64, format, 4.4, 16.4, 23.2, 27.2);
+      }
+    }
+
+    // Socio Badge
+    const hasSocioElement = config.elements.some(el => el.field === 'socioId');
+    if (!hasSocioElement) {
+      pdf.setFillColor(config.primaryColor || '#003366');
+      pdf.rect(4, 45.5, 24, 4, 'F');
+      pdf.setDrawColor(234, 179, 8); // yellow-500
+      pdf.setLineWidth(0.2);
+      pdf.line(4, 49.5, 28, 49.5);
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6);
+      pdf.text(`SOCIO: ${member.socioId || '0000'}`, 16, 48.5, { align: 'center' });
+    }
+  } else if (member.photoUrl && isFirstPageOfMemberCard) {
+    const hasPhotoElement = config.elements.some(el => (el.field as string) === 'foto' || (el.field as string) === 'photoUrl' || el.type === 'image');
+    if (!hasPhotoElement) {
+      const photoBase64 = await fetchImageAsBase64(member.photoUrl || '');
+      if (photoBase64) {
+        const format = photoBase64.includes('image/png') ? 'PNG' : 'JPEG';
+        pdf.addImage(photoBase64, format, 4.4, 16.4, 23.2, 27.2);
+      }
+    }
+  }
+
+  // Dynamic Elements
+  for (const el of config.elements) {
+    if (!el.isVisible) continue;
+    
+    const x = el.x;
+    const y = el.y;
+
+    if (el.type === 'qr') {
+      let qrData = '';
+      if (qrType === 'legacy' && member.legacyQrData) {
+        qrData = member.legacyQrData;
+      } else {
+        qrData = member.qrData
+          ? member.qrData
+          : [
+              `NOMBRE: ${member.fullName}`,
+              `NÓMINA: ${member.employeeId}`,
+              `PUESTO: ${member.position || ''}`
+            ].join('\n');
+      }
+      const qrBase64 = await QRCode.toDataURL(qrData, { margin: 1, errorCorrectionLevel: 'H' });
+      pdf.addImage(qrBase64, 'PNG', x, y, el.w || 20, el.h || 20);
+      continue;
+    }
+
+    if ((el.field as string) === 'foto' || (el.field as string) === 'photoUrl') {
+      const photoBase64 = await fetchImageAsBase64(member.photoUrl || '');
+      if (photoBase64) {
+        const format = photoBase64.includes('image/png') ? 'PNG' : 'JPEG';
+        pdf.addImage(photoBase64, format, x, y, el.w || 24, el.h || 28);
+      }
+      continue;
+    }
+
+    let value = '';
+    if (el.field === 'fixed_text') {
+      value = el.fixedText || '';
+    } else if ((el.field as string) === 'emision') {
+      const date = new Date();
+      const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      value = `${months[date.getMonth()]} ${date.getFullYear()}`;
+    } else if ((el.field as string) === 'vigencia') {
+      const date = new Date();
+      const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      value = `${months[date.getMonth()]} ${date.getFullYear() + 1}`;
+    } else {
+      value = (member[el.field as keyof Member] as string) || '';
+    }
+
+    if (!value) continue;
+
+    const fontSize = el.fontSize || 7;
+    pdf.setFontSize(fontSize);
+    pdf.setFont('helvetica', el.fontWeight === 'bold' || el.fontWeight === 'black' ? 'bold' : 'normal');
+    pdf.setTextColor(el.color || '#000000');
+
+    let textX = x;
+    let align: 'left' | 'center' | 'right' = 'left';
+    
+    if (el.alignment === 'center') {
+      align = 'center';
+      textX = x + ((el.w || 20) / 2);
+    } else if (el.alignment === 'right') {
+      align = 'right';
+      textX = x + (el.w || 20);
+    }
+
+    let textY = y + (fontSize * 0.35);
+    if (el.alignment === 'center' && el.h) {
+      textY = y + (el.h / 2) + (fontSize * 0.35) / 2;
+    }
+
+    pdf.text((value || '').toUpperCase(), textX, textY, { align });
+  }
+
+  // Expiry
+  if (showTemplate) {
+    pdf.setTextColor(0, 51, 102);
+    pdf.setFontSize(4.5);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('VIGENCIA CREDENCIAL', 32, 50.5);
+    pdf.setFillColor(234, 179, 8);
+    pdf.rect(32, 51, 15, 2, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(5.5);
+    pdf.text(member.expiryDate || '---', 39.5, 52.5, { align: 'center' });
+
+    // Bottom Bar
+    pdf.setFillColor(config.primaryColor || '#003366');
+    pdf.rect(0, 52.5, 85.6, 1.5, 'F');
+  }
+};
+
+// Vectorial Generator (Single Member)
 export const generateVectorialCredentialPDF = async (
   member: Member, 
   frontConfig: CredentialConfig, 
@@ -76,194 +266,44 @@ export const generateVectorialCredentialPDF = async (
     format: [85.6, 54]
   });
 
-  const drawFace = async (config: CredentialConfig, isFirstPage: boolean) => {
-    if (!isFirstPage) {
-      pdf.addPage([85.6, 54], 'landscape');
-    }
-
-    // Background
-    if (config.backgroundUrl) {
-      const bgBase64 = await fetchImageAsBase64(config.backgroundUrl);
-      if (bgBase64) {
-        const format = bgBase64.includes('image/png') ? 'PNG' : 'JPEG';
-        pdf.addImage(bgBase64, format, 0, 0, 85.6, 54);
-      }
-    } else {
-      pdf.setFillColor(255, 255, 255);
-      pdf.rect(0, 0, 85.6, 54, 'F');
-    }
-
-    const showTemplate = (config.showTemplate as any) !== false && (config.showTemplate as any) !== 0 && (config.showTemplate as any) !== 'false';
-
-    if (showTemplate) {
-      pdf.setFillColor(config.primaryColor || '#003366');
-      pdf.rect(0, 0, 85.6, 13, 'F');
-      pdf.setDrawColor(234, 179, 8); // border-yellow-500
-      pdf.setLineWidth(0.5);
-      pdf.line(0, 13, 85.6, 13);
-
-      const logo1 = await fetchImageAsBase64('/logos/logo.png');
-      if (logo1) {
-        pdf.setFillColor(255, 255, 255);
-        pdf.circle(8, 6.5, 5, 'F');
-        pdf.addImage(logo1, 'PNG', 4, 2.5, 8, 8);
-      }
-
-      const logo2 = await fetchImageAsBase64('/logos/logo2.png');
-      if (logo2) {
-        pdf.setFillColor(255, 255, 255);
-        pdf.circle(77.6, 6.5, 5, 'F');
-        pdf.addImage(logo2, 'PNG', 73.6, 2.5, 8, 8);
-      }
-
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(5.5);
-      pdf.text('Sindicato Único de Trabajadores de', 42.8, 4.5, { align: 'center' });
-      pdf.setFontSize(10);
-      pdf.text('Ciudad Benito Juárez', 42.8, 8.5, { align: 'center' });
-      pdf.setFont('helvetica', 'italic');
-      pdf.setFontSize(5);
-      pdf.text('"Unidad, Trabajo y Justicia Social"', 42.8, 11.5, { align: 'center' });
-
-      // Photo Container (Only if there is no photo element and we want default template photo)
-      const hasPhotoElement = config.elements.some(el => (el.field as string) === 'foto' || (el.field as string) === 'photoUrl' || el.type === 'image');
-      if (!hasPhotoElement && member.photoUrl && isFirstPage) {
-        pdf.setFillColor(249, 250, 251); // gray-50
-        pdf.setDrawColor(config.primaryColor || '#003366');
-        pdf.setLineWidth(0.8);
-        pdf.rect(4, 16, 24, 28, 'FD'); // FD = fill and stroke
-        
-        const photoBase64 = await fetchImageAsBase64(member.photoUrl);
-        if (photoBase64) {
-          const format = photoBase64.includes('image/png') ? 'PNG' : 'JPEG';
-          pdf.addImage(photoBase64, format, 4.4, 16.4, 23.2, 27.2);
-        }
-      }
-
-      // Socio Badge
-      const hasSocioElement = config.elements.some(el => el.field === 'socioId');
-      if (!hasSocioElement) {
-        pdf.setFillColor(config.primaryColor || '#003366');
-        pdf.rect(4, 45.5, 24, 4, 'F');
-        pdf.setDrawColor(234, 179, 8); // yellow-500
-        pdf.setLineWidth(0.2);
-        pdf.line(4, 49.5, 28, 49.5);
-        pdf.setTextColor(255, 255, 255);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(6);
-        pdf.text(`SOCIO: ${member.socioId || '0000'}`, 16, 48.5, { align: 'center' });
-      }
-    } else if (member.photoUrl && isFirstPage) {
-      const hasPhotoElement = config.elements.some(el => (el.field as string) === 'foto' || (el.field as string) === 'photoUrl' || el.type === 'image');
-      if (!hasPhotoElement) {
-        const photoBase64 = await fetchImageAsBase64(member.photoUrl || '');
-        if (photoBase64) {
-          const format = photoBase64.includes('image/png') ? 'PNG' : 'JPEG';
-          pdf.addImage(photoBase64, format, 4.4, 16.4, 23.2, 27.2);
-        }
-      }
-    }
-
-    // Dynamic Elements
-    for (const el of config.elements) {
-      if (!el.isVisible) continue;
-      
-      const x = el.x;
-      const y = el.y;
-
-      if (el.type === 'qr') {
-        let qrData = '';
-        if (qrType === 'legacy' && member.legacyQrData) {
-          qrData = member.legacyQrData;
-        } else {
-          qrData = member.qrData
-            ? member.qrData
-            : [
-                `NOMBRE: ${member.fullName}`,
-                `NÓMINA: ${member.employeeId}`,
-                `PUESTO: ${member.position || ''}`
-              ].join('\n');
-        }
-        const qrBase64 = await QRCode.toDataURL(qrData, { margin: 1, errorCorrectionLevel: 'H' });
-        pdf.addImage(qrBase64, 'PNG', x, y, el.w || 20, el.h || 20);
-        continue;
-      }
-
-      if ((el.field as string) === 'foto' || (el.field as string) === 'photoUrl') {
-        const photoBase64 = await fetchImageAsBase64(member.photoUrl || '');
-        if (photoBase64) {
-          const format = photoBase64.includes('image/png') ? 'PNG' : 'JPEG';
-          pdf.addImage(photoBase64, format, x, y, el.w || 24, el.h || 28);
-        }
-        continue;
-      }
-
-      let value = '';
-      if (el.field === 'fixed_text') {
-        value = el.fixedText || '';
-      } else if ((el.field as string) === 'emision') {
-        const date = new Date();
-        const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-        value = `${months[date.getMonth()]} ${date.getFullYear()}`;
-      } else if ((el.field as string) === 'vigencia') {
-        const date = new Date();
-        const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-        value = `${months[date.getMonth()]} ${date.getFullYear() + 1}`;
-      } else {
-        value = (member[el.field as keyof Member] as string) || '';
-      }
-
-      if (!value) continue;
-
-      const fontSize = el.fontSize || 7;
-      pdf.setFontSize(fontSize);
-      pdf.setFont('helvetica', el.fontWeight === 'bold' || el.fontWeight === 'black' ? 'bold' : 'normal');
-      pdf.setTextColor(el.color || '#000000');
-
-      let textX = x;
-      let align: 'left' | 'center' | 'right' = 'left';
-      
-      if (el.alignment === 'center') {
-        align = 'center';
-        textX = x + ((el.w || 20) / 2);
-      } else if (el.alignment === 'right') {
-        align = 'right';
-        textX = x + (el.w || 20);
-      }
-
-      let textY = y + (fontSize * 0.35);
-      if (el.alignment === 'center' && el.h) {
-        textY = y + (el.h / 2) + (fontSize * 0.35) / 2;
-      }
-
-      pdf.text((value || '').toUpperCase(), textX, textY, { align });
-    }
-
-    // Expiry
-    if (showTemplate) {
-      pdf.setTextColor(0, 51, 102);
-      pdf.setFontSize(4.5);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('VIGENCIA CREDENCIAL', 32, 50.5);
-      pdf.setFillColor(234, 179, 8);
-      pdf.rect(32, 51, 15, 2, 'F');
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(5.5);
-      pdf.text(member.expiryDate || '---', 39.5, 52.5, { align: 'center' });
-
-      // Bottom Bar
-      pdf.setFillColor(config.primaryColor || '#003366');
-      pdf.rect(0, 52.5, 85.6, 1.5, 'F');
-    }
-  };
-
   // Draw Front Page
-  await drawFace(frontConfig, true);
+  await drawFaceOnPdf(pdf, member, frontConfig, true, true, qrType);
 
   // Draw Back Page (if provided)
   if (backConfig) {
-    await drawFace(backConfig, false);
+    await drawFaceOnPdf(pdf, member, backConfig, false, false, qrType);
+  }
+
+  pdf.save(`${fileName}.pdf`);
+};
+
+// Vectorial Generator (Batch / Multiple Members)
+export const generateVectorialBatchCredentialsPDF = async (
+  members: Member[], 
+  frontConfig: CredentialConfig, 
+  backConfig: CredentialConfig | null, 
+  fileName: string,
+  qrType: 'new' | 'legacy' = 'new'
+) => {
+  if (!members || members.length === 0) return;
+
+  const pdf = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: [85.6, 54]
+  });
+
+  let isFirstPageDoc = true;
+
+  for (const member of members) {
+    // Draw Front
+    await drawFaceOnPdf(pdf, member, frontConfig, isFirstPageDoc, true, qrType);
+    isFirstPageDoc = false;
+
+    // Draw Back (if provided)
+    if (backConfig) {
+      await drawFaceOnPdf(pdf, member, backConfig, false, false, qrType);
+    }
   }
 
   pdf.save(`${fileName}.pdf`);

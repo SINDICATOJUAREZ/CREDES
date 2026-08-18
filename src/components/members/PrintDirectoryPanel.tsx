@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { Member, CredentialDesign } from '@/types/member';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { generateVectorialCredentialPDF, mapDesignToConfig } from '@/lib/pdf-generator';
+import { generateVectorialCredentialPDF, generateVectorialBatchCredentialsPDF, mapDesignToConfig } from '@/lib/pdf-generator';
 import { toast } from 'sonner';
-import { Search, ArrowLeft, Printer, Eye, RefreshCw, Layers, QrCode, History } from 'lucide-react';
+import { Search, ArrowLeft, Printer, Eye, RefreshCw, Layers, QrCode, History, CheckSquare, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
@@ -26,12 +26,13 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
   const [filterPuesto, setFilterPuesto] = useState('');
   const [filterDepartamento, setFilterDepartamento] = useState('');
 
-  // Print Configuration States
+  // Print Configuration & Batch States
   const [printMode, setPrintMode] = useState<'both' | 'front_only'>('both');
   const [qrType, setQrType] = useState<'new' | 'legacy'>('new');
   const [designs, setDesigns] = useState<CredentialDesign[]>([]);
   const [selectedFrontDesignId, setSelectedFrontDesignId] = useState<string>('');
   const [selectedBackDesignId, setSelectedBackDesignId] = useState<string>('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Preview & Printing Modal
   const [previewMember, setPreviewMember] = useState<Member | null>(null);
@@ -87,9 +88,61 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
 
   const { data, isLoading } = useSWR(fetchUrl, fetcher);
   const members: Member[] = data?.data || [];
-  const totalPages = data?.totalPages || 1;
+  const totalPages = data?.totalPages || data?.meta?.totalPages || 1;
 
-  // Print function
+  // Checkbox Selection Logic
+  const allSelectedOnPage = members.length > 0 && members.every(m => selectedIds.includes(m.id));
+  const toggleSelectAll = () => {
+    if (allSelectedOnPage) {
+      setSelectedIds(prev => prev.filter(id => !members.some(m => m.id === id)));
+    } else {
+      const newIds = new Set([...selectedIds, ...members.map(m => m.id)]);
+      setSelectedIds(Array.from(newIds));
+    }
+  };
+
+  const toggleSelectMember = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  // Batch Print function
+  const handlePrintBatch = async () => {
+    if (selectedIds.length === 0) return;
+    const selectedMembers = members.filter(m => selectedIds.includes(m.id));
+    if (selectedMembers.length === 0) return;
+
+    setIsPrinting(true);
+    try {
+      const frontDesign = designs.find(d => d.id === selectedFrontDesignId) || designs.find(d => (d.section || 'frente') === 'frente');
+      const backDesign = printMode === 'both' ? (designs.find(d => d.id === selectedBackDesignId) || designs.find(d => d.section === 'reverso')) : null;
+
+      if (!frontDesign) {
+        toast.error('No se encontró una plantilla de diseño de credencial');
+        setIsPrinting(false);
+        return;
+      }
+
+      const frontConfig = mapDesignToConfig(frontDesign);
+      const backConfig = backDesign ? mapDesignToConfig(backDesign) : null;
+
+      toast.info(`Generando PDF masivo para ${selectedMembers.length} agremiados...`);
+      await generateVectorialBatchCredentialsPDF(
+        selectedMembers,
+        frontConfig,
+        backConfig,
+        `Credenciales_Masivas_${selectedMembers.length}_Agremiados`,
+        qrType
+      );
+      toast.success(`PDF generado exitosamente con ${selectedMembers.length} credenciales.`);
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al generar las credenciales masivas');
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  // Print function for Single Member
   const handlePrintMember = async (member: Member) => {
     setIsPrinting(true);
     try {
@@ -246,6 +299,15 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
               <table className="w-full text-left border-collapse">
                 <thead className="bg-gray-50/90 border-b border-gray-100 sticky top-0 z-10">
                   <tr>
+                    <th className="w-[45px] text-center px-3 py-4">
+                      <button
+                        onClick={toggleSelectAll}
+                        className="text-emerald-700 hover:text-emerald-900 transition-colors inline-flex items-center justify-center"
+                        title={allSelectedOnPage ? "Deseleccionar todos en esta página" : "Seleccionar todos en esta página"}
+                      >
+                        {allSelectedOnPage ? <CheckSquare className="w-4 h-4 text-emerald-600" /> : <Square className="w-4 h-4 text-gray-300" />}
+                      </button>
+                    </th>
                     <th className="w-[60px] font-black text-emerald-950 uppercase text-[10px] tracking-widest px-3 py-4">Foto</th>
                     <th className="w-[100px] font-black text-emerald-950 uppercase text-[10px] tracking-widest px-3 py-4">Nómina</th>
                     <th className="min-w-[180px] font-black text-emerald-950 uppercase text-[10px] tracking-widest px-3 py-4">Nombre Completo</th>
@@ -258,8 +320,19 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {members.length > 0 ? (
-                    members.map((member) => (
-                      <tr key={member.id} className="hover:bg-emerald-50/40 transition-colors group">
+                    members.map((member) => {
+                      const isSelected = selectedIds.includes(member.id);
+                      return (
+                        <tr key={member.id} className={`hover:bg-emerald-50/40 transition-colors group ${isSelected ? 'bg-emerald-50/60' : ''}`}>
+                          {/* Checkbox */}
+                          <td className="py-3 px-3 text-center">
+                            <button
+                              onClick={() => toggleSelectMember(member.id)}
+                              className="text-emerald-700 hover:text-emerald-900 transition-colors inline-flex items-center justify-center"
+                            >
+                              {isSelected ? <CheckSquare className="w-4 h-4 text-emerald-600" /> : <Square className="w-4 h-4 text-gray-300 group-hover:text-emerald-400" />}
+                            </button>
+                          </td>
                         {/* Foto */}
                         <td className="py-3 px-3">
                           {member.photoUrl ? (
@@ -377,10 +450,11 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
                           </div>
                         </td>
                       </tr>
-                    ))
+                    );
+                  })
                   ) : (
                     <tr>
-                      <td colSpan={8} className="text-center py-16 text-gray-500">
+                      <td colSpan={9} className="text-center py-16 text-gray-500">
                         <div className="flex flex-col items-center gap-2">
                           <Printer className="w-10 h-10 text-gray-300 stroke-1" />
                           <p className="font-bold text-gray-600">No se encontraron agremiados para imprimir.</p>
@@ -390,6 +464,29 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
                   )}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Floating Action Bar for Batch Printing */}
+          {selectedIds.length > 0 && (
+            <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-emerald-950/95 backdrop-blur-md text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-5 border border-emerald-700/50">
+              <span className="text-xs font-black uppercase tracking-wider text-emerald-200">
+                {selectedIds.length} agremiado{selectedIds.length > 1 ? 's' : ''} seleccionado{selectedIds.length > 1 ? 's' : ''}
+              </span>
+              <Button
+                onClick={handlePrintBatch}
+                disabled={isPrinting}
+                className="bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-black rounded-full text-xs h-9 px-5 gap-2 shadow-lg transition-all transform hover:scale-105"
+              >
+                <Printer className="w-4 h-4" />
+                <span>IMPRIMIR CREDENCIALES SELECCIONADAS ({selectedIds.length})</span>
+              </Button>
+              <button
+                onClick={() => setSelectedIds([])}
+                className="text-emerald-300 hover:text-white text-xs font-bold underline pl-2"
+              >
+                Deseleccionar
+              </button>
             </div>
           )}
 

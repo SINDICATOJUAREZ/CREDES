@@ -113,9 +113,14 @@ export async function GET(request: Request) {
         membersWithFamily = membersWithFamily.slice(offset, offset + limit);
       }
 
+      const calculatedTotalPages = Math.max(1, Math.ceil(finalTotal / limit));
       return NextResponse.json({
         data: membersWithFamily,
-        meta: { total: finalTotal, page, limit, totalPages: Math.ceil(finalTotal / limit) },
+        total: finalTotal,
+        page,
+        limit,
+        totalPages: calculatedTotalPages,
+        meta: { total: finalTotal, page, limit, totalPages: calculatedTotalPages },
       });
     }
 
@@ -193,9 +198,14 @@ export async function GET(request: Request) {
       finalMembers = allPensioners.slice(offset, offset + limit);
     }
 
+    const calculatedTotalPages = Math.max(1, Math.ceil(finalTotal / limit));
     return NextResponse.json({
       data: finalMembers,
-      meta: { total: finalTotal, page, limit, totalPages: Math.ceil(finalTotal / limit) },
+      total: finalTotal,
+      page,
+      limit,
+      totalPages: calculatedTotalPages,
+      meta: { total: finalTotal, page, limit, totalPages: calculatedTotalPages },
     });
   } catch (error: any) {
     console.error('API Error:', error);
