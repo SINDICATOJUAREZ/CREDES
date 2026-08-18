@@ -125,14 +125,6 @@ export function MemberDirectoryPanel({ inline = false, onClose = () => {} }: { i
             Directorio de Agremiados
           </h1>
         </div>
-        {canCreate && (
-          <Button 
-            onClick={() => { setEditingMember(undefined); setIsFormOpen(true); }}
-            className="bg-blue-600 hover:bg-blue-700 rounded-full font-bold px-6"
-          >
-            NUEVO AGREMIADO
-          </Button>
-        )}
       </div>
 
       {/* Main Content */}
