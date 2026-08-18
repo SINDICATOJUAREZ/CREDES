@@ -389,43 +389,48 @@ export const generateResumePDF = async (member: Member) => {
       ? `$${Number(member.salary).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       : '---';
     pdf.text(salaryVal, 55, 92);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Fecha de Ingreso:', 20, 99);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(member.joinDate || member.altaSindicato || '---', 55, 99);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Puesto Actual:', 20, 99);
+    pdf.text('Puesto Actual:', 20, 106);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.position || '---', 55, 99);
+    pdf.text(member.position || '---', 55, 106);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Departamento:', 20, 106);
+    pdf.text('Departamento:', 20, 113);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.department || '---', 55, 106);
+    pdf.text(member.department || '---', 55, 113);
     
     // Section: DATOS DE CONTACTO
     pdf.setTextColor(0, 51, 102);
     pdf.setFontSize(13);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('DATOS DE CONTACTO', 20, 119);
+    pdf.text('DATOS DE CONTACTO', 20, 126);
     pdf.setDrawColor(0, 51, 102);
     pdf.setLineWidth(0.5);
-    pdf.line(20, 121, 190, 121);
+    pdf.line(20, 128, 190, 128);
     
     pdf.setTextColor(0, 0, 0);
     pdf.setFontSize(10);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Teléfono:', 20, 129);
+    pdf.text('Teléfono:', 20, 136);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.phone || '---', 55, 129);
+    pdf.text(member.phone || '---', 55, 136);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Email:', 20, 136);
+    pdf.text('Email:', 20, 143);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.email || '---', 55, 136);
+    pdf.text(member.email || '---', 55, 143);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Domicilio:', 20, 143);
+    pdf.text('Domicilio:', 20, 150);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.address || '---', 55, 143);
+    pdf.text(member.address || '---', 55, 150);
     
     // Footer
     pdf.setFontSize(8);

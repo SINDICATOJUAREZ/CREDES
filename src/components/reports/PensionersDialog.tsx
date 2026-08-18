@@ -328,6 +328,18 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
                       <span className="text-gray-900 font-semibold">{selectedMemberForPreview?.socioId || '---'}</span>
                     </div>
                     <div className="flex border-b border-gray-100 py-1">
+                      <span className="w-32 font-bold text-gray-700">Sueldo:</span>
+                      <span className="text-gray-900 font-semibold">
+                        {selectedMemberForPreview?.salary !== undefined && selectedMemberForPreview?.salary !== null && selectedMemberForPreview?.salary !== 0
+                          ? `$${Number(selectedMemberForPreview.salary).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : '---'}
+                      </span>
+                    </div>
+                    <div className="flex border-b border-gray-100 py-1">
+                      <span className="w-32 font-bold text-gray-700">Fecha Ingreso:</span>
+                      <span className="text-gray-900 font-semibold">{selectedMemberForPreview?.joinDate || selectedMemberForPreview?.altaSindicato || '---'}</span>
+                    </div>
+                    <div className="flex border-b border-gray-100 py-1">
                       <span className="w-32 font-bold text-gray-700">Puesto Actual:</span>
                       <span className="text-gray-900 font-semibold">{selectedMemberForPreview?.position || '---'}</span>
                     </div>
