@@ -328,16 +328,42 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
                       <span className="text-gray-900 font-semibold">{selectedMemberForPreview?.socioId || '---'}</span>
                     </div>
                     <div className="flex border-b border-gray-100 py-1">
+                      <span className="w-32 font-bold text-gray-700">Edad:</span>
+                      <span className="text-gray-900 font-semibold">
+                        {(() => {
+                          const bDate = parseDate(selectedMemberForPreview?.birthDate);
+                          if (!bDate) return '---';
+                          const today = new Date();
+                          let age = today.getFullYear() - bDate.getFullYear();
+                          if (today < new Date(today.getFullYear(), bDate.getMonth(), bDate.getDate())) age--;
+                          return `${age} años`;
+                        })()}
+                      </span>
+                    </div>
+                    <div className="flex border-b border-gray-100 py-1">
+                      <span className="w-32 font-bold text-gray-700">Antigüedad:</span>
+                      <span className="text-gray-900 font-semibold">
+                        {(() => {
+                          const jDate = parseDate(selectedMemberForPreview?.joinDate || selectedMemberForPreview?.altaSindicato);
+                          if (!jDate) return '---';
+                          const today = new Date();
+                          let years = today.getFullYear() - jDate.getFullYear();
+                          if (today < new Date(today.getFullYear(), jDate.getMonth(), jDate.getDate())) years--;
+                          return `${Math.max(0, years)} años`;
+                        })()}
+                      </span>
+                    </div>
+                    <div className="flex border-b border-gray-100 py-1">
+                      <span className="w-32 font-bold text-gray-700">Fecha Ingreso:</span>
+                      <span className="text-gray-900 font-semibold">{selectedMemberForPreview?.joinDate || selectedMemberForPreview?.altaSindicato || '---'}</span>
+                    </div>
+                    <div className="flex border-b border-gray-100 py-1">
                       <span className="w-32 font-bold text-gray-700">Sueldo:</span>
                       <span className="text-gray-900 font-semibold">
                         {selectedMemberForPreview?.salary !== undefined && selectedMemberForPreview?.salary !== null && selectedMemberForPreview?.salary !== 0
                           ? `$${Number(selectedMemberForPreview.salary).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                           : '---'}
                       </span>
-                    </div>
-                    <div className="flex border-b border-gray-100 py-1">
-                      <span className="w-32 font-bold text-gray-700">Fecha Ingreso:</span>
-                      <span className="text-gray-900 font-semibold">{selectedMemberForPreview?.joinDate || selectedMemberForPreview?.altaSindicato || '---'}</span>
                     </div>
                     <div className="flex border-b border-gray-100 py-1">
                       <span className="w-32 font-bold text-gray-700">Puesto Actual:</span>

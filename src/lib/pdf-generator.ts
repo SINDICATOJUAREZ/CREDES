@@ -358,6 +358,42 @@ export const generateResumePDF = async (member: Member) => {
       }
     }
     
+    // Calculations for Age and Seniority
+    const calcDate = (dateStr: string | any) => {
+      if (!dateStr) return null;
+      if (dateStr instanceof Date) return dateStr;
+      if (typeof dateStr === 'number') return new Date(dateStr);
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) return d;
+      const parts = dateStr.toString().split(/[-/]/);
+      if (parts.length === 3) {
+        const p0 = parseInt(parts[0]);
+        const p1 = parseInt(parts[1]);
+        const p2 = parseInt(parts[2]);
+        if (parts[0].length === 4) return new Date(p0, p1 - 1, p2);
+        if (parts[2].length === 4) return new Date(p2, p1 - 1, p0);
+      }
+      return null;
+    };
+
+    const bDate = calcDate(member.birthDate);
+    let ageStr = '---';
+    if (bDate) {
+      const today = new Date();
+      let age = today.getFullYear() - bDate.getFullYear();
+      if (today < new Date(today.getFullYear(), bDate.getMonth(), bDate.getDate())) age--;
+      ageStr = `${age} años`;
+    }
+
+    const jDate = calcDate(member.joinDate || member.altaSindicato);
+    let seniorityStr = '---';
+    if (jDate) {
+      const today = new Date();
+      let years = today.getFullYear() - jDate.getFullYear();
+      if (today < new Date(today.getFullYear(), jDate.getMonth(), jDate.getDate())) years--;
+      seniorityStr = `${Math.max(0, years)} años`;
+    }
+
     // Text fields on the left
     pdf.setTextColor(0, 0, 0);
     pdf.setFontSize(10);
@@ -381,56 +417,66 @@ export const generateResumePDF = async (member: Member) => {
     pdf.text('No. Socio:', 20, 85);
     pdf.setFont('helvetica', 'normal');
     pdf.text(member.socioId || '---', 55, 85);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Edad:', 20, 92);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(ageStr, 55, 92);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Antigüedad:', 20, 99);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(seniorityStr, 55, 99);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Sueldo:', 20, 92);
+    pdf.text('Fecha de Ingreso:', 20, 106);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(member.joinDate || member.altaSindicato || '---', 55, 106);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Sueldo:', 20, 113);
     pdf.setFont('helvetica', 'normal');
     const salaryVal = member.salary !== undefined && member.salary !== null && member.salary !== 0
       ? `$${Number(member.salary).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       : '---';
-    pdf.text(salaryVal, 55, 92);
-
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('Fecha de Ingreso:', 20, 99);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text(member.joinDate || member.altaSindicato || '---', 55, 99);
+    pdf.text(salaryVal, 55, 113);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Puesto Actual:', 20, 106);
+    pdf.text('Puesto Actual:', 20, 120);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.position || '---', 55, 106);
+    pdf.text(member.position || '---', 55, 120);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Departamento:', 20, 113);
+    pdf.text('Departamento:', 20, 127);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.department || '---', 55, 113);
+    pdf.text(member.department || '---', 55, 127);
     
     // Section: DATOS DE CONTACTO
     pdf.setTextColor(0, 51, 102);
     pdf.setFontSize(13);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('DATOS DE CONTACTO', 20, 126);
+    pdf.text('DATOS DE CONTACTO', 20, 140);
     pdf.setDrawColor(0, 51, 102);
     pdf.setLineWidth(0.5);
-    pdf.line(20, 128, 190, 128);
+    pdf.line(20, 142, 190, 142);
     
     pdf.setTextColor(0, 0, 0);
     pdf.setFontSize(10);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Teléfono:', 20, 136);
+    pdf.text('Teléfono:', 20, 150);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.phone || '---', 55, 136);
+    pdf.text(member.phone || '---', 55, 150);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Email:', 20, 143);
+    pdf.text('Email:', 20, 157);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.email || '---', 55, 143);
+    pdf.text(member.email || '---', 55, 157);
     
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Domicilio:', 20, 150);
+    pdf.text('Domicilio:', 20, 164);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(member.address || '---', 55, 150);
+    pdf.text(member.address || '---', 55, 164);
     
     // Footer
     pdf.setFontSize(8);
