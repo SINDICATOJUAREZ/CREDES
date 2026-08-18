@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Member } from '@/types/member';
 import { Button } from "@/components/ui/button";
-import { Plus, Search, FileText, Users, LogOut, Award, Settings, Gift, FileWarning } from 'lucide-react';
+import { Plus, Search, FileText, Users, LogOut, Award, Settings, Gift, FileWarning, Printer } from 'lucide-react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Toaster, toast } from 'sonner';
 import { MemberForm } from '@/components/members/MemberForm';
@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 
 // Import sub-pages as components for modal integration
 import { MemberDirectoryPanel } from '@/components/members/MemberDirectoryPanel';
+import { PrintDirectoryPanel } from '@/components/members/PrintDirectoryPanel';
 import { AttendanceReportsDialog } from '@/components/reports/AttendanceReportsDialog';
 import { MemberReportsPanel } from '@/components/reports/MemberReportsPanel';
 import { PensionersDialog } from '@/components/reports/PensionersDialog';
@@ -29,6 +30,7 @@ export default function Home() {
 
   // States for unified modal windows
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isImpresionesOpen, setIsImpresionesOpen] = useState(false);
   const [isAttendanceOpen, setIsAttendanceOpen] = useState(false);
   const [isReportsOpen, setIsReportsOpen] = useState(false);
   const [isPensionersOpen, setIsPensionersOpen] = useState(false);
@@ -100,6 +102,14 @@ export default function Home() {
       icon: Search, 
       color: 'from-indigo-500 to-indigo-600',
       action: () => setIsSearchOpen(true),
+      permission: 'canSearchMember'
+    },
+    { 
+      title: 'Impresiones', 
+      description: 'Busca agremiados e imprime sus credenciales con datos básicos.',
+      icon: Printer, 
+      color: 'from-emerald-500 to-emerald-600',
+      action: () => setIsImpresionesOpen(true),
       permission: 'canSearchMember'
     },
     { 
@@ -310,6 +320,13 @@ export default function Home() {
       <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
         <DialogContent className="max-w-[95vw] md:max-w-[1300px] h-[90vh] rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
           <MemberDirectoryPanel inline={true} onClose={() => setIsSearchOpen(false)} />
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL PARA IMPRESIONES DE CREDENCIALES */}
+      <Dialog open={isImpresionesOpen} onOpenChange={setIsImpresionesOpen}>
+        <DialogContent className="max-w-[95vw] md:max-w-[1300px] h-[90vh] rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
+          <PrintDirectoryPanel inline={true} onClose={() => setIsImpresionesOpen(false)} />
         </DialogContent>
       </Dialog>
 
