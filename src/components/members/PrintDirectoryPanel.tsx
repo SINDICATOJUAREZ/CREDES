@@ -6,7 +6,7 @@ import { Member, CredentialDesign } from '@/types/member';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { generateVectorialCredentialPDF, mapDesignToConfig } from '@/lib/pdf-generator';
 import { toast } from 'sonner';
-import { Search, ArrowLeft, Printer, Eye, RefreshCw, Layers } from 'lucide-react';
+import { Search, ArrowLeft, Printer, Eye, RefreshCw, Layers, QrCode, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
@@ -28,6 +28,7 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
 
   // Print Configuration States
   const [printMode, setPrintMode] = useState<'both' | 'front_only'>('both');
+  const [qrType, setQrType] = useState<'new' | 'legacy'>('new');
   const [designs, setDesigns] = useState<CredentialDesign[]>([]);
   const [selectedFrontDesignId, setSelectedFrontDesignId] = useState<string>('');
   const [selectedBackDesignId, setSelectedBackDesignId] = useState<string>('');
@@ -109,7 +110,8 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
         member,
         frontConfig,
         backConfig,
-        `Credencial_${member.employeeId || 'SUTSMBJ'}_${member.fullName.replace(/ /g, '_')}`
+        `Credencial_${member.employeeId || 'SUTSMBJ'}_${member.fullName.replace(/ /g, '_')}`,
+        qrType
       );
       toast.success('Credencial lista e impresa con éxito.');
     } catch (err) {
@@ -148,7 +150,7 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
         </div>
 
         {/* Global Print Options Controls */}
-        <div className="flex items-center gap-3 bg-emerald-50/60 p-2 rounded-2xl border border-emerald-100/80">
+        <div className="flex flex-wrap items-center gap-3 bg-emerald-50/60 p-2 rounded-2xl border border-emerald-100/80">
           {/* Print Mode Selector */}
           <div className="flex items-center bg-white rounded-xl p-1 border border-emerald-200/60 shadow-sm">
             <button
@@ -158,6 +160,7 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
                   ? 'bg-emerald-600 text-white shadow-sm'
                   : 'text-gray-600 hover:text-emerald-700'
               }`}
+              title="Imprimir ambas caras (Frente y Reverso)"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Ambas Caras</span>
@@ -169,9 +172,38 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
                   ? 'bg-emerald-600 text-white shadow-sm'
                   : 'text-gray-600 hover:text-emerald-700'
               }`}
+              title="Imprimir únicamente la cara frontal"
             >
               <Layers className="w-3.5 h-3.5" />
               <span>Solo Frente</span>
+            </button>
+          </div>
+
+          {/* QR Code Selector */}
+          <div className="flex items-center bg-white rounded-xl p-1 border border-emerald-200/60 shadow-sm">
+            <button
+              onClick={() => setQrType('new')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all flex items-center gap-1.5 ${
+                qrType === 'new'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:text-emerald-700'
+              }`}
+              title="Generar código QR nuevo estructurado"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+              <span>QR Nuevo</span>
+            </button>
+            <button
+              onClick={() => setQrType('legacy')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all flex items-center gap-1.5 ${
+                qrType === 'legacy'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:text-emerald-700'
+              }`}
+              title="Usar código QR anterior almacenado previamente"
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>QR Anterior</span>
             </button>
           </div>
 
@@ -434,6 +466,32 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
                     }`}
                   >
                     Solo Frente
+                  </button>
+                </div>
+              </div>
+
+              {/* QR Code Selector inside Modal */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100 text-xs font-bold">
+                <span className="text-gray-600 flex items-center gap-1.5">
+                  <QrCode className="w-4 h-4 text-emerald-600" />
+                  <span>Código QR:</span>
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setQrType('new')}
+                    className={`px-3 py-1.5 rounded-xl font-black transition-all ${
+                      qrType === 'new' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-200'
+                    }`}
+                  >
+                    QR Nuevo
+                  </button>
+                  <button
+                    onClick={() => setQrType('legacy')}
+                    className={`px-3 py-1.5 rounded-xl font-black transition-all ${
+                      qrType === 'legacy' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-200'
+                    }`}
+                  >
+                    QR Anterior
                   </button>
                 </div>
               </div>
