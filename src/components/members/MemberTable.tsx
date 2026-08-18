@@ -296,7 +296,7 @@ export const MemberTable: React.FC<MemberTableProps> = ({
                 {renderTextFilterDropdown('departamento', 'Departamento', filterDepartamento, tempDepartamento, setTempDepartamento, setFilterDepartamento)}
               </TableHead>
 
-              <TableHead className="text-right font-black text-blue-900 uppercase text-[10px] tracking-widest px-6 py-4">Acciones</TableHead>
+              <TableHead className="text-right font-black text-blue-900 uppercase text-[10px] tracking-widest px-4 py-4 min-w-[140px]">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -419,19 +419,38 @@ export const MemberTable: React.FC<MemberTableProps> = ({
                     <span className="text-gray-500 text-sm font-medium italic">{member.department}</span>
                   </TableCell>
 
-                  <TableCell className="py-5 px-6 text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" className="h-9 px-3 rounded-xl border-gray-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all font-bold gap-2" onClick={(e) => { e.stopPropagation(); onView(member); }}>
-                        <Eye className="w-4 h-4" /> <span className="hidden sm:inline">Ver</span>
+                  <TableCell className="py-4 px-4 text-right">
+                    <div className="flex justify-end items-center gap-1.5 shrink-0">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 px-3 rounded-xl border-blue-200 bg-blue-50/50 text-blue-700 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all font-bold gap-1.5 shadow-sm" 
+                        onClick={(e) => { e.stopPropagation(); onView(member); }}
+                        title="Ver Expediente"
+                      >
+                        <Eye className="w-3.5 h-3.5 shrink-0" />
+                        <span className="font-bold text-xs">Expediente</span>
                       </Button>
                       {canEdit && (
-                        <Button variant="outline" size="sm" className="h-9 px-3 rounded-xl border-gray-200 hover:bg-gray-50 transition-all font-bold" onClick={(e) => { e.stopPropagation(); onEdit(member); }}>
-                          <Edit className="w-4 h-4" />
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-8 w-8 p-0 rounded-xl border-gray-200 hover:bg-gray-100 transition-all font-bold shrink-0" 
+                          onClick={(e) => { e.stopPropagation(); onEdit(member); }}
+                          title="Editar Agremiado"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
                         </Button>
                       )}
                       {canDelete && (
-                        <Button variant="outline" size="sm" className="h-9 px-3 rounded-xl border-red-50 hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all font-bold" onClick={(e) => { e.stopPropagation(); onDelete(member.id); }}>
-                          <Trash2 className="w-4 h-4" />
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-8 w-8 p-0 rounded-xl border-red-100 text-red-600 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all font-bold shrink-0" 
+                          onClick={(e) => { e.stopPropagation(); onDelete(member.id); }}
+                          title="Eliminar Agremiado"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       )}
                     </div>
