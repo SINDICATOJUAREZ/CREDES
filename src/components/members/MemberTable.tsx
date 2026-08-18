@@ -195,11 +195,11 @@ export const MemberTable: React.FC<MemberTableProps> = ({
         <Table>
           <TableHeader className="bg-gray-50/80 sticky top-0 z-10">
             <TableRow className="hover:bg-transparent border-b border-gray-100">
-              <TableHead className="w-[80px] font-black text-blue-900 uppercase text-[10px] tracking-widest px-4 py-4">Foto</TableHead>
+              <TableHead className="w-[60px] font-black text-blue-900 uppercase text-[10px] tracking-widest px-3 py-4">Foto</TableHead>
               
               {/* Nómina Column Header */}
-              <TableHead className="font-black text-blue-900 uppercase text-[10px] tracking-widest px-3 py-4 relative overflow-visible">
-                <div className="flex items-center gap-2">
+              <TableHead className="w-[90px] font-black text-blue-900 uppercase text-[10px] tracking-widest px-3 py-4 relative overflow-visible">
+                <div className="flex items-center gap-1.5">
                   <span>Nómina</span>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setActiveFilterDropdown(activeFilterDropdown === 'nomina' ? null : 'nomina'); }}
@@ -212,8 +212,8 @@ export const MemberTable: React.FC<MemberTableProps> = ({
               </TableHead>
 
               {/* Nombre Column Header */}
-              <TableHead className="font-black text-blue-900 uppercase text-[10px] tracking-widest px-3 py-4 relative overflow-visible">
-                <div className="flex items-center gap-2">
+              <TableHead className="min-w-[180px] max-w-[220px] font-black text-blue-900 uppercase text-[10px] tracking-widest px-3 py-4 relative overflow-visible">
+                <div className="flex items-center gap-1.5">
                   <span>Nombre Completo</span>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setActiveFilterDropdown(activeFilterDropdown === 'nombre' ? null : 'nombre'); }}
@@ -226,9 +226,9 @@ export const MemberTable: React.FC<MemberTableProps> = ({
               </TableHead>
 
               {/* Tipo de Agremiado Column Header */}
-              <TableHead className="font-black text-blue-900 uppercase text-[10px] tracking-widest px-3 py-4 relative overflow-visible">
-                <div className="flex items-center gap-2">
-                  <span>Tipo de Agremiado</span>
+              <TableHead className="w-[140px] font-black text-blue-900 uppercase text-[10px] tracking-widest px-3 py-4 relative overflow-visible">
+                <div className="flex items-center gap-1.5">
+                  <span>Tipo</span>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setActiveFilterDropdown(activeFilterDropdown === 'tipo' ? null : 'tipo'); }}
                     className={`filter-trigger-btn p-1 rounded-md hover:bg-gray-200 transition-colors ${filterTipo ? 'text-blue-600 bg-blue-50' : 'text-gray-400'}`}
@@ -246,8 +246,8 @@ export const MemberTable: React.FC<MemberTableProps> = ({
               </TableHead>
 
               {/* Estado Column Header */}
-              <TableHead className="font-black text-blue-900 uppercase text-[10px] tracking-widest px-3 py-4 relative overflow-visible">
-                <div className="flex items-center gap-2">
+              <TableHead className="w-[110px] font-black text-blue-900 uppercase text-[10px] tracking-widest px-3 py-4 relative overflow-visible">
+                <div className="flex items-center gap-1.5">
                   <span>Estado</span>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setActiveFilterDropdown(activeFilterDropdown === 'estado' ? null : 'estado'); }}
@@ -269,8 +269,8 @@ export const MemberTable: React.FC<MemberTableProps> = ({
               </TableHead>
 
               {/* Puesto Column Header */}
-              <TableHead className="font-black text-blue-900 uppercase text-[10px] tracking-widest px-3 py-4 relative overflow-visible">
-                <div className="flex items-center gap-2">
+              <TableHead className="min-w-[150px] max-w-[200px] font-black text-blue-900 uppercase text-[10px] tracking-widest px-3 py-4 relative overflow-visible">
+                <div className="flex items-center gap-1.5">
                   <span>Puesto</span>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setActiveFilterDropdown(activeFilterDropdown === 'puesto' ? null : 'puesto'); }}
@@ -283,8 +283,8 @@ export const MemberTable: React.FC<MemberTableProps> = ({
               </TableHead>
 
               {/* Departamento Column Header */}
-              <TableHead className="font-black text-blue-900 uppercase text-[10px] tracking-widest px-3 py-4 relative overflow-visible">
-                <div className="flex items-center gap-2">
+              <TableHead className="min-w-[150px] max-w-[200px] font-black text-blue-900 uppercase text-[10px] tracking-widest px-3 py-4 relative overflow-visible">
+                <div className="flex items-center gap-1.5">
                   <span>Departamento</span>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setActiveFilterDropdown(activeFilterDropdown === 'departamento' ? null : 'departamento'); }}
@@ -296,7 +296,7 @@ export const MemberTable: React.FC<MemberTableProps> = ({
                 {renderTextFilterDropdown('departamento', 'Departamento', filterDepartamento, tempDepartamento, setTempDepartamento, setFilterDepartamento)}
               </TableHead>
 
-              <TableHead className="text-right font-black text-blue-900 uppercase text-[10px] tracking-widest px-4 py-4 min-w-[140px]">Acciones</TableHead>
+              <TableHead className="text-right font-black text-blue-900 uppercase text-[10px] tracking-widest px-4 py-4 w-[160px] sticky right-0 bg-gray-50/95 backdrop-blur-sm z-20 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.06)]">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -307,56 +307,56 @@ export const MemberTable: React.FC<MemberTableProps> = ({
                   className="hover:bg-blue-50/50 transition-all border-b border-gray-50 cursor-pointer group"
                   onClick={() => canEdit ? onEdit(member) : onView(member)}
                 >
-                  <TableCell className="py-3 px-4">
+                  <TableCell className="py-3 px-3">
                     {member.photoUrl ? (
-                      <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-sm ring-2 ring-gray-100 group-hover:ring-blue-200 transition-all">
+                      <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-white shadow-sm ring-2 ring-gray-100 group-hover:ring-blue-200 transition-all shrink-0">
                         <img src={`${member.photoUrl}?t=${new Date().getTime()}`} alt={member.fullName} className="w-full h-full object-cover" />
                       </div>
                     ) : (
-                      <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 text-gray-500 flex items-center justify-center text-xs font-black uppercase shadow-inner group-hover:bg-blue-50 group-hover:text-blue-600 transition-all">
+                      <div className="w-9 h-9 rounded-full bg-gray-100 border border-gray-200 text-gray-500 flex items-center justify-center text-xs font-black uppercase shadow-inner group-hover:bg-blue-50 group-hover:text-blue-600 transition-all shrink-0">
                         {member.fullName.charAt(0)}
                       </div>
                     )}
                   </TableCell>
                   
                   {/* Nómina */}
-                  <TableCell className="py-4">
-                    <span className="font-mono text-xs font-black px-2 py-1 bg-gray-100 text-gray-600 rounded-md border border-gray-200">
+                  <TableCell className="py-3 px-2">
+                    <span className="font-mono text-xs font-black px-2 py-1 bg-gray-100 text-gray-600 rounded-md border border-gray-200 whitespace-nowrap">
                       {member.employeeId}
                     </span>
                   </TableCell>
                   
                   {/* Nombre Completo */}
-                  <TableCell className="py-5 px-4">
-                    <span className="font-bold text-gray-900">{member.fullName}</span>
+                  <TableCell className="py-3 px-3 max-w-[220px]">
+                    <span className="font-bold text-gray-900 text-xs block truncate" title={member.fullName}>{member.fullName}</span>
                   </TableCell>
 
                   {/* Tipo de Agremiado */}
-                  <TableCell className="py-5 px-4">
+                  <TableCell className="py-3 px-2">
                     {member.memberType === 'SECRETARIO GENERAL' && (
-                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full border border-indigo-200">
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full border border-indigo-200 whitespace-nowrap">
                         Secretario General
                       </span>
                     )}
                     {member.memberType === 'DELEGADO' && (
-                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full border border-purple-200">
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full border border-purple-200 whitespace-nowrap">
                         Delegado
                       </span>
                     )}
                     {member.memberType === 'LISTA DE ESPERA' && (
-                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full border border-orange-200">
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full border border-orange-200 whitespace-nowrap">
                         Lista de Espera
                       </span>
                     )}
                     {member.memberType === 'AGREMIADO' && (
-                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-green-100 text-green-700 rounded-full border border-green-200">
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-green-100 text-green-700 rounded-full border border-green-200 whitespace-nowrap">
                         Agremiado
                       </span>
                     )}
                   </TableCell>
 
                   {/* Estado */}
-                  <TableCell className="py-5 px-4">
+                  <TableCell className="py-3 px-2">
                     {member.status === 'BAJA' && (() => {
                       const today = new Date();
                       const parseDate = (dStr: any) => {
@@ -370,61 +370,62 @@ export const MemberTable: React.FC<MemberTableProps> = ({
                       let age = bDate ? today.getFullYear() - bDate.getFullYear() : 0;
                       const isPensioned = (age > 50 && years >= 15);
                       return isPensioned ? (
-                        <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full border border-blue-200">
+                        <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full border border-blue-200 whitespace-nowrap">
                           Pensionado
                         </span>
                       ) : (
-                        <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-red-100 text-red-700 rounded-full border border-red-200">
+                        <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-red-100 text-red-700 rounded-full border border-red-200 whitespace-nowrap">
                           Baja
                         </span>
                       );
                     })()}
                     {member.status === 'ACTIVO' && (
-                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full border border-emerald-200">
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full border border-emerald-200 whitespace-nowrap">
                         Activo
                       </span>
                     )}
                     {member.status === 'JUBILADO/PENSIONADO' && (
-                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full border border-indigo-200">
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full border border-indigo-200 whitespace-nowrap">
                         Jubilado/Pensionado
                       </span>
                     )}
                     {member.status === 'FINADO' && (
-                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full border border-slate-200">
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full border border-slate-200 whitespace-nowrap">
                         Finado
                       </span>
                     )}
                     {member.status === 'INCAPACITADO' && (
-                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full border border-amber-200">
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full border border-amber-200 whitespace-nowrap">
                         Incapacitado
                       </span>
                     )}
                     {member.status === 'N/A' && (
-                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full border border-gray-200">
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full border border-gray-200 whitespace-nowrap">
                         N/A
                       </span>
                     )}
                   </TableCell>
 
                   {/* Puesto */}
-                  <TableCell className="py-5 px-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
-                      <span className="text-gray-600 text-sm font-medium">{member.position}</span>
+                  <TableCell className="py-3 px-3 max-w-[200px]">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0"></div>
+                      <span className="text-gray-600 text-xs font-medium truncate" title={member.position}>{member.position}</span>
                     </div>
                   </TableCell>
 
                   {/* Departamento */}
-                  <TableCell className="py-5 px-4">
-                    <span className="text-gray-500 text-sm font-medium italic">{member.department}</span>
+                  <TableCell className="py-3 px-3 max-w-[200px]">
+                    <span className="text-gray-500 text-xs font-medium italic block truncate" title={member.department}>{member.department}</span>
                   </TableCell>
 
-                  <TableCell className="py-4 px-4 text-right">
-                    <div className="flex justify-end items-center gap-1.5 shrink-0">
+                  {/* Acciones (Sticky a la derecha) */}
+                  <TableCell className="py-3 px-4 text-right sticky right-0 bg-white group-hover:bg-blue-50/90 z-10 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.06)]">
+                    <div className="flex justify-end items-center gap-1 shrink-0">
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className="h-8 px-3 rounded-xl border-blue-200 bg-blue-50/50 text-blue-700 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all font-bold gap-1.5 shadow-sm" 
+                        className="h-8 px-2.5 rounded-xl border-blue-200 bg-blue-50/50 text-blue-700 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all font-bold gap-1 shadow-sm shrink-0" 
                         onClick={(e) => { e.stopPropagation(); onView(member); }}
                         title="Ver Expediente"
                       >
