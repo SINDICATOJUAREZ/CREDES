@@ -145,6 +145,7 @@ const UserForm: React.FC<{ user: SystemUser; roles: Role[]; onSave: (u: SystemUs
 const PERMISSION_LABELS: Record<string, string> = {
   can_create_member: 'Crear Agremiado',
   can_search_member: 'Buscar Agremiado',
+  can_print_credentials: 'Impresiones',
   can_view_reports: 'Reportes de Asistencia',
   can_view_birthdays: 'Cumpleaños',
   can_view_member_reports: 'Reportes de Agremiados',
@@ -164,6 +165,7 @@ export const RolesPanel: React.FC = () => {
     description: '', 
     can_create_member: false, 
     can_search_member: false, 
+    can_print_credentials: true,
     can_view_reports: false, 
     can_view_birthdays: false, 
     can_view_member_reports: false, 

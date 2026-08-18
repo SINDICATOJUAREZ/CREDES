@@ -10,11 +10,12 @@ export async function POST(request: Request) {
     let user: any = null;
 
     if (isProduction) {
-      user = await sSelectOne('users', `select=*,roles!role_id(name,can_create_member,can_search_member,can_view_reports,can_view_birthdays,can_view_member_reports,can_view_complaints,can_view_pensioners,can_access_settings)&email=eq.${encodeURIComponent(email)}&is_active=eq.1`);
+      user = await sSelectOne('users', `select=*,roles!role_id(name,can_create_member,can_search_member,can_print_credentials,can_view_reports,can_view_birthdays,can_view_member_reports,can_view_complaints,can_view_pensioners,can_access_settings)&email=eq.${encodeURIComponent(email)}&is_active=eq.1`);
       if (user) {
         user.role_name = user.roles?.name;
         user.can_create_member = user.roles?.can_create_member;
         user.can_search_member = user.roles?.can_search_member;
+        user.can_print_credentials = user.roles?.can_print_credentials;
         user.can_view_reports = user.roles?.can_view_reports;
         user.can_view_birthdays = user.roles?.can_view_birthdays;
         user.can_view_member_reports = user.roles?.can_view_member_reports;
@@ -37,8 +38,13 @@ export async function POST(request: Request) {
       } catch {
         db.exec('ALTER TABLE roles ADD COLUMN can_view_complaints INTEGER DEFAULT 1');
       }
+      try {
+        db.prepare('SELECT can_print_credentials FROM roles LIMIT 1').get();
+      } catch {
+        db.exec('ALTER TABLE roles ADD COLUMN can_print_credentials INTEGER DEFAULT 1');
+      }
 
-      user = db.prepare('SELECT u.*, r.name as role_name, r.can_create_member, r.can_search_member, r.can_view_reports, r.can_view_birthdays, r.can_view_member_reports, r.can_view_complaints, r.can_view_pensioners, r.can_access_settings FROM users u JOIN roles r ON u.role_id = r.id WHERE u.email = ? AND u.is_active = 1').get(email);
+      user = db.prepare('SELECT u.*, r.name as role_name, r.can_create_member, r.can_search_member, r.can_print_credentials, r.can_view_reports, r.can_view_birthdays, r.can_view_member_reports, r.can_view_complaints, r.can_view_pensioners, r.can_access_settings FROM users u JOIN roles r ON u.role_id = r.id WHERE u.email = ? AND u.is_active = 1').get(email);
       db.close();
     }
 
@@ -60,6 +66,7 @@ export async function POST(request: Request) {
       permissions: {
         canCreateMember: !!user.can_create_member,
         canSearchMember: !!user.can_search_member,
+        canPrintCredentials: user.can_print_credentials !== undefined ? !!user.can_print_credentials : true,
         canViewReports: !!user.can_view_reports,
         canViewBirthdays: !!user.can_view_birthdays,
         canViewMemberReports: !!user.can_view_member_reports,

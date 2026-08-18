@@ -48,12 +48,12 @@ export async function POST(request: Request) {
     const data = await request.json();
     const id = `role-${crypto.randomUUID().substring(0, 8)}`;
     if (isProduction) {
-      await sInsert('roles', { id, name: data.name, description: data.description, can_create_member: data.can_create_member ? 1 : 0, can_search_member: data.can_search_member ? 1 : 0, can_view_reports: data.can_view_reports ? 1 : 0, can_view_birthdays: data.can_view_birthdays ? 1 : 0, can_view_member_reports: data.can_view_member_reports ? 1 : 0, can_view_complaints: data.can_view_complaints ? 1 : 0, can_view_pensioners: data.can_view_pensioners ? 1 : 0, can_access_settings: data.can_access_settings ? 1 : 0 });
+      await sInsert('roles', { id, name: data.name, description: data.description, can_create_member: data.can_create_member ? 1 : 0, can_search_member: data.can_search_member ? 1 : 0, can_print_credentials: data.can_print_credentials ? 1 : 0, can_view_reports: data.can_view_reports ? 1 : 0, can_view_birthdays: data.can_view_birthdays ? 1 : 0, can_view_member_reports: data.can_view_member_reports ? 1 : 0, can_view_complaints: data.can_view_complaints ? 1 : 0, can_view_pensioners: data.can_view_pensioners ? 1 : 0, can_access_settings: data.can_access_settings ? 1 : 0 });
     } else {
       const Database = (await import('better-sqlite3')).default;
       const path = await import('path');
       const db = new Database(path.join(process.cwd(), 'database.sqlite'));
-      db.prepare('INSERT INTO roles (id, name, description, can_create_member, can_search_member, can_view_reports, can_view_birthdays, can_view_member_reports, can_view_complaints, can_view_pensioners, can_access_settings) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(id, data.name, data.description, data.can_create_member ? 1 : 0, data.can_search_member ? 1 : 0, data.can_view_reports ? 1 : 0, data.can_view_birthdays ? 1 : 0, data.can_view_member_reports ? 1 : 0, data.can_view_complaints ? 1 : 0, data.can_view_pensioners ? 1 : 0, data.can_access_settings ? 1 : 0);
+      db.prepare('INSERT INTO roles (id, name, description, can_create_member, can_search_member, can_print_credentials, can_view_reports, can_view_birthdays, can_view_member_reports, can_view_complaints, can_view_pensioners, can_access_settings) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(id, data.name, data.description, data.can_create_member ? 1 : 0, data.can_search_member ? 1 : 0, data.can_print_credentials ? 1 : 0, data.can_view_reports ? 1 : 0, data.can_view_birthdays ? 1 : 0, data.can_view_member_reports ? 1 : 0, data.can_view_complaints ? 1 : 0, data.can_view_pensioners ? 1 : 0, data.can_access_settings ? 1 : 0);
       db.close();
     }
     return NextResponse.json({ success: true, id });
@@ -69,12 +69,12 @@ export async function PUT(request: Request) {
   try {
     const data = await request.json();
     if (isProduction) {
-      await sUpdate('roles', `id=eq.${data.id}`, { name: data.name, description: data.description, can_create_member: data.can_create_member ? 1 : 0, can_search_member: data.can_search_member ? 1 : 0, can_view_reports: data.can_view_reports ? 1 : 0, can_view_birthdays: data.can_view_birthdays ? 1 : 0, can_view_member_reports: data.can_view_member_reports ? 1 : 0, can_view_complaints: data.can_view_complaints ? 1 : 0, can_view_pensioners: data.can_view_pensioners ? 1 : 0, can_access_settings: data.can_access_settings ? 1 : 0 });
+      await sUpdate('roles', `id=eq.${data.id}`, { name: data.name, description: data.description, can_create_member: data.can_create_member ? 1 : 0, can_search_member: data.can_search_member ? 1 : 0, can_print_credentials: data.can_print_credentials ? 1 : 0, can_view_reports: data.can_view_reports ? 1 : 0, can_view_birthdays: data.can_view_birthdays ? 1 : 0, can_view_member_reports: data.can_view_member_reports ? 1 : 0, can_view_complaints: data.can_view_complaints ? 1 : 0, can_view_pensioners: data.can_view_pensioners ? 1 : 0, can_access_settings: data.can_access_settings ? 1 : 0 });
     } else {
       const Database = (await import('better-sqlite3')).default;
       const path = await import('path');
       const db = new Database(path.join(process.cwd(), 'database.sqlite'));
-      db.prepare('UPDATE roles SET name=?, description=?, can_create_member=?, can_search_member=?, can_view_reports=?, can_view_birthdays=?, can_view_member_reports=?, can_view_complaints=?, can_view_pensioners=?, can_access_settings=? WHERE id=?').run(data.name, data.description, data.can_create_member ? 1 : 0, data.can_search_member ? 1 : 0, data.can_view_reports ? 1 : 0, data.can_view_birthdays ? 1 : 0, data.can_view_member_reports ? 1 : 0, data.can_view_complaints ? 1 : 0, data.can_view_pensioners ? 1 : 0, data.can_access_settings ? 1 : 0, data.id);
+      db.prepare('UPDATE roles SET name=?, description=?, can_create_member=?, can_search_member=?, can_print_credentials=?, can_view_reports=?, can_view_birthdays=?, can_view_member_reports=?, can_view_complaints=?, can_view_pensioners=?, can_access_settings=? WHERE id=?').run(data.name, data.description, data.can_create_member ? 1 : 0, data.can_search_member ? 1 : 0, data.can_print_credentials ? 1 : 0, data.can_view_reports ? 1 : 0, data.can_view_birthdays ? 1 : 0, data.can_view_member_reports ? 1 : 0, data.can_view_complaints ? 1 : 0, data.can_view_pensioners ? 1 : 0, data.can_access_settings ? 1 : 0, data.id);
       db.close();
     }
     return NextResponse.json({ success: true });

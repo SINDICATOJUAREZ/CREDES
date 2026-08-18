@@ -102,6 +102,7 @@ export interface Role {
   description: string;
   can_create_member: boolean;
   can_search_member: boolean;
+  can_print_credentials?: boolean;
   can_view_reports: boolean;
   can_view_birthdays: boolean;
   can_view_member_reports: boolean;

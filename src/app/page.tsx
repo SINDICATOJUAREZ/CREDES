@@ -110,7 +110,7 @@ export default function Home() {
       icon: Printer, 
       color: 'from-emerald-500 to-emerald-600',
       action: () => setIsImpresionesOpen(true),
-      permission: 'canSearchMember'
+      permission: 'canPrintCredentials'
     },
     { 
       title: 'Reportes de asistencia', 
