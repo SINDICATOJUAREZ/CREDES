@@ -574,13 +574,13 @@ export const generatePensionersReportPDF = async (
     pdf.setFont('helvetica', 'bold');
 
     pdf.text('NÓMINA', 18, startY + 5.5);
-    pdf.text('NOMBRE DEL AGREMIADO', 42, startY + 5.5);
-    pdf.text('PUESTO', 115, startY + 5.5);
-    pdf.text('DEPARTAMENTO', 165, startY + 5.5);
-    pdf.text('EDAD', 215, startY + 5.5);
-    pdf.text('ANTIGÜEDAD', 232, startY + 5.5);
-    pdf.text('INGRESO', 255, startY + 5.5);
-    pdf.text('% PENSIÓN', 277, startY + 5.5, { align: 'right' });
+    pdf.text('NOMBRE DEL AGREMIADO', 38, startY + 5.5);
+    pdf.text('PUESTO', 100, startY + 5.5);
+    pdf.text('DEPARTAMENTO', 142, startY + 5.5);
+    pdf.text('EDAD', 192, startY + 5.5);
+    pdf.text('ANTIGÜEDAD', 212, startY + 5.5);
+    pdf.text('INGRESO', 238, startY + 5.5);
+    pdf.text('% PENSIÓN', 280, startY + 5.5, { align: 'right' });
 
     let currentY = startY + 8;
     pdf.setFont('helvetica', 'normal');
@@ -600,13 +600,13 @@ export const generatePensionersReportPDF = async (
         pdf.setFontSize(8);
         pdf.setFont('helvetica', 'bold');
         pdf.text('NÓMINA', 18, currentY + 5.5);
-        pdf.text('NOMBRE DEL AGREMIADO', 42, currentY + 5.5);
-        pdf.text('PUESTO', 115, currentY + 5.5);
-        pdf.text('DEPARTAMENTO', 165, currentY + 5.5);
-        pdf.text('EDAD', 215, currentY + 5.5);
-        pdf.text('ANTIGÜEDAD', 232, currentY + 5.5);
-        pdf.text('INGRESO', 255, currentY + 5.5);
-        pdf.text('% PENSIÓN', 277, currentY + 5.5, { align: 'right' });
+        pdf.text('NOMBRE DEL AGREMIADO', 38, currentY + 5.5);
+        pdf.text('PUESTO', 100, currentY + 5.5);
+        pdf.text('DEPARTAMENTO', 142, currentY + 5.5);
+        pdf.text('EDAD', 192, currentY + 5.5);
+        pdf.text('ANTIGÜEDAD', 212, currentY + 5.5);
+        pdf.text('INGRESO', 238, currentY + 5.5);
+        pdf.text('% PENSIÓN', 280, currentY + 5.5, { align: 'right' });
 
         currentY += 8;
       }
@@ -624,23 +624,23 @@ export const generatePensionersReportPDF = async (
 
       pdf.setFont('helvetica', 'normal');
       const fullName = (p.fullName || '').toUpperCase();
-      pdf.text(fullName.length > 36 ? fullName.substring(0, 34) + '...' : fullName, 42, currentY + 4.8);
+      pdf.text(fullName.length > 32 ? fullName.substring(0, 30) + '...' : fullName, 38, currentY + 4.8);
 
       const pos = (p.position || '---').toUpperCase();
-      pdf.text(pos.length > 25 ? pos.substring(0, 23) + '...' : pos, 115, currentY + 4.8);
+      pdf.text(pos.length > 22 ? pos.substring(0, 20) + '...' : pos, 100, currentY + 4.8);
 
       const dept = (p.department || '---').toUpperCase();
-      pdf.text(dept.length > 25 ? dept.substring(0, 23) + '...' : dept, 165, currentY + 4.8);
+      pdf.text(dept.length > 24 ? dept.substring(0, 22) + '...' : dept, 142, currentY + 4.8);
 
-      pdf.text(`${p.calculatedAge} años`, 215, currentY + 4.8);
-      pdf.text(`${p.calculatedYears} años`, 232, currentY + 4.8);
-      pdf.text(p.joinDate || p.altaSindicato || '---', 255, currentY + 4.8);
+      pdf.text(`${p.calculatedAge} años`, 192, currentY + 4.8);
+      pdf.text(`${p.calculatedYears} años`, 212, currentY + 4.8);
+      pdf.text(p.joinDate || p.altaSindicato || '---', 238, currentY + 4.8);
 
       pdf.setFont('helvetica', 'bold');
       if (p.pensionPct === 100) pdf.setTextColor(16, 185, 129); // emerald
       else pdf.setTextColor(59, 130, 246); // blue
 
-      pdf.text(`${p.pensionPct}%`, 277, currentY + 4.8, { align: 'right' });
+      pdf.text(`${p.pensionPct}%`, 280, currentY + 4.8, { align: 'right' });
 
       currentY += 7;
     }
