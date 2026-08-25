@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Search, Gift, ClipboardCheck, User as UserIcon, Plus, Trash2, Users, FileText, Eye, QrCode, ArrowLeft, Trophy, BarChart3, Download, X, Edit2, Check } from 'lucide-react';
+import { Search, Gift, ClipboardCheck, User as UserIcon, Plus, Trash2, Users, FileText, Eye, QrCode, ArrowLeft, Trophy, BarChart3, Download, X, Edit2, Check, Calendar } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Member } from '@/types/member';
@@ -14,6 +14,50 @@ interface Props { isOpen?: boolean; onClose?: () => void; initialTab?: TabType; 
 type TabType = 'busqueda' | 'cumpleanos' | 'asistencia' | 'top20';
 interface AttRecord { id: string; name: string; date: string; created_at: string; }
 interface EventRecord { id: string; name: string; date: string; attendee_count: number; }
+
+const getEventYear = (evt: AttRecord): number => {
+  if (evt.name) {
+    const match4 = evt.name.match(/\b(20\d{2})\b/);
+    if (match4) return parseInt(match4[1]);
+  }
+
+  if (evt.date) {
+    const match4 = evt.date.match(/\b(20\d{2})\b/);
+    if (match4) return parseInt(match4[1]);
+    
+    const match2 = evt.date.match(/\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})\b/);
+    if (match2) {
+      let yr = parseInt(match2[3]);
+      if (yr < 100) yr += 2000;
+      return yr;
+    }
+
+    const d = new Date(evt.date);
+    if (!isNaN(d.getTime())) return d.getFullYear();
+  }
+
+  if (evt.created_at) {
+    const d = new Date(evt.created_at);
+    if (!isNaN(d.getTime())) return d.getFullYear();
+  }
+
+  return new Date().getFullYear();
+};
+
+const getGroupedEventsByYear = (attRecords: AttRecord[]) => {
+  const groups: Record<number, AttRecord[]> = {};
+  for (const evt of attRecords) {
+    const yr = getEventYear(evt);
+    if (!groups[yr]) groups[yr] = [];
+    groups[yr].push(evt);
+  }
+
+  const sortedYears = Object.keys(groups).map(Number).sort((a, b) => a - b);
+  return sortedYears.map(yr => ({
+    year: yr,
+    events: groups[yr]
+  }));
+};
 
 export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, initialTab = 'busqueda', inline = false, onlyShowBirthdays = false }: Props) {
   const [tab, setTab] = useState<TabType>(onlyShowBirthdays ? 'cumpleanos' : initialTab);
@@ -486,7 +530,23 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
     const w = window.open('', '_blank');
     if (!w) { toast.error('Popup bloqueado'); return; }
 
-    const evtList = attData.map(e => `<li style="padding:4px 0">${e.name}</li>`).join('');
+    const groupedEvts = getGroupedEventsByYear(attData);
+
+    const yearBlocksHtml = groupedEvts.length > 0
+      ? groupedEvts.map(g => `
+        <div class="year-block" style="margin-top: 20px; page-break-inside: avoid;">
+          <div class="year-header-bar" style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <span class="year-chip" style="background: #1e40af; color: #ffffff; padding: 4px 16px; border-radius: 8px; font-size: 13px; font-weight: 800; tracking: 0.05em; display: inline-flex; align-items: center; gap: 6px;">
+              &#128197; AÑO ${g.year}
+            </span>
+            <div style="flex: 1; height: 2px; background: #cbd5e1;"></div>
+          </div>
+          <ul class="attendance-list" style="list-style: none; padding: 15px 20px; columns: 2; column-gap: 30px; border: 1px solid #e5e7eb; border-radius: 12px; margin: 0; background: #fff;">
+            ${g.events.map(e => `<li style="font-size: 13px; font-weight: bold; color: #1f2937; display: flex; align-items: center; gap: 8px; break-inside: avoid; padding: 5px 0;">${e.name}</li>`).join('')}
+          </ul>
+        </div>
+      `).join('')
+      : '<div style="padding: 25px; text-align: center; color: #94a3b8; font-weight: bold; border: 1px solid #e5e7eb; border-top: none;">No se encontraron registros de asistencia.</div>';
 
     w.document.write(`
     <!DOCTYPE html>
@@ -513,11 +573,9 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
         .label { color: #555; margin-right: 6px; }
         .val { text-transform: uppercase; color: #000; }
         
-        .history-bar { background: #1e40af; color: white; padding: 15px 20px; font-weight: bold; font-size: 18px; text-transform: uppercase; margin-top: 10px; }
+        .history-bar { background: #1e40af; color: white; padding: 15px 20px; font-weight: bold; font-size: 18px; text-transform: uppercase; margin-top: 10px; border-radius: 8px 8px 0 0; }
         
-        .attendance-list { list-style: none; padding: 25px; columns: 2; column-gap: 30px; border: 1px solid #e5e7eb; border-top: none; }
-        .attendance-list li { font-size: 14px; font-weight: bold; color: #1f2937; display: flex; align-items: center; gap: 8px; break-inside: avoid; padding: 4px 0; }
-        .attendance-list li::before { content: "✓"; color: #059669; font-size: 18px; }
+        .attendance-list li::before { content: "✓"; color: #059669; font-size: 16px; margin-right: 6px; }
         
         @media print { 
           .actions-bar { display: none !important; }
@@ -581,9 +639,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
         </table>
 
         <div class="history-bar">HISTORIAL DE PARTICIPACIÓN</div>
-        <ul class="attendance-list">
-          ${evtList || '<li style="column-span: all; text-align: center; color: #999">No se encontraron registros de asistencia.</li>'}
-        </ul>
+        ${yearBlocksHtml}
       </div>
     </body>
     </html>
@@ -1213,11 +1269,30 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                       <span className="text-[10px] md:text-xs font-medium text-blue-600 bg-blue-50 px-2 md:px-3 py-1 md:py-1.5 rounded-lg">Total: {attData.length}</span>
                     </div>
                     {attData.length > 0 ? (
-                      <div className="columns-1 md:columns-2 lg:columns-3 gap-2.5">
-                        {attData.map((e,i) => (
-                          <div key={i} className="break-inside-avoid mb-2.5 flex items-center gap-2.5 p-2.5 rounded-lg border border-gray-100 bg-gray-50/50 hover:bg-blue-50/50 transition-colors">
-                            <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><ClipboardCheck className="w-4 h-4"/></div>
-                            <p className="font-semibold text-slate-700 text-[10px] md:text-xs">{e.name}</p>
+                      <div className="space-y-6">
+                        {getGroupedEventsByYear(attData).map((group) => (
+                          <div key={group.year} className="space-y-3">
+                            {/* Cabecera Gráfica por Año */}
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2 bg-gradient-to-r from-blue-700 to-cyan-700 text-white px-3.5 py-1.5 rounded-xl shadow-sm text-xs font-black tracking-wider uppercase">
+                                <Calendar className="w-3.5 h-3.5 text-cyan-200" />
+                                <span>AÑO {group.year}</span>
+                              </div>
+                              <div className="flex-1 h-[2px] bg-gradient-to-r from-blue-100 to-transparent rounded-full" />
+                              <span className="text-[10px] font-bold text-gray-400">{group.events.length} evento{group.events.length > 1 ? 's' : ''}</span>
+                            </div>
+
+                            {/* Grilla de Eventos por Año */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                              {group.events.map((e, i) => (
+                                <div key={i} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-gray-100 bg-white hover:bg-blue-50/50 hover:border-blue-200 shadow-sm transition-all">
+                                  <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                                    <ClipboardCheck className="w-4 h-4" />
+                                  </div>
+                                  <p className="font-bold text-slate-700 text-[10px] md:text-xs leading-tight">{e.name}</p>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         ))}
                       </div>
