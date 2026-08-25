@@ -212,6 +212,47 @@ export function MemberReportsPanel({
     }
   };
 
+  const toggleComplaintStatus = async (item: any) => {
+    const isCurrentlyAttended = item.follow_up && (
+      item.follow_up.toUpperCase().includes('ATENDIDO') || 
+      item.status === 'ATENDIDO' ||
+      item.follow_up.toUpperCase().includes('RESUELTO')
+    );
+
+    const newFollowUp = isCurrentlyAttended 
+      ? '' 
+      : (item.follow_up && item.follow_up !== 'PENDIENTE' ? `${item.follow_up} (ATENDIDO)` : 'ATENDIDO');
+
+    try {
+      const payload = {
+        id: item.id,
+        employeeId: item.employee_id,
+        reportDate: item.report_date,
+        description: item.description,
+        followUp: newFollowUp
+      };
+
+      const res = await fetch('/api/complaints', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      const d = await res.json();
+      if (d.success) {
+        toast.success(isCurrentlyAttended ? 'Estatus cambiado a PENDIENTE' : 'Formato de apoyo marcado como ATENDIDO');
+        // Refresh complaints list
+        const r = await fetch('/api/complaints');
+        const d2 = await r.json();
+        setComplaintsCache(d2.complaints || []);
+      } else {
+        toast.error('Error al actualizar estatus: ' + d.error);
+      }
+    } catch {
+      toast.error('Error actualizando el estatus del formato de apoyo');
+    }
+  };
+
   const printComplaintSheet = async (c: any) => {
     toast.info('Cargando datos del agremiado...');
     try {
@@ -1414,7 +1455,7 @@ export function MemberReportsPanel({
                           <th className="px-4 py-4 w-28 text-center text-xs font-black uppercase tracking-wider">Fecha</th>
                           <th className="px-4 py-4 text-xs font-black uppercase tracking-wider">Detalle Apoyo</th>
                           <th className="px-4 py-4 text-xs font-black uppercase tracking-wider">Seguimiento / Estatus</th>
-                          <th className="px-4 py-4 w-44 text-center text-xs font-black uppercase tracking-wider">Acciones</th>
+                          <th className="px-4 py-4 w-64 text-center text-xs font-black uppercase tracking-wider">Acciones</th>
                         </>
                       ) : (
                         <>
@@ -1473,14 +1514,30 @@ export function MemberReportsPanel({
                                 {item.description || 'N/A'}
                               </td>
                               <td className="px-4 py-3.5 text-[11px] font-bold">
-                                {item.follow_up ? (
-                                  <span className="text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100 truncate block max-w-xs">{item.follow_up}</span>
+                                {item.follow_up && (item.follow_up.toUpperCase().includes('ATENDIDO') || item.status === 'ATENDIDO' || item.follow_up.toUpperCase().includes('RESUELTO')) ? (
+                                  <span className="text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 block w-max font-black uppercase tracking-wider">ATENDIDO</span>
+                                ) : item.follow_up ? (
+                                  <span className="text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100 truncate block max-w-xs">{item.follow_up}</span>
                                 ) : (
-                                  <span className="text-rose-700 bg-rose-50 px-2 py-1 rounded-md border border-rose-100 block w-max">PENDIENTE</span>
+                                  <span className="text-rose-700 bg-rose-50 px-2.5 py-1 rounded-md border border-rose-200 block w-max font-black uppercase tracking-wider">PENDIENTE</span>
                                 )}
                               </td>
                               <td className="px-4 py-3.5 text-center">
-                                <div className="flex justify-center gap-2">
+                                <div className="flex justify-center items-center gap-2">
+                                  <button 
+                                    onClick={() => toggleComplaintStatus(item)} 
+                                    className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border transition-all shadow-sm ${
+                                      item.follow_up && (item.follow_up.toUpperCase().includes('ATENDIDO') || item.status === 'ATENDIDO' || item.follow_up.toUpperCase().includes('RESUELTO'))
+                                        ? 'text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
+                                        : 'text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100'
+                                    }`}
+                                    title={item.follow_up && (item.follow_up.toUpperCase().includes('ATENDIDO') || item.status === 'ATENDIDO') ? 'Haz clic para alternar a PENDIENTE' : 'Haz clic para marcar como ATENDIDO'}
+                                  >
+                                    {item.follow_up && (item.follow_up.toUpperCase().includes('ATENDIDO') || item.status === 'ATENDIDO' || item.follow_up.toUpperCase().includes('RESUELTO'))
+                                      ? '✓ ATENDIDO'
+                                      : 'MARCAR ATENDIDO'
+                                    }
+                                  </button>
                                   <button onClick={() => printComplaintSheet(item)} className="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 hover:underline uppercase tracking-wider">Ficha</button>
                                   <button onClick={() => editComplaint(item)} className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline uppercase tracking-wider">Editar</button>
                                   <button onClick={() => deleteComplaint(item.id)} className="text-[10px] font-bold text-red-600 hover:text-red-800 hover:underline uppercase tracking-wider">Eliminar</button>
