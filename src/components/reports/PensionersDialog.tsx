@@ -1,10 +1,12 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Users, X, Printer, ArrowLeft } from 'lucide-react';
+import { Users, X, Printer, ArrowLeft, Search, FileSpreadsheet, Filter, Calendar, Layers } from 'lucide-react';
 import { Member } from '@/types/member';
-import { generateResumePDF } from '@/lib/pdf-generator';
+import { generateResumePDF, generatePensionersReportPDF } from '@/lib/pdf-generator';
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from 'sonner';
 import Link from 'next/link';
 
 interface Props {
@@ -18,21 +20,22 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
   const [isLoading, setIsLoading] = useState(false);
   const [selectedMemberForPreview, setSelectedMemberForPreview] = useState<any | null>(null);
 
+  // Search and Filter States
+  const [searchTerm, setSearchTerm] = useState('');
+  const [yearFilter, setYearFilter] = useState<string>('all');
+  const [pctFilter, setPctFilter] = useState<string>('all');
+
   useEffect(() => {
     if (isOpen || inline) calc();
   }, [isOpen, inline]);
 
   const parseDate = (dateStr: string | any) => {
     if (!dateStr) return null;
-    // Handle Date objects
     if (dateStr instanceof Date) return dateStr;
-    // Handle numbers (timestamps)
     if (typeof dateStr === 'number') return new Date(dateStr);
-    // Standard string parsing
     const d = new Date(dateStr);
     if (!isNaN(d.getTime())) return d;
     
-    // Manual parsing for common formats
     const parts = dateStr.toString().split(/[-/]/);
     if (parts.length === 3) {
       const p0 = parseInt(parts[0]);
@@ -48,7 +51,6 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
   const calc = async () => {
     setIsLoading(true);
     try {
-      // Fetch active types in parallel to get a better sample
       const types = ['ACTIVO', 'DELEGADO', 'SECRETARIO_GENERAL'];
       const responses = await Promise.all(
         types.map(t => fetch(`/api/members?limit=2000&memberType=${t}`))
@@ -57,17 +59,14 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
       const results = await Promise.all(responses.map(r => r.json()));
       const allMembers: Member[] = results.flatMap(d => d.data || []);
       
-      // Also fetch by status ACTIVO for good measure (some might have other memberTypes but still be active)
       const rStatus = await fetch('/api/members?limit=2000&status=ACTIVO');
       const dStatus = await rStatus.json();
       const statusActive = dStatus.data || [];
       
-      // Fetch members with INCAPACITADO status
       const rIncap = await fetch('/api/members?limit=2000&status=INCAPACITADO');
       const dIncap = await rIncap.json();
       const statusIncap = dIncap.data || [];
       
-      // Merge and deduplicate
       const merged = [...allMembers, ...statusActive, ...statusIncap];
       const uniqueIds = new Set();
       const uniqueMembers = merged.filter(m => {
@@ -77,6 +76,8 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
       });
 
       const today = new Date();
+      const currentYear = today.getFullYear();
+
       const filtered = uniqueMembers.filter(m => {
         const bDate = parseDate(m.birthDate);
         const jDate = parseDate(m.joinDate);
@@ -85,13 +86,11 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
         let years = today.getFullYear() - jDate.getFullYear();
         if (today < new Date(today.getFullYear(), jDate.getMonth(), jDate.getDate())) years--;
 
-        // Case 1: Incapacitated (10 or more years working in the municipality, age doesn't matter)
         const isIncapacitated = m.status === 'INCAPACITADO';
         if (isIncapacitated) {
           return years >= 10;
         }
 
-        // Case 2: Standard Pension (age > 50 and years >= 15)
         if (!bDate) return false;
         let age = today.getFullYear() - bDate.getFullYear();
         if (today < new Date(today.getFullYear(), bDate.getMonth(), bDate.getDate())) age--;
@@ -111,11 +110,20 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
         if (today < new Date(today.getFullYear(), jDate.getMonth(), jDate.getDate())) years--;
         
         const isIncapacitated = m.status === 'INCAPACITADO';
+
+        // Calculate estimated year of eligibility
+        const reqSeniorityYears = isIncapacitated ? 10 : 15;
+        const reqAgeYears = isIncapacitated ? 0 : 51;
+        const missingSeniority = Math.max(0, reqSeniorityYears - years);
+        const missingAge = Math.max(0, reqAgeYears - age);
+        const missingTotal = Math.max(missingSeniority, missingAge);
+        const estimatedYear = currentYear + missingTotal;
         
         return { 
           ...m, 
           calculatedAge: age, 
           calculatedYears: years, 
+          estimatedYear,
           pensionPct: isIncapacitated ? 100 : (years >= 24 ? 100 : 75),
           pensionType: isIncapacitated ? 'INCAPACIDAD' : 'EDAD Y ANTIGÜEDAD'
         };
@@ -129,10 +137,94 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
     }
   };
 
+  // Filter List Logic
+  const filteredList = list.filter(m => {
+    // Text search
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      const matchName = (m.fullName || '').toLowerCase().includes(term);
+      const matchEmp = (m.employeeId || '').toLowerCase().includes(term);
+      const matchPos = (m.position || '').toLowerCase().includes(term);
+      const matchDept = (m.department || '').toLowerCase().includes(term);
+      if (!matchName && !matchEmp && !matchPos && !matchDept) return false;
+    }
+
+    // % Pension filter
+    if (pctFilter !== 'all') {
+      if (pctFilter === 'INCAPACIDAD' && m.pensionType !== 'INCAPACIDAD') return false;
+      if (pctFilter === '100' && (m.pensionPct !== 100 || m.pensionType === 'INCAPACIDAD')) return false;
+      if (pctFilter === '75' && m.pensionPct !== 75) return false;
+    }
+
+    // Estimated Year filter
+    if (yearFilter !== 'all') {
+      const estYear = m.estimatedYear || 2026;
+      if (yearFilter === '2026' && estYear !== 2026) return false;
+      if (yearFilter === '2027' && estYear !== 2027) return false;
+      if (yearFilter === '2028' && estYear !== 2028) return false;
+      if (yearFilter === '2029+' && estYear < 2029) return false;
+    }
+
+    return true;
+  });
+
+  const getFilterTitle = () => {
+    let title = 'Reporte de Proyección de Pensiones';
+    if (yearFilter !== 'all') {
+      if (yearFilter === '2026') title += ' - Jubilaciones 2026 (Este Año)';
+      else if (yearFilter === '2027') title += ' - Jubilaciones 2027 (Próximo Año)';
+      else if (yearFilter === '2028') title += ' - Jubilaciones 2028 (En 2 Años)';
+      else if (yearFilter === '2029+') title += ' - Jubilaciones 2029 en adelante';
+    }
+    if (pctFilter !== 'all') {
+      title += ` (${pctFilter === 'INCAPACIDAD' ? 'Incapacidad' : pctFilter + '% Pensión'})`;
+    }
+    return title;
+  };
+
+  const handleExportCSV = () => {
+    if (filteredList.length === 0) {
+      toast.error('No hay datos para exportar');
+      return;
+    }
+    const headers = ['Nómina', 'Nombre Completo', 'Puesto', 'Departamento', 'Edad', 'Antigüedad', 'Fecha Ingreso', 'Sueldo', '% Pensión', 'Tipo', 'Año Jubilación Estimado'];
+    const rows = filteredList.map(m => [
+      `"${m.employeeId || ''}"`,
+      `"${(m.fullName || '').replace(/"/g, '""')}"`,
+      `"${(m.position || '').replace(/"/g, '""')}"`,
+      `"${(m.department || '').replace(/"/g, '""')}"`,
+      m.calculatedAge,
+      m.calculatedYears,
+      `"${m.joinDate || m.altaSindicato || ''}"`,
+      m.salary || 0,
+      `"${m.pensionPct}%"`,
+      `"${m.pensionType}"`,
+      m.estimatedYear || 2026
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Proyeccion_Pensiones_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success(`Exportados ${filteredList.length} registros a Excel.`);
+  };
+
+  const handlePrintPDF = () => {
+    if (filteredList.length === 0) {
+      toast.error('No hay agremiados para generar el reporte');
+      return;
+    }
+    generatePensionersReportPDF(filteredList, getFilterTitle());
+  };
+
   const pensionersContent = (
     <div className={inline ? "w-full bg-white border border-gray-100 shadow-xl rounded-[2rem] overflow-hidden flex flex-col h-[calc(100vh-140px)] min-h-[600px]" : "max-w-[95vw] md:max-w-7xl h-[90vh] rounded-[2rem] md:rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-gray-50/98 backdrop-blur-xl flex flex-col"}>
       {/* Header */}
-      <div className="px-5 py-5 md:px-10 md:py-8 bg-white border-b border-gray-100 flex justify-between items-center shrink-0">
+      <div className="px-5 py-5 md:px-10 md:py-6 bg-white border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
         <div className="flex items-center gap-4 flex-1">
           {inline && (
             onClose ? (
@@ -148,18 +240,100 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
             )
           )}
           <div className="flex-1">
-            <h2 className="text-2xl md:text-4xl font-black text-blue-900 uppercase tracking-tighter flex items-center gap-3 md:gap-4">
-              <Users className="w-8 h-8 md:w-10 md:h-10 text-cyan-600 shrink-0" />
+            <h2 className="text-xl md:text-3xl font-black text-blue-900 uppercase tracking-tighter flex items-center gap-3 md:gap-4">
+              <Users className="w-7 h-7 md:w-9 md:h-9 text-cyan-600 shrink-0" />
               Proyección de Pensiones
             </h2>
-            <p className="text-[9px] md:text-[11px] text-gray-400 font-black uppercase tracking-widest md:tracking-[0.2em] italic mt-2 md:mt-1 md:ml-14 leading-tight">
+            <p className="text-[9px] md:text-[10px] text-gray-400 font-black uppercase tracking-widest italic leading-tight mt-1">
               Edad y Antigüedad (&gt;50 años / &gt;=15 años serv.) o por Incapacidad (&gt;=10 años serv.)
             </p>
           </div>
         </div>
-        {!inline && (
-          <button onClick={onClose} className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-2xl bg-gray-50 flex items-center justify-center hover:bg-red-50 hover:text-red-600 transition-all active:scale-95 ml-2 md:ml-0">
-            <X className="w-5 h-5 md:w-6 md:h-6" />
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            onClick={handlePrintPDF}
+            className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl flex items-center gap-2 shadow-md shadow-blue-600/20"
+          >
+            <Printer className="w-4 h-4" />
+            <span>Imprimir Reporte PDF</span>
+          </Button>
+
+          <Button
+            onClick={handleExportCSV}
+            variant="outline"
+            className="h-10 px-4 border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-black text-xs rounded-xl flex items-center gap-2"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>Exportar Excel</span>
+          </Button>
+
+          {!inline && (
+            <button onClick={onClose} className="w-10 h-10 shrink-0 rounded-2xl bg-gray-50 flex items-center justify-center hover:bg-red-50 hover:text-red-600 transition-all active:scale-95 ml-2">
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Search & Filter Toolbar */}
+      <div className="px-5 py-3 md:px-10 bg-blue-900/5 border-b border-blue-100/60 flex flex-col md:flex-row items-center gap-3 shrink-0">
+        {/* Search Bar */}
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            placeholder="Buscar por nombre, nómina, puesto o departamento..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 h-10 rounded-xl bg-white border-gray-200 text-xs font-bold text-gray-800 placeholder:text-gray-400 focus-visible:ring-blue-500"
+          />
+        </div>
+
+        {/* Filters */}
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          {/* Year Filter */}
+          <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 h-10 text-xs font-bold text-gray-700 w-1/2 md:w-auto">
+            <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <select
+              value={yearFilter}
+              onChange={(e) => setYearFilter(e.target.value)}
+              className="bg-transparent focus:outline-none cursor-pointer text-xs font-bold w-full"
+            >
+              <option value="all">Todos los Años</option>
+              <option value="2026">Elegibles 2026 (Este Año)</option>
+              <option value="2027">Elegibles 2027 (Próximo Año)</option>
+              <option value="2028">Elegibles 2028 (En 2 Años)</option>
+              <option value="2029+">Elegibles 2029 en adelante</option>
+            </select>
+          </div>
+
+          {/* % Pension Filter */}
+          <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 h-10 text-xs font-bold text-gray-700 w-1/2 md:w-auto">
+            <Filter className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <select
+              value={pctFilter}
+              onChange={(e) => setPctFilter(e.target.value)}
+              className="bg-transparent focus:outline-none cursor-pointer text-xs font-bold w-full"
+            >
+              <option value="all">Todas las Categorías</option>
+              <option value="100">100% Pensión (24+ Años)</option>
+              <option value="75">75% Pensión (15-23 Años)</option>
+              <option value="INCAPACIDAD">Por Incapacidad (10+ Años)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Results Sub-header */}
+      <div className="px-5 py-2 md:px-10 bg-white border-b border-gray-100 text-[11px] font-bold text-gray-500 flex justify-between items-center shrink-0">
+        <span>Mostrando <strong className="text-blue-900">{filteredList.length}</strong> de <strong className="text-gray-700">{list.length}</strong> elegibles a pensión</span>
+        {(searchTerm || yearFilter !== 'all' || pctFilter !== 'all') && (
+          <button
+            onClick={() => { setSearchTerm(''); setYearFilter('all'); setPctFilter('all'); }}
+            className="text-blue-600 hover:text-blue-800 text-[10px] font-black uppercase tracking-wider underline"
+          >
+            Limpiar Filtros
           </button>
         )}
       </div>
@@ -186,66 +360,77 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
             background-clip: padding-box;
           }
         `}</style>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {list.map((m, i) => (
-            <div key={i} className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-xl hover:border-blue-200 transition-all duration-500">
-              {m.pensionType === 'INCAPACIDAD' ? (
-                <div className="absolute top-0 left-0 px-4 py-2 rounded-br-3xl bg-amber-500 text-white text-[9px] font-black uppercase tracking-widest shadow-sm">
-                  Incapacidad
-                </div>
-              ) : null}
-              
-              <div className={`absolute top-0 right-0 px-6 py-2 rounded-bl-3xl text-white text-[10px] font-black uppercase tracking-widest shadow-sm ${m.pensionPct === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`}>
-                {m.pensionPct}% Pensión
-              </div>
-              
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 rounded-2xl border-2 border-gray-50 overflow-hidden shadow-inner bg-gray-50">
-                  {m.photoUrl ? <img src={m.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300 font-black text-xl">{m.fullName.charAt(0)}</div>}
-                </div>
-                <div className="min-w-0">
-                  <h4 className="font-black text-blue-900 uppercase text-sm truncate leading-tight mb-1">{m.fullName}</h4>
-                  <p className="text-[10px] text-blue-600 font-black uppercase tracking-widest italic">{m.position}</p>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-2">
-                <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100/50">
-                  <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest mb-1 text-center">Edad</p>
-                  <p className="text-xl font-black text-blue-900 text-center">{m.calculatedAge} <span className="text-[10px] opacity-50 uppercase">años</span></p>
-                </div>
-                <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100/50">
-                  <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest mb-1 text-center">Antigüedad</p>
-                  <p className="text-xl font-black text-blue-900 text-center">{m.calculatedYears} <span className="text-[10px] opacity-50 uppercase">años</span></p>
-                </div>
-              </div>
-              
-              <div className="mt-4 pt-4 border-t border-dashed border-gray-100 flex justify-between items-center mb-4">
-                <div className="flex flex-col">
-                  <span className="text-[9px] text-gray-400 font-black uppercase">Ingreso</span>
-                  <span className="text-[11px] text-slate-700 font-bold">{m.joinDate}</span>
-                </div>
-                <div className="flex flex-col items-end">
-                  <span className="text-[9px] text-gray-400 font-black uppercase">Nómina</span>
-                  <span className="text-[11px] text-slate-700 font-bold">#{m.employeeId}</span>
-                </div>
-              </div>
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <p className="text-xs font-bold text-gray-500 mt-4">Calculando proyección de pensiones...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredList.map((m, i) => (
+              <div key={i} className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-xl hover:border-blue-200 transition-all duration-500 flex flex-col justify-between">
+                <div>
+                  {m.pensionType === 'INCAPACIDAD' ? (
+                    <div className="absolute top-0 left-0 px-4 py-2 rounded-br-3xl bg-amber-500 text-white text-[9px] font-black uppercase tracking-widest shadow-sm">
+                      Incapacidad
+                    </div>
+                  ) : null}
+                  
+                  <div className={`absolute top-0 right-0 px-6 py-2 rounded-bl-3xl text-white text-[10px] font-black uppercase tracking-widest shadow-sm ${m.pensionPct === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`}>
+                    {m.pensionPct}% Pensión
+                  </div>
+                  
+                  <div className="flex items-center gap-4 mb-6 mt-2">
+                    <div className="w-16 h-16 rounded-2xl border-2 border-gray-50 overflow-hidden shadow-inner bg-gray-50 shrink-0">
+                      {m.photoUrl ? <img src={m.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300 font-black text-xl">{m.fullName.charAt(0)}</div>}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-black text-blue-900 uppercase text-sm truncate leading-tight mb-1" title={m.fullName}>{m.fullName}</h4>
+                      <p className="text-[10px] text-blue-600 font-black uppercase tracking-widest italic truncate">{m.position}</p>
+                    </div>
+                  </div>
 
-              <button 
-                onClick={() => setSelectedMemberForPreview(m)}
-                className="w-full py-3 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-2xl font-black text-[10px] uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 group-hover:bg-blue-600 group-hover:text-white shadow-sm shadow-blue-100"
-              >
-                <Printer className="w-4 h-4" />
-                Previsualizar Expediente
-              </button>
-            </div>
-          ))}
-          {list.length === 0 && (
-            <div className="col-span-full py-20 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
-              <p className="text-gray-400 font-black uppercase tracking-widest italic">No se encontraron miembros elegibles para pensión próxima</p>
-            </div>
-          )}
-        </div>
+                  <div className="grid grid-cols-2 gap-3 mb-2">
+                    <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100/50">
+                      <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest mb-1 text-center">Edad</p>
+                      <p className="text-xl font-black text-blue-900 text-center">{m.calculatedAge} <span className="text-[10px] opacity-50 uppercase">años</span></p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100/50">
+                      <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest mb-1 text-center">Antigüedad</p>
+                      <p className="text-xl font-black text-blue-900 text-center">{m.calculatedYears} <span className="text-[10px] opacity-50 uppercase">años</span></p>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 pt-4 border-t border-dashed border-gray-100 flex justify-between items-center mb-4 text-[11px]">
+                    <div className="flex flex-col">
+                      <span className="text-[9px] text-gray-400 font-black uppercase">Ingreso</span>
+                      <span className="text-slate-700 font-bold">{m.joinDate || m.altaSindicato}</span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-[9px] text-gray-400 font-black uppercase">Nómina</span>
+                      <span className="text-slate-700 font-bold">#{m.employeeId}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => setSelectedMemberForPreview(m)}
+                  className="w-full py-3 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-2xl font-black text-[10px] uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 group-hover:bg-blue-600 group-hover:text-white shadow-sm shadow-blue-100 mt-2"
+                >
+                  <Printer className="w-4 h-4" />
+                  Previsualizar Expediente
+                </button>
+              </div>
+            ))}
+            {filteredList.length === 0 && (
+              <div className="col-span-full py-20 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
+                <Users className="w-12 h-12 text-gray-300 mx-auto mb-3 stroke-1" />
+                <p className="text-gray-400 font-black uppercase tracking-widest italic">No se encontraron agremiados con los filtros seleccionados</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

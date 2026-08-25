@@ -530,3 +530,133 @@ export const generateResumePDF = async (member: Member) => {
     toast.error('Error al generar el PDF del expediente.');
   }
 };
+
+export const generatePensionersReportPDF = async (
+  pensioners: any[], 
+  filterTitle: string = 'Reporte General de Proyección de Pensiones'
+) => {
+  toast.info('Generando reporte de proyección de pensiones...');
+  try {
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const logo2Base64 = await fetchImageAsBase64('/logos/logo2.png');
+    if (logo2Base64) {
+      pdf.addImage(logo2Base64, 'PNG', 15, 10, 60, 16);
+    }
+
+    pdf.setTextColor(0, 51, 102);
+    pdf.setFontSize(15);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('PROYECCIÓN DE PENSIONES Y JUBILACIONES', 282, 16, { align: 'right' });
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(filterTitle.toUpperCase(), 282, 22, { align: 'right' });
+
+    const todayStr = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+    pdf.setFontSize(8);
+    pdf.setTextColor(100, 100, 100);
+    pdf.text(`Fecha de Emisión: ${todayStr} | Total de Registros: ${pensioners.length}`, 282, 26, { align: 'right' });
+
+    pdf.setDrawColor(0, 51, 102);
+    pdf.setLineWidth(0.5);
+    pdf.line(15, 30, 282, 30);
+
+    // Table Header
+    let startY = 35;
+    pdf.setFillColor(0, 51, 102);
+    pdf.rect(15, startY, 267, 8, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'bold');
+
+    pdf.text('NÓMINA', 18, startY + 5.5);
+    pdf.text('NOMBRE DEL AGREMIADO', 42, startY + 5.5);
+    pdf.text('PUESTO', 115, startY + 5.5);
+    pdf.text('DEPARTAMENTO', 165, startY + 5.5);
+    pdf.text('EDAD', 215, startY + 5.5);
+    pdf.text('ANTIGÜEDAD', 232, startY + 5.5);
+    pdf.text('INGRESO', 255, startY + 5.5);
+    pdf.text('% PENSIÓN', 277, startY + 5.5, { align: 'right' });
+
+    let currentY = startY + 8;
+    pdf.setFont('helvetica', 'normal');
+
+    for (let i = 0; i < pensioners.length; i++) {
+      const p = pensioners[i];
+
+      // Page overflow check (A4 landscape height = 210mm)
+      if (currentY > 185) {
+        pdf.addPage('a4', 'landscape');
+        currentY = 20;
+
+        // Repeat header on new page
+        pdf.setFillColor(0, 51, 102);
+        pdf.rect(15, currentY, 267, 8, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('NÓMINA', 18, currentY + 5.5);
+        pdf.text('NOMBRE DEL AGREMIADO', 42, currentY + 5.5);
+        pdf.text('PUESTO', 115, currentY + 5.5);
+        pdf.text('DEPARTAMENTO', 165, currentY + 5.5);
+        pdf.text('EDAD', 215, currentY + 5.5);
+        pdf.text('ANTIGÜEDAD', 232, currentY + 5.5);
+        pdf.text('INGRESO', 255, currentY + 5.5);
+        pdf.text('% PENSIÓN', 277, currentY + 5.5, { align: 'right' });
+
+        currentY += 8;
+      }
+
+      // Alternating row backgrounds
+      if (i % 2 === 1) {
+        pdf.setFillColor(245, 247, 250);
+        pdf.rect(15, currentY, 267, 7, 'F');
+      }
+
+      pdf.setTextColor(40, 40, 40);
+      pdf.setFontSize(7.5);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(String(p.employeeId || '---'), 18, currentY + 4.8);
+
+      pdf.setFont('helvetica', 'normal');
+      const fullName = (p.fullName || '').toUpperCase();
+      pdf.text(fullName.length > 36 ? fullName.substring(0, 34) + '...' : fullName, 42, currentY + 4.8);
+
+      const pos = (p.position || '---').toUpperCase();
+      pdf.text(pos.length > 25 ? pos.substring(0, 23) + '...' : pos, 115, currentY + 4.8);
+
+      const dept = (p.department || '---').toUpperCase();
+      pdf.text(dept.length > 25 ? dept.substring(0, 23) + '...' : dept, 165, currentY + 4.8);
+
+      pdf.text(`${p.calculatedAge} años`, 215, currentY + 4.8);
+      pdf.text(`${p.calculatedYears} años`, 232, currentY + 4.8);
+      pdf.text(p.joinDate || p.altaSindicato || '---', 255, currentY + 4.8);
+
+      pdf.setFont('helvetica', 'bold');
+      if (p.pensionPct === 100) pdf.setTextColor(16, 185, 129); // emerald
+      else pdf.setTextColor(59, 130, 246); // blue
+
+      pdf.text(`${p.pensionPct}%`, 277, currentY + 4.8, { align: 'right' });
+
+      currentY += 7;
+    }
+
+    // Footer summary
+    pdf.setDrawColor(200, 200, 200);
+    pdf.line(15, currentY + 2, 282, currentY + 2);
+    pdf.setFontSize(8);
+    pdf.setTextColor(100, 100, 100);
+    pdf.setFont('helvetica', 'italic');
+    pdf.text('Sindicato Único de Trabajadores al Servicio del Municipio de Benito Juárez, N.L.', 148.5, currentY + 8, { align: 'center' });
+
+    pdf.save(`Reporte_Proyeccion_Pensiones_${new Date().getTime()}.pdf`);
+    toast.success('Reporte de pensiones generado en PDF con éxito.');
+  } catch (err) {
+    console.error('Error generating pensioners report PDF:', err);
+    toast.error('Error al generar el reporte PDF.');
+  }
+};
