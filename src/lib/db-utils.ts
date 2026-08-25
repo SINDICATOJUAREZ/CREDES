@@ -4,7 +4,6 @@
 
 export const MEMBER_MAPPING: Record<string, string> = {
   id: 'id',
-  socio_id: 'socioId',
   employee_id: 'employeeId',
   full_name: 'fullName',
   member_type: 'memberType',

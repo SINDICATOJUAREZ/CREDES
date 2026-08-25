@@ -18,7 +18,6 @@ import { Rnd } from 'react-rnd';
 const FIELD_CATALOG = [
   { value: 'fullName', label: 'NOMBRE COMPLETO' },
   { value: 'employeeId', label: 'NO. NÓMINA' },
-  { value: 'socioId', label: 'NO. SOCIO' },
   { value: 'position', label: 'PUESTO' },
   { value: 'department', label: 'DIRECCIÓN' },
   { value: 'secretariat', label: 'SECRETARÍA' },
@@ -37,7 +36,7 @@ const FIELD_CATALOG = [
 
 
 const mockMember: Member = {
-  id: 'preview', fullName: 'JUAN PEREZ LOPEZ', employeeId: '2196', socioId: '31',
+  id: 'preview', fullName: 'JUAN PEREZ LOPEZ', employeeId: '2196',
   position: 'INTENDENTE', department: 'PARQUES Y JARDINES', secretariat: 'SECRETARÍA DE SERVICIOS PÚBLICOS', memberType: 'AGREMIADO',
   status: 'ACTIVO', family: [], address: 'AV. SIEMPRE VIVA #123', colonia: 'CENTRO',
   municipio: 'MONTERREY, NL', curp: 'PERL900101HNLRPN09', phone: '8112345678',

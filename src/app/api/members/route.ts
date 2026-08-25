@@ -62,7 +62,7 @@ export async function GET(request: Request) {
       }
       if (search) {
         const s = encodeURIComponent(`*${search}*`);
-        query += `&or=(full_name.ilike.${s},employee_id.ilike.${s},department.ilike.${s},socio_id.ilike.${s})`;
+        query += `&or=(full_name.ilike.${s},employee_id.ilike.${s},department.ilike.${s})`;
       } else if (!status) {
         query += `&status=neq.BAJA`;
       }
@@ -132,9 +132,9 @@ export async function GET(request: Request) {
     let baseQuery = 'FROM members WHERE 1=1';
     const params: any[] = [];
     if (search) {
-      baseQuery += ' AND (full_name LIKE ? OR employee_id LIKE ? OR department LIKE ? OR socio_id LIKE ?)';
+      baseQuery += ' AND (full_name LIKE ? OR employee_id LIKE ? OR department LIKE ?)';
       const searchParam = `%${search}%`;
-      params.push(searchParam, searchParam, searchParam, searchParam);
+      params.push(searchParam, searchParam, searchParam);
     } else if (!status) {
       baseQuery += " AND status != 'BAJA'";
     }

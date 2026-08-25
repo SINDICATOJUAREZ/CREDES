@@ -45,7 +45,6 @@ export interface CredentialConfig {
 
 export interface Member {
   id: string;
-  socioId?: string;
   employeeId?: string;
   fullName: string;
   memberType: 'AGREMIADO' | 'DELEGADO' | 'SECRETARIO GENERAL' | 'LISTA DE ESPERA';

@@ -25,7 +25,6 @@ export const useExcel = () => {
             department: item['DEPARTAMENTO'] || '',
             secretariat: item['SECRETARIA'] || '',
             employeeId: String(item['NUMERO DE EMPLEADO'] || ''),
-            socioId: String(item['N SOCIO'] || ''),
             curp: item['CURP'] || '',
             rfc: item['RFC'] || '',
             birthDate: item['FECHA NAC.'] || '',
@@ -60,7 +59,6 @@ export const useExcel = () => {
   const exportToExcel = (members: Member[]) => {
     const ws = XLSX.utils.json_to_sheet(members.map(m => ({
       '# EMPLEADO': m.employeeId,
-      '# SOCIO': m.socioId,
       'NOMBRE COMPLETO': m.fullName,
       'STATUS': m.status,
       'PUESTO': m.position,

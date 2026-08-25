@@ -89,7 +89,7 @@ export const CredentialCard: React.FC<CredentialCardProps> = ({ member, config, 
             className="mt-[1.5mm] text-white px-[3mm] py-[0.5mm] rounded-sm text-[6px] font-black tracking-widest border-b border-yellow-500"
             style={{ backgroundColor: config.primaryColor }}
           >
-            SOCIO: {member.socioId || '0000'}
+            NÓMINA: {member.employeeId || '0000'}
           </div>
         </div>
         )}

@@ -73,7 +73,6 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
       department: '',
       secretariat: '',
       employeeId: '',
-      socioId: '',
       curp: '',
       rfc: '',
       phone: '',
@@ -244,14 +243,10 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
           </TabsContent>
 
           <TabsContent value="laboral" className="space-y-8 mt-0 outline-none animate-in fade-in duration-500">
-            <div className="grid grid-cols-3 gap-8">
+            <div className="grid grid-cols-2 gap-8">
               <div className="space-y-2">
                 <Label className="text-xs font-black text-blue-900 uppercase tracking-widest">Número de Nómina</Label>
                 <Input {...register('employeeId')} className="h-12 border-gray-200 focus:ring-2 focus:ring-blue-500 rounded-xl bg-gray-50/30" placeholder="Ej. 12345" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-black text-blue-900 uppercase tracking-widest">Número de Socio</Label>
-                <Input {...register('socioId')} className="h-12 border-gray-200 focus:ring-2 focus:ring-blue-500 rounded-xl bg-gray-50/30" placeholder="Ej. S-900" />
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-black text-blue-900 uppercase tracking-widest">Estado</Label>

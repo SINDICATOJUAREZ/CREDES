@@ -509,10 +509,6 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
                       <span className="text-gray-900 font-semibold">{selectedMemberForPreview?.employeeId || '---'}</span>
                     </div>
                     <div className="flex border-b border-gray-100 py-1">
-                      <span className="w-32 font-bold text-gray-700">No. Socio:</span>
-                      <span className="text-gray-900 font-semibold">{selectedMemberForPreview?.socioId || '---'}</span>
-                    </div>
-                    <div className="flex border-b border-gray-100 py-1">
                       <span className="w-32 font-bold text-gray-700">Edad:</span>
                       <span className="text-gray-900 font-semibold">
                         {(() => {
