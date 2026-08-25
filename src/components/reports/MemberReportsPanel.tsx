@@ -66,7 +66,7 @@ const getIsPensioner = (item: any) => {
   let age = today.getFullYear() - bDate.getFullYear();
   if (today < new Date(today.getFullYear(), bDate.getMonth(), bDate.getDate())) age--;
   
-  return age > 50 && years >= 15;
+  return age >= 50 && years >= 10;
 };
 
 export function MemberReportsPanel({ 

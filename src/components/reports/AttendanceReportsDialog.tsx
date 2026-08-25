@@ -153,7 +153,7 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
     let age = today.getFullYear() - bDate.getFullYear();
     if (today < new Date(today.getFullYear(), bDate.getMonth(), bDate.getDate())) age--;
     
-    return age > 50 && years >= 15;
+    return age >= 50 && years >= 10;
   };
 
   const currentTop20Data = top20Data.filter((m: any) => {

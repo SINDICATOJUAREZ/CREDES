@@ -15,6 +15,22 @@ interface Props {
   inline?: boolean;
 }
 
+export const calculatePensionPct = (years: number, isIncapacitated: boolean = false): number => {
+  if (isIncapacitated) return 100;
+  if (years >= 25) return 100;
+  if (years === 24) return 95;
+  if (years === 23) return 90;
+  if (years === 22) return 85;
+  if (years === 21) return 80;
+  if (years === 20) return 75;
+  if (years === 19) return 64;
+  if (years === 18) return 63;
+  if (years === 17) return 62;
+  if (years === 16) return 61;
+  if (years >= 10 && years <= 15) return 60;
+  return 0;
+};
+
 export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = false }: Props) {
   const [list, setList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -80,7 +96,7 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
 
       const filtered = uniqueMembers.filter(m => {
         const bDate = parseDate(m.birthDate);
-        const jDate = parseDate(m.joinDate);
+        const jDate = parseDate(m.joinDate || m.altaSindicato);
         if (!jDate) return false;
 
         let years = today.getFullYear() - jDate.getFullYear();
@@ -95,10 +111,10 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
         let age = today.getFullYear() - bDate.getFullYear();
         if (today < new Date(today.getFullYear(), bDate.getMonth(), bDate.getDate())) age--;
         
-        return age > 50 && years >= 15;
+        return age >= 50 && years >= 10;
       }).map(m => {
         const bDate = parseDate(m.birthDate);
-        const jDate = parseDate(m.joinDate)!;
+        const jDate = parseDate(m.joinDate || m.altaSindicato)!;
         
         let age = 0;
         if (bDate) {
@@ -111,20 +127,22 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
         
         const isIncapacitated = m.status === 'INCAPACITADO';
 
-        // Calculate estimated year of eligibility
-        const reqSeniorityYears = isIncapacitated ? 10 : 15;
-        const reqAgeYears = isIncapacitated ? 0 : 51;
+        // Calculate estimated year of eligibility for 100% pension (25 years seniority & 50 age)
+        const reqSeniorityYears = isIncapacitated ? 10 : 25;
+        const reqAgeYears = isIncapacitated ? 0 : 50;
         const missingSeniority = Math.max(0, reqSeniorityYears - years);
         const missingAge = Math.max(0, reqAgeYears - age);
         const missingTotal = Math.max(missingSeniority, missingAge);
         const estimatedYear = currentYear + missingTotal;
         
+        const pensionPct = calculatePensionPct(years, isIncapacitated);
+
         return { 
           ...m, 
           calculatedAge: age, 
           calculatedYears: years, 
           estimatedYear,
-          pensionPct: isIncapacitated ? 100 : (years >= 24 ? 100 : 75),
+          pensionPct,
           pensionType: isIncapacitated ? 'INCAPACIDAD' : 'EDAD Y ANTIGÜEDAD'
         };
       }).sort((a, b) => b.calculatedYears - a.calculatedYears);
@@ -153,7 +171,9 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
     if (pctFilter !== 'all') {
       if (pctFilter === 'INCAPACIDAD' && m.pensionType !== 'INCAPACIDAD') return false;
       if (pctFilter === '100' && (m.pensionPct !== 100 || m.pensionType === 'INCAPACIDAD')) return false;
-      if (pctFilter === '75' && m.pensionPct !== 75) return false;
+      if (pctFilter === '90-95' && (m.pensionPct < 90 || m.pensionPct > 95 || m.pensionType === 'INCAPACIDAD')) return false;
+      if (pctFilter === '75-85' && (m.pensionPct < 75 || m.pensionPct > 85 || m.pensionType === 'INCAPACIDAD')) return false;
+      if (pctFilter === '60-64' && (m.pensionPct < 60 || m.pensionPct > 64 || m.pensionType === 'INCAPACIDAD')) return false;
     }
 
     // Estimated Year filter
@@ -317,8 +337,10 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
               className="bg-transparent focus:outline-none cursor-pointer text-xs font-bold w-full"
             >
               <option value="all">Todas las Categorías</option>
-              <option value="100">100% Pensión (24+ Años)</option>
-              <option value="75">75% Pensión (15-23 Años)</option>
+              <option value="100">100% Pensión (25+ Años)</option>
+              <option value="90-95">90% - 95% Pensión (23-24 Años)</option>
+              <option value="75-85">75% - 85% Pensión (20-22 Años)</option>
+              <option value="60-64">60% - 64% Pensión (10-19 Años)</option>
               <option value="INCAPACIDAD">Por Incapacidad (10+ Años)</option>
             </select>
           </div>
