@@ -140,4 +140,23 @@
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.2);
   }
+
+  @keyframes scanLaser {
+    0% {
+      top: 6%;
+      opacity: 0.3;
+    }
+    50% {
+      top: 92%;
+      opacity: 1;
+    }
+    100% {
+      top: 6%;
+      opacity: 0.3;
+    }
+  }
+
+  .animate-scan-laser {
+    animation: scanLaser 2.4s ease-in-out infinite;
+  }
 }
