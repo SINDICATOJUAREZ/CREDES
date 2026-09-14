@@ -1,8 +1,78 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { Member, CredentialConfig } from '@/types/member';
+import { Member, CredentialConfig, CredentialDesign } from '@/types/member';
 import QRCode from 'qrcode';
 import { toast } from 'sonner';
+
+/**
+ * Automatically find the matching back design ('reverso') for a given front design ('frente').
+ * Handles matching by name keywords ('anterior', 'nuevo', etc.), active status, or positional index.
+ */
+export function findMatchingBackDesign<T extends { id: string; name: string; section?: string; is_active?: boolean | number }>(
+  frontDesign: T | undefined | null,
+  designs: T[]
+): T | undefined {
+  if (!frontDesign || !Array.isArray(designs) || designs.length === 0) return undefined;
+
+  const backDesigns = designs.filter(d => d.section === 'reverso');
+  if (backDesigns.length === 0) return undefined;
+  if (backDesigns.length === 1) return backDesigns[0];
+
+  const clean = (name: string, isBack = false) => {
+    let s = (name || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    if (isBack) {
+      s = s.replace(/\b(reverso|trasero|atras|cara\s*2|dorso)\b/gi, '');
+    } else {
+      s = s.replace(/\b(frente|anverso|cara\s*1|frontal)\b/gi, '');
+    }
+    return s.replace(/[-_:]/g, ' ').trim();
+  };
+
+  const cleanFront = clean(frontDesign.name, false);
+
+  // 1. Exact match after removing section terms
+  if (cleanFront) {
+    const exact = backDesigns.find(b => clean(b.name, true) === cleanFront);
+    if (exact) return exact;
+  }
+
+  // 2. Substring / keyword inclusion
+  if (cleanFront) {
+    const subMatch = backDesigns.find(b => {
+      const cleanB = clean(b.name, true);
+      return cleanB && (cleanB.includes(cleanFront) || cleanFront.includes(cleanB));
+    });
+    if (subMatch) return subMatch;
+
+    const frontWords = cleanFront.split(/\s+/).filter(w => w.length >= 3 && !['del', 'los', 'las', 'por', 'con'].includes(w));
+    if (frontWords.length > 0) {
+      const wordMatch = backDesigns.find(b => {
+        const cleanB = clean(b.name, true);
+        return frontWords.some(w => cleanB.includes(w));
+      });
+      if (wordMatch) return wordMatch;
+    }
+  }
+
+  // 3. Active status match
+  if (frontDesign.is_active) {
+    const activeBack = backDesigns.find(b => b.is_active);
+    if (activeBack) return activeBack;
+  }
+
+  // 4. Index matching fallback
+  const frontDesigns = designs.filter(d => (d.section || 'frente') === 'frente');
+  const frontIdx = frontDesigns.findIndex(d => d.id === frontDesign.id);
+  if (frontIdx >= 0 && frontIdx < backDesigns.length) {
+    return backDesigns[frontIdx];
+  }
+
+  // 5. Fallback: active back or first available back
+  return backDesigns.find(b => b.is_active) || backDesigns[0];
+}
 
 const fetchImageAsBase64 = async (url: string): Promise<string> => {
   try {

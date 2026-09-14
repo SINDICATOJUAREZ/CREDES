@@ -12,7 +12,7 @@ import { motion } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCredentialConfig } from '@/hooks/useCredentialConfig';
 import { CredentialCard } from '@/components/credential/CredentialCard';
-import { generateCredentialPDF, generateVectorialCredentialPDF, mapDesignToConfig } from '@/lib/pdf-generator';
+import { generateCredentialPDF, generateVectorialCredentialPDF, mapDesignToConfig, findMatchingBackDesign } from '@/lib/pdf-generator';
 import { PhotoUploadDialog } from './PhotoUploadDialog';
 
 interface MemberFormProps {
@@ -42,7 +42,8 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
         const data = await res.json();
         if (Array.isArray(data)) {
           const front = data.find((d: any) => d.section === 'frente' && d.is_active);
-          const back = data.find((d: any) => d.section === 'reverso' && d.is_active);
+          const matchedBack = findMatchingBackDesign(front, data);
+          const back = matchedBack || data.find((d: any) => d.section === 'reverso' && d.is_active);
           
           if (front) {
             setActiveFrontConfig(mapDesignToConfig(front));

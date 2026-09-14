@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { Member, CredentialDesign } from '@/types/member';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { generateVectorialCredentialPDF, generateVectorialBatchCredentialsPDF, mapDesignToConfig } from '@/lib/pdf-generator';
+import { generateVectorialCredentialPDF, generateVectorialBatchCredentialsPDF, mapDesignToConfig, findMatchingBackDesign } from '@/lib/pdf-generator';
 import { toast } from 'sonner';
 import { Search, ArrowLeft, Printer, Eye, RefreshCw, Layers, QrCode, History, CheckSquare, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -60,23 +60,49 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
         if (Array.isArray(data)) {
           setDesigns(data);
           const activeFront = data.find(d => (d.section || 'frente') === 'frente' && d.is_active);
-          const activeBack = data.find(d => d.section === 'reverso' && d.is_active);
+          const firstFront = data.find(d => (d.section || 'frente') === 'frente');
+          const chosenFront = activeFront || firstFront;
           
-          if (activeFront) setSelectedFrontDesignId(activeFront.id);
-          else {
-            const firstFront = data.find(d => (d.section || 'frente') === 'frente');
-            if (firstFront) setSelectedFrontDesignId(firstFront.id);
-          }
-
-          if (activeBack) setSelectedBackDesignId(activeBack.id);
-          else {
-            const firstBack = data.find(d => d.section === 'reverso');
-            if (firstBack) setSelectedBackDesignId(firstBack.id);
+          if (chosenFront) {
+            setSelectedFrontDesignId(chosenFront.id);
+            const matchedBack = findMatchingBackDesign(chosenFront, data);
+            if (matchedBack) {
+              setSelectedBackDesignId(matchedBack.id);
+            } else {
+              const activeBack = data.find(d => d.section === 'reverso' && d.is_active);
+              const firstBack = data.find(d => d.section === 'reverso');
+              if (activeBack) setSelectedBackDesignId(activeBack.id);
+              else if (firstBack) setSelectedBackDesignId(firstBack.id);
+            }
           }
         }
       })
       .catch(err => console.error('Error cargando diseños:', err));
   }, []);
+
+  // Synchronized design selection: changes both front and back designs
+  const handleSelectDesign = (frontId: string) => {
+    setSelectedFrontDesignId(frontId);
+    const chosenFront = designs.find(d => d.id === frontId);
+    const matchedBack = findMatchingBackDesign(chosenFront, designs);
+    if (matchedBack) {
+      setSelectedBackDesignId(matchedBack.id);
+    }
+  };
+
+  // Helper to resolve currently active paired designs for printing
+  const getResolvedDesigns = () => {
+    const frontDesign = designs.find(d => d.id === selectedFrontDesignId) || designs.find(d => (d.section || 'frente') === 'frente');
+    let backDesign: CredentialDesign | null = null;
+    if (printMode === 'both') {
+      backDesign = findMatchingBackDesign(frontDesign, designs)
+        || (selectedBackDesignId ? designs.find(d => d.id === selectedBackDesignId) : null)
+        || designs.find(d => d.section === 'reverso' && d.is_active)
+        || designs.find(d => d.section === 'reverso')
+        || null;
+    }
+    return { frontDesign, backDesign };
+  };
 
   let fetchUrl = `/api/members?page=${page}&limit=50&search=${encodeURIComponent(debouncedSearch)}`;
   if (filterNomina) fetchUrl += `&employeeId=${encodeURIComponent(filterNomina)}`;
@@ -113,8 +139,7 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
 
     setIsPrinting(true);
     try {
-      const frontDesign = designs.find(d => d.id === selectedFrontDesignId) || designs.find(d => (d.section || 'frente') === 'frente');
-      const backDesign = printMode === 'both' ? (designs.find(d => d.id === selectedBackDesignId) || designs.find(d => d.section === 'reverso')) : null;
+      const { frontDesign, backDesign } = getResolvedDesigns();
 
       if (!frontDesign) {
         toast.error('No se encontró una plantilla de diseño de credencial');
@@ -146,8 +171,7 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
   const handlePrintMember = async (member: Member) => {
     setIsPrinting(true);
     try {
-      const frontDesign = designs.find(d => d.id === selectedFrontDesignId) || designs.find(d => (d.section || 'frente') === 'frente');
-      const backDesign = printMode === 'both' ? (designs.find(d => d.id === selectedBackDesignId) || designs.find(d => d.section === 'reverso')) : null;
+      const { frontDesign, backDesign } = getResolvedDesigns();
 
       if (!frontDesign) {
         toast.error('No se encontró una plantilla de diseño de credencial');
@@ -176,6 +200,7 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
   };
 
   const frontDesigns = designs.filter(d => (d.section || 'frente') === 'frente');
+  const { frontDesign: currentFrontDesign, backDesign: currentBackDesign } = getResolvedDesigns();
 
   return (
     <div className={inline ? "h-full flex flex-col bg-white min-h-0 w-full" : "min-h-screen bg-gray-50 flex flex-col"}>
@@ -260,12 +285,13 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
             </button>
           </div>
 
-          {/* Front Design Selector */}
+          {/* Design Selector (Applies to both faces) */}
           {frontDesigns.length > 1 && (
             <select
               value={selectedFrontDesignId}
-              onChange={(e) => setSelectedFrontDesignId(e.target.value)}
-              className="h-9 px-3 rounded-xl text-xs font-bold bg-white border border-emerald-200 text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              onChange={(e) => handleSelectDesign(e.target.value)}
+              className="h-9 px-3 rounded-xl text-xs font-bold bg-white border border-emerald-200 text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-sm"
+              title="Selecciona la plantilla que se aplicará a ambas caras de la credencial"
             >
               {frontDesigns.map(d => (
                 <option key={d.id} value={d.id}>Diseño: {d.name}</option>
@@ -542,6 +568,30 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
                   <h4 className="font-extrabold text-sm text-gray-900">{previewMember.fullName}</h4>
                   <p className="text-xs text-gray-500">Nómina: <span className="font-mono font-bold text-gray-700">{previewMember.employeeId}</span> | {previewMember.position || 'Sin puesto'}</p>
                 </div>
+              </div>
+
+              {/* Design Selector inside Modal */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100 text-xs font-bold">
+                <span className="text-gray-600 flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-emerald-600" />
+                  <span>Diseño Plantilla:</span>
+                </span>
+                {frontDesigns.length > 1 ? (
+                  <select
+                    value={selectedFrontDesignId}
+                    onChange={(e) => handleSelectDesign(e.target.value)}
+                    className="h-8 px-2.5 rounded-xl text-xs font-bold bg-white border border-emerald-200 text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer max-w-[220px]"
+                    title="Aplica a ambas caras de la credencial"
+                  >
+                    {frontDesigns.map(d => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="text-emerald-900 font-extrabold">
+                    {currentFrontDesign?.name || 'Estándar'}
+                  </span>
+                )}
               </div>
 
               {/* Print Modes Selector inside Modal */}
