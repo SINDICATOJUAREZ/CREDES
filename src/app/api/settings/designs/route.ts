@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { isProduction, sSelect, sInsert, sUpdate, sDelete } from '@/lib/supabase';
+import { hasPermission } from '@/lib/auth-utils';
 
 export async function GET() {
+  if (!await hasPermission('canAccessSettings') && !await hasPermission('canPrintCredentials')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     if (isProduction) {
       const designs = await sSelect('credential_designs', 'select=*,visual_elements(*)&order=is_active.desc,name');
@@ -19,11 +23,15 @@ export async function GET() {
     db.close();
     return NextResponse.json(designsWithElements);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Designs GET Error:', error);
+    return NextResponse.json({ error: 'Error al obtener diseños' }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
+  if (!await hasPermission('canAccessSettings')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const data = await request.json();
     const id = `design-${crypto.randomUUID().substring(0, 8)}`;
@@ -61,23 +69,30 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ success: true, id });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Designs POST Error:', error);
+    return NextResponse.json({ error: 'Error al crear diseño' }, { status: 500 });
   }
 }
 
 export async function PUT(request: Request) {
+  if (!await hasPermission('canAccessSettings')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const data = await request.json();
+    if (!data.id) return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
+    const safeId = encodeURIComponent(data.id);
+
     if (isProduction) {
       if (data.is_active) {
-        await sUpdate('credential_designs', `section=eq.${data.section || 'frente'}`, { is_active: 0 });
+        await sUpdate('credential_designs', `section=eq.${encodeURIComponent(data.section || 'frente')}`, { is_active: 0 });
       }
-      await sUpdate('credential_designs', `id=eq.${data.id}`, {
+      await sUpdate('credential_designs', `id=eq.${safeId}`, {
         name: data.name, section: data.section || 'frente', background_url: data.background_url || null,
         primary_color: data.primary_color || '#003366', secondary_color: data.secondary_color || '#EAB308',
         is_active: data.is_active ? 1 : 0, show_template: data.show_template ? 1 : 0,
       });
-      await sDelete('visual_elements', `design_id=eq.${data.id}`);
+      await sDelete('visual_elements', `design_id=eq.${safeId}`);
       if (data.elements?.length) {
         const elements = data.elements.map((el: any, i: number) => ({
           id: el.id || `ve-${crypto.randomUUID().substring(0, 8)}`, design_id: data.id,
@@ -108,18 +123,24 @@ export async function PUT(request: Request) {
     }
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Designs PUT Error:', error);
+    return NextResponse.json({ error: 'Error al actualizar diseño' }, { status: 500 });
   }
 }
 
 export async function DELETE(request: Request) {
+  if (!await hasPermission('canAccessSettings')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    if (!id) throw new Error('ID is required');
+    if (!id) return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
+    const safeId = encodeURIComponent(id);
+
     if (isProduction) {
-      await sDelete('visual_elements', `design_id=eq.${id}`);
-      await sDelete('credential_designs', `id=eq.${id}`);
+      await sDelete('visual_elements', `design_id=eq.${safeId}`);
+      await sDelete('credential_designs', `id=eq.${safeId}`);
     } else {
       const Database = (await import('better-sqlite3')).default;
       const path = await import('path');
@@ -130,6 +151,7 @@ export async function DELETE(request: Request) {
     }
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Designs DELETE Error:', error);
+    return NextResponse.json({ error: 'Error al eliminar diseño' }, { status: 500 });
   }
 }

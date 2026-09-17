@@ -3,9 +3,9 @@ import fs from 'fs';
 import path from 'path';
 import { isProduction, sUpdate } from '@/lib/supabase';
 import { hasPermission } from '@/lib/auth-utils';
+import { isSafePath, sanitizeFileName, validateImageUpload, isValidEmployeeId } from '@/lib/security-utils';
 
 const BASE_DIR = 'I:/APLICACIONES/SINDICATO/RECURSOS/FOTOS';
-
 
 function ensureLocalDir() {
   if (isProduction) return;
@@ -27,7 +27,7 @@ export async function GET() {
       try {
         const url = process.env.SUPABASE_URL;
         const key = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
-        
+
         const res = await fetch(`${url}/storage/v1/object/list/photos`, {
           method: 'POST',
           headers: {
@@ -39,8 +39,8 @@ export async function GET() {
             prefix: '',
             limit: 1000,
             offset: 0,
-            sortBy: { column: 'name', order: 'asc' }
-          })
+            sortBy: { column: 'name', order: 'asc' },
+          }),
         });
 
         if (res.ok) {
@@ -49,7 +49,7 @@ export async function GET() {
             name: item.name,
             url: `/api/photos/${encodeURIComponent(item.name)}`,
             size: item.metadata?.size || 0,
-            updatedAt: item.updated_at || new Date().toISOString()
+            updatedAt: item.updated_at || new Date().toISOString(),
           }));
 
           return NextResponse.json(photos);
@@ -62,24 +62,28 @@ export async function GET() {
 
     // Local listing fallback
     ensureLocalDir();
+    if (!fs.existsSync(BASE_DIR)) {
+      return NextResponse.json([]);
+    }
+
     const files = fs.readdirSync(BASE_DIR);
     const photos = files
-      .filter(file => /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(file))
-      .map(file => {
+      .filter((file) => /\.(jpg|jpeg|png|webp|bmp|gif)$/i.test(file))
+      .map((file) => {
         const filePath = path.join(BASE_DIR, file);
         const stat = fs.statSync(filePath);
         return {
           name: file,
           url: `/api/photos/${encodeURIComponent(file)}`,
           size: stat.size,
-          updatedAt: stat.mtime.toISOString()
+          updatedAt: stat.mtime.toISOString(),
         };
       });
 
     return NextResponse.json(photos);
   } catch (error: any) {
     console.error('GET Photos API Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al consultar fotografías' }, { status: 500 });
   }
 }
 
@@ -89,23 +93,43 @@ export async function POST(request: NextRequest) {
   }
   try {
     const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const employeeId = formData.get('employeeId') as string;
+    const file = formData.get('file') as File | null;
+    const rawEmployeeId = formData.get('employeeId') as string | null;
 
     if (!file) {
       return NextResponse.json({ error: 'Archivo no proporcionado.' }, { status: 400 });
     }
 
-    // Determine target filename
-    let fileName = file.name;
-    if (employeeId) {
-      const ext = path.extname(file.name) || '.jpg';
-      fileName = `${employeeId}${ext}`;
+    // Validate employee ID if provided
+    let cleanEmployeeId = '';
+    if (rawEmployeeId) {
+      if (!isValidEmployeeId(rawEmployeeId)) {
+        return NextResponse.json({ error: 'Número de nómina inválido.' }, { status: 400 });
+      }
+      cleanEmployeeId = rawEmployeeId.trim();
     }
 
-    // Convert file to Buffer
+    // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+
+    // Validate image format, mime type and maximum size (10 MB)
+    const validation = validateImageUpload(file.name, file.type, buffer.byteLength, 10 * 1024 * 1024);
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    // Determine target safe filename
+    let fileName = sanitizeFileName(file.name);
+    if (cleanEmployeeId) {
+      const ext = path.extname(fileName).toLowerCase() || '.jpg';
+      fileName = `${cleanEmployeeId}${ext}`;
+    }
+
+    // Validate path safety
+    if (!isSafePath(BASE_DIR, fileName)) {
+      return NextResponse.json({ error: 'Nombre de archivo inválido.' }, { status: 400 });
+    }
 
     let publicUrl = `/api/photos/${encodeURIComponent(fileName)}`;
 
@@ -119,9 +143,9 @@ export async function POST(request: NextRequest) {
           'Authorization': `Bearer ${key}`,
           'apikey': key || '',
           'Content-Type': file.type || 'image/jpeg',
-          'x-upsert': 'true'
+          'x-upsert': 'true',
         },
-        body: buffer
+        body: buffer,
       });
 
       if (!res.ok) {
@@ -133,16 +157,19 @@ export async function POST(request: NextRequest) {
     } else {
       // Save locally only for local development
       ensureLocalDir();
-      const localPath = path.join(BASE_DIR, fileName);
+      const localPath = path.resolve(BASE_DIR, fileName);
+      if (!isSafePath(BASE_DIR, fileName)) {
+        return NextResponse.json({ error: 'Ruta no permitida' }, { status: 403 });
+      }
       fs.writeFileSync(localPath, buffer);
     }
 
     // Synchronize photo URL with Database for the corresponding member
-    const memberIdMatch = fileName.match(/^(\d+)/);
+    const memberIdMatch = fileName.match(/^([a-zA-Z0-9_-]+)\./);
     if (memberIdMatch) {
       const empId = memberIdMatch[1];
       if (isProduction) {
-        await sUpdate('members', `employee_id=eq.${empId}`, { photo_url: publicUrl });
+        await sUpdate('members', `employee_id=eq.${encodeURIComponent(empId)}`, { photo_url: publicUrl });
       } else {
         const Database = (await import('better-sqlite3')).default;
         const db = new Database(path.join(process.cwd(), 'database.sqlite'));
@@ -154,7 +181,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, name: fileName, url: publicUrl });
   } catch (error: any) {
     console.error('POST Photos API Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al subir la fotografía' }, { status: 500 });
   }
 }
 
@@ -164,16 +191,21 @@ export async function DELETE(request: NextRequest) {
   }
   try {
     const { searchParams } = new URL(request.url);
-    const name = searchParams.get('name');
+    const rawName = searchParams.get('name');
 
-    if (!name) {
+    if (!rawName) {
       return NextResponse.json({ error: 'Nombre de fotografía requerido.' }, { status: 400 });
     }
 
-    // Delete local file
+    const safeName = sanitizeFileName(rawName);
+    if (!isSafePath(BASE_DIR, safeName)) {
+      return NextResponse.json({ error: 'Nombre de archivo inválido.' }, { status: 400 });
+    }
+
+    // Delete local file safely
     if (!isProduction) {
-      const localPath = path.join(BASE_DIR, name);
-      if (fs.existsSync(localPath)) {
+      const localPath = path.resolve(BASE_DIR, safeName);
+      if (isSafePath(BASE_DIR, safeName) && fs.existsSync(localPath)) {
         fs.unlinkSync(localPath);
       }
     }
@@ -189,7 +221,7 @@ export async function DELETE(request: NextRequest) {
           'apikey': key || '',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prefixes: [name] })
+        body: JSON.stringify({ prefixes: [safeName] }),
       });
 
       if (!res.ok) {
@@ -199,11 +231,11 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Remove photo reference in database
-    const memberIdMatch = name.match(/^(\d+)/);
+    const memberIdMatch = safeName.match(/^([a-zA-Z0-9_-]+)\./);
     if (memberIdMatch) {
       const empId = memberIdMatch[1];
       if (isProduction) {
-        await sUpdate('members', `employee_id=eq.${empId}`, { photo_url: null });
+        await sUpdate('members', `employee_id=eq.${encodeURIComponent(empId)}`, { photo_url: null });
       } else {
         const Database = (await import('better-sqlite3')).default;
         const db = new Database(path.join(process.cwd(), 'database.sqlite'));
@@ -215,6 +247,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('DELETE Photos API Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al eliminar la fotografía' }, { status: 500 });
   }
 }

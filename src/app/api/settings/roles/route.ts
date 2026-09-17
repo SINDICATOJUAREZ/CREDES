@@ -36,7 +36,8 @@ export async function GET() {
     db.close();
     return NextResponse.json(rolesWithCounts);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Roles GET Error:', error);
+    return NextResponse.json({ error: 'Error al obtener roles' }, { status: 500 });
   }
 }
 
@@ -46,12 +47,17 @@ export async function POST(request: Request) {
   }
   try {
     const data = await request.json();
+    const roleName = typeof data.name === 'string' ? data.name.trim() : '';
+    if (!roleName) {
+      return NextResponse.json({ error: 'El nombre del rol es obligatorio' }, { status: 400 });
+    }
+
     const id = `role-${crypto.randomUUID().substring(0, 8)}`;
     if (isProduction) {
       const payload: any = { 
         id, 
-        name: data.name, 
-        description: data.description, 
+        name: roleName, 
+        description: data.description || '', 
         can_create_member: data.can_create_member ? 1 : 0, 
         can_search_member: data.can_search_member ? 1 : 0, 
         can_print_credentials: data.can_print_credentials ? 1 : 0, 
@@ -76,12 +82,13 @@ export async function POST(request: Request) {
       const Database = (await import('better-sqlite3')).default;
       const path = await import('path');
       const db = new Database(path.join(process.cwd(), 'database.sqlite'));
-      db.prepare('INSERT INTO roles (id, name, description, can_create_member, can_search_member, can_print_credentials, can_view_reports, can_view_birthdays, can_view_member_reports, can_view_complaints, can_view_pensioners, can_access_settings) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(id, data.name, data.description, data.can_create_member ? 1 : 0, data.can_search_member ? 1 : 0, data.can_print_credentials ? 1 : 0, data.can_view_reports ? 1 : 0, data.can_view_birthdays ? 1 : 0, data.can_view_member_reports ? 1 : 0, data.can_view_complaints ? 1 : 0, data.can_view_pensioners ? 1 : 0, data.can_access_settings ? 1 : 0);
+      db.prepare('INSERT INTO roles (id, name, description, can_create_member, can_search_member, can_print_credentials, can_view_reports, can_view_birthdays, can_view_member_reports, can_view_complaints, can_view_pensioners, can_access_settings) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(id, roleName, data.description || '', data.can_create_member ? 1 : 0, data.can_search_member ? 1 : 0, data.can_print_credentials ? 1 : 0, data.can_view_reports ? 1 : 0, data.can_view_birthdays ? 1 : 0, data.can_view_member_reports ? 1 : 0, data.can_view_complaints ? 1 : 0, data.can_view_pensioners ? 1 : 0, data.can_access_settings ? 1 : 0);
       db.close();
     }
     return NextResponse.json({ success: true, id });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Roles POST Error:', error);
+    return NextResponse.json({ error: 'Error al crear rol' }, { status: 500 });
   }
 }
 
@@ -91,6 +98,9 @@ export async function PUT(request: Request) {
   }
   try {
     const data = await request.json();
+    if (!data.id) return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
+    const safeId = encodeURIComponent(data.id);
+
     if (isProduction) {
       const payload: any = { 
         name: data.name, 
@@ -106,11 +116,11 @@ export async function PUT(request: Request) {
         can_access_settings: data.can_access_settings ? 1 : 0 
       };
       try {
-        await sUpdate('roles', `id=eq.${data.id}`, payload);
+        await sUpdate('roles', `id=eq.${safeId}`, payload);
       } catch (err: any) {
         if (err.message && err.message.includes('can_print_credentials')) {
           delete payload.can_print_credentials;
-          await sUpdate('roles', `id=eq.${data.id}`, payload);
+          await sUpdate('roles', `id=eq.${safeId}`, payload);
         } else {
           throw err;
         }
@@ -124,7 +134,8 @@ export async function PUT(request: Request) {
     }
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Roles PUT Error:', error);
+    return NextResponse.json({ error: 'Error al actualizar rol' }, { status: 500 });
   }
 }
 
@@ -135,11 +146,19 @@ export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    if (!id) throw new Error('ID is required');
+    if (!id) return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
+
+    // Protect MASTER role
+    if (id === 'role-master' || id.toLowerCase().includes('master')) {
+      return NextResponse.json({ error: 'No es posible eliminar el rol MASTER del sistema' }, { status: 400 });
+    }
+
+    const safeId = encodeURIComponent(id);
+
     if (isProduction) {
-      const usersWithRole = await sSelect('users', `select=id&role_id=eq.${id}&limit=1`);
+      const usersWithRole = await sSelect('users', `select=id&role_id=eq.${safeId}&limit=1`);
       if (usersWithRole.length > 0) return NextResponse.json({ error: 'No se puede eliminar un rol con usuarios asignados' }, { status: 400 });
-      await sDelete('roles', `id=eq.${id}`);
+      await sDelete('roles', `id=eq.${safeId}`);
     } else {
       const Database = (await import('better-sqlite3')).default;
       const path = await import('path');
@@ -151,6 +170,7 @@ export async function DELETE(request: Request) {
     }
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Roles DELETE Error:', error);
+    return NextResponse.json({ error: 'Error al eliminar rol' }, { status: 500 });
   }
 }

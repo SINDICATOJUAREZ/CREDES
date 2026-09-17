@@ -67,13 +67,13 @@ export async function GET(request: Request) {
         query += `&status=neq.BAJA`;
       }
       if (memberType) {
-        query += `&member_type=eq.${memberType}`;
+        query += `&member_type=eq.${encodeURIComponent(memberType)}`;
       }
       if (status) {
         if (status === 'PENSIONADO') {
           query += `&status=in.(BAJA,INCAPACITADO)`;
         } else {
-          query += `&status=eq.${status}`;
+          query += `&status=eq.${encodeURIComponent(status)}`;
         }
       }
       if (employeeId) {
@@ -94,7 +94,8 @@ export async function GET(request: Request) {
       const ids = members.map((m: any) => m.id);
       let familyMap: Record<string, any[]> = {};
       if (ids.length > 0) {
-        const family = await sSelect('family_members', `member_id=in.(${ids.join(',')})`);
+        const safeIds = ids.map(encodeURIComponent).join(',');
+        const family = await sSelect('family_members', `member_id=in.(${safeIds})`);
         for (const f of family) {
           if (!familyMap[f.member_id]) familyMap[f.member_id] = [];
           familyMap[f.member_id].push({ id: f.id, fullName: f.full_name, relationship: f.relationship, age: f.age });
@@ -266,7 +267,8 @@ export async function PUT(request: Request) {
   }
   try {
     const data = await request.json();
-    if (!data.id) throw new Error('ID is required');
+    if (!data.id) return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
+    const safeId = encodeURIComponent(data.id);
 
     if (isProduction) {
       const { id, family, ...rest } = data;
@@ -274,11 +276,11 @@ export async function PUT(request: Request) {
       for (const [dbKey, fsKey] of Object.entries(MEMBER_MAPPING)) {
         if (rest[fsKey as string] !== undefined) dbData[dbKey] = rest[fsKey as string];
       }
-      await sUpdate('members', `id=eq.${id}`, dbData);
-      await sDelete('family_members', `member_id=eq.${id}`);
+      await sUpdate('members', `id=eq.${safeId}`, dbData);
+      await sDelete('family_members', `member_id=eq.${safeId}`);
       if (family && Array.isArray(family)) {
         const familyRows = family.map((f: any) => ({
-          id: f.id || crypto.randomUUID(), member_id: id,
+          id: f.id || crypto.randomUUID(), member_id: data.id,
           full_name: f.fullName, relationship: f.relationship, age: f.age,
         }));
         if (familyRows.length) await sInsert('family_members', familyRows);
@@ -304,7 +306,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('PUT Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al actualizar agremiado' }, { status: 500 });
   }
 }
 
@@ -315,10 +317,11 @@ export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    if (!id) throw new Error('ID is required');
+    if (!id) return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
+    const safeId = encodeURIComponent(id);
 
     if (isProduction) {
-      await sDelete('members', `id=eq.${id}`);
+      await sDelete('members', `id=eq.${safeId}`);
     } else {
       const Database = (await import('better-sqlite3')).default;
       const path = await import('path');
@@ -330,6 +333,6 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('DELETE Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al eliminar agremiado' }, { status: 500 });
   }
 }

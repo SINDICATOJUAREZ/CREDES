@@ -151,13 +151,15 @@ export async function GET(request: Request) {
       if (action === 'eventAttendees') {
         const eventId = searchParams.get('eventId');
         if (!eventId) return NextResponse.json({ error: 'Se requiere eventId' }, { status: 400 });
-        const event = await sSelectOne('events', `id=eq.${eventId}`);
-        const attendance = await sSelect('member_attendance', `event_id=eq.${eventId}&order=created_at.desc`);
+        const safeEventId = encodeURIComponent(eventId);
+        const event = await sSelectOne('events', `id=eq.${safeEventId}`);
+        const attendance = await sSelect('member_attendance', `event_id=eq.${safeEventId}&order=created_at.desc`);
         // Get member info for attendees
         const empIds = attendance.map((a: any) => a.employee_id);
         let membersMap: Record<string, any> = {};
         if (empIds.length > 0) {
-          const members = await sSelect('members', `select=employee_id,full_name,member_type,status,department,photo_url&employee_id=in.(${empIds.join(',')})`);
+          const safeEmpIds = empIds.map(encodeURIComponent).join(',');
+          const members = await sSelect('members', `select=employee_id,full_name,member_type,status,department,photo_url&employee_id=in.(${safeEmpIds})`);
           for (const m of members) membersMap[m.employee_id] = m;
         }
         const attendees = attendance.map((a: any) => {
@@ -272,7 +274,7 @@ export async function GET(request: Request) {
     });
   } catch (error: any) {
     console.error('Attendance API Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al obtener datos de asistencia' }, { status: 500 });
   }
 }
 
@@ -290,23 +292,27 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: true, id, name: data.name, date: data.date });
       }
       if (data.action === 'addAttendance') {
-        const existing = await sSelectOne('member_attendance', `event_id=eq.${data.eventId}&employee_id=eq.${encodeURIComponent(data.employeeId)}`);
+        const safeEventId = encodeURIComponent(data.eventId || '');
+        const safeEmployeeId = encodeURIComponent(data.employeeId || '');
+        const existing = await sSelectOne('member_attendance', `event_id=eq.${safeEventId}&employee_id=eq.${safeEmployeeId}`);
         if (existing) {
-          const member = await sSelectOne('members', `employee_id=eq.${encodeURIComponent(data.employeeId)}`);
+          const member = await sSelectOne('members', `employee_id=eq.${safeEmployeeId}`);
           return NextResponse.json({ success: false, duplicate: true, member: member ? { fullName: member.full_name, memberType: member.member_type, status: member.status, photoUrl: member.photo_url } : null });
         }
         await sInsert('member_attendance', { id: crypto.randomUUID(), employee_id: data.employeeId, event_id: data.eventId });
-        const member = await sSelectOne('members', `employee_id=eq.${encodeURIComponent(data.employeeId)}`);
-        const countArr = await sSelect('member_attendance', `select=id&event_id=eq.${data.eventId}`);
+        const member = await sSelectOne('members', `employee_id=eq.${safeEmployeeId}`);
+        const countArr = await sSelect('member_attendance', `select=id&event_id=eq.${safeEventId}`);
         return NextResponse.json({ success: true, member: member ? { fullName: member.full_name, memberType: member.member_type, status: member.status, photoUrl: member.photo_url, department: member.department } : null, totalAttendees: countArr.length });
       }
       if (data.action === 'deleteEvent') {
-        await sDelete('member_attendance', `event_id=eq.${data.eventId}`);
-        await sDelete('events', `id=eq.${data.eventId}`);
+        const safeEventId = encodeURIComponent(data.eventId || '');
+        await sDelete('member_attendance', `event_id=eq.${safeEventId}`);
+        await sDelete('events', `id=eq.${safeEventId}`);
         return NextResponse.json({ success: true });
       }
       if (data.action === 'renameEvent') {
-        await sUpdate('events', `id=eq.${data.eventId}`, { name: data.name });
+        const safeEventId = encodeURIComponent(data.eventId || '');
+        await sUpdate('events', `id=eq.${safeEventId}`, { name: data.name });
         return NextResponse.json({ success: true, name: data.name });
       }
       return NextResponse.json({ error: 'Acción no válida' }, { status: 400 });
@@ -351,6 +357,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Acción no válida' }, { status: 400 });
   } catch (error: any) {
     console.error('Attendance POST Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al procesar la solicitud de asistencia' }, { status: 500 });
   }
 }

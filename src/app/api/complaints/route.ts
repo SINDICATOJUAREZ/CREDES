@@ -49,7 +49,8 @@ export async function GET(request: Request) {
         if (empIds.length > 0) {
           // Get member details for each complaint
           const uniqueEmpIds = Array.from(new Set(empIds));
-          const members = await sSelect('members', `select=employee_id,full_name,department,status&employee_id=in.(${uniqueEmpIds.join(',')})`);
+          const safeEmpIds = uniqueEmpIds.map(encodeURIComponent).join(',');
+          const members = await sSelect('members', `select=employee_id,full_name,department,status&employee_id=in.(${safeEmpIds})`);
           for (const m of members) {
             membersMap[m.employee_id] = m;
           }
@@ -95,7 +96,7 @@ export async function GET(request: Request) {
     }
   } catch (error: any) {
     console.error('Complaints GET Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al consultar quejas' }, { status: 500 });
   }
 }
 
@@ -120,7 +121,8 @@ export async function POST(request: Request) {
     if (isProduction) {
       if (id) {
         // Update
-        await sUpdate('member_complaints', `id=eq.${id}`, {
+        const safeId = encodeURIComponent(id);
+        await sUpdate('member_complaints', `id=eq.${safeId}`, {
           report_date: reportDate,
           description,
           follow_up: followUp
@@ -160,7 +162,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, id: complaintId });
   } catch (error: any) {
     console.error('Complaints POST Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al guardar la queja' }, { status: 500 });
   }
 }
 
@@ -175,10 +177,13 @@ export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    if (!id) throw new Error('ID is required');
+    if (!id) {
+      return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
+    }
 
     if (isProduction) {
-      await sDelete('member_complaints', `id=eq.${id}`);
+      const safeId = encodeURIComponent(id);
+      await sDelete('member_complaints', `id=eq.${safeId}`);
     } else {
       const db = await initSQLiteTable();
       db.prepare('DELETE FROM member_complaints WHERE id = ?').run(id);
@@ -188,6 +193,6 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Complaints DELETE Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al eliminar la queja' }, { status: 500 });
   }
 }

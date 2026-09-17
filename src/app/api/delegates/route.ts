@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { DELEGATE_MAPPING, mapToFrontend, generateInsert, generateUpdate } from '@/lib/db-utils';
-import { isProduction, sSelect, sSelectOne, sInsert, sUpdate, sDelete } from '@/lib/supabase';
+import { isProduction, sSelect, sInsert, sUpdate, sDelete } from '@/lib/supabase';
+import { getSessionUser, hasPermission } from '@/lib/auth-utils';
 
 export async function GET() {
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  }
+
   try {
     if (isProduction) {
       const delegates = await sSelect('delegates', 'order=full_name.asc');
@@ -17,11 +23,15 @@ export async function GET() {
     return NextResponse.json(delegates.map((d: any) => mapToFrontend(d, DELEGATE_MAPPING)));
   } catch (error: any) {
     console.error('Delegates API Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al consultar delegados' }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
+  if (!await hasPermission('canCreateMember') && !await hasPermission('canAccessSettings')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
+
   try {
     const data = await request.json();
     const id = data.id || crypto.randomUUID();
@@ -44,14 +54,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, id });
   } catch (error: any) {
     console.error('Delegates POST Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al registrar delegado' }, { status: 500 });
   }
 }
 
 export async function PUT(request: Request) {
+  if (!await hasPermission('canCreateMember') && !await hasPermission('canAccessSettings')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
+
   try {
     const data = await request.json();
-    if (!data.id) throw new Error('ID is required');
+    if (!data.id) return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
+    const safeId = encodeURIComponent(data.id);
 
     if (isProduction) {
       const { id, ...rest } = data;
@@ -59,7 +74,7 @@ export async function PUT(request: Request) {
       for (const [dbKey, fsKey] of Object.entries(DELEGATE_MAPPING)) {
         if (rest[fsKey as string] !== undefined) dbData[dbKey] = rest[fsKey as string];
       }
-      await sUpdate('delegates', `id=eq.${id}`, dbData);
+      await sUpdate('delegates', `id=eq.${safeId}`, dbData);
     } else {
       const Database = (await import('better-sqlite3')).default;
       const path = await import('path');
@@ -71,22 +86,27 @@ export async function PUT(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Delegates PUT Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al actualizar delegado' }, { status: 500 });
   }
 }
 
 export async function DELETE(request: Request) {
+  if (!await hasPermission('canCreateMember') && !await hasPermission('canAccessSettings')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    if (!id) throw new Error('ID is required');
+    if (!id) return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
+    const safeId = encodeURIComponent(id);
 
     if (isProduction) {
-      const linked = await sSelect('members', `select=id&delegate_id=eq.${id}&limit=1`);
+      const linked = await sSelect('members', `select=id&delegate_id=eq.${safeId}&limit=1`);
       if (linked.length > 0) {
         return NextResponse.json({ error: 'No se puede eliminar: hay agremiados vinculados a este delegado.' }, { status: 400 });
       }
-      await sDelete('delegates', `id=eq.${id}`);
+      await sDelete('delegates', `id=eq.${safeId}`);
     } else {
       const Database = (await import('better-sqlite3')).default;
       const path = await import('path');
@@ -102,6 +122,6 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Delegates DELETE Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al eliminar delegado' }, { status: 500 });
   }
 }
