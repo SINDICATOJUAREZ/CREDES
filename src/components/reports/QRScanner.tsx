@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Camera, Zap, ZapOff, X, SwitchCamera, Focus, Sparkles } from 'lucide-react';
 import jsQR from 'jsqr';
+import { useBackHandler } from '@/hooks/useBackHandler';
 
 interface Props {
   onScan: (text: string) => void;
@@ -16,6 +17,11 @@ interface FocusPoint {
 }
 
 export function QRScanner({ onScan, onClose }: Props) {
+  useBackHandler({
+    enabled: true,
+    onBack: onClose
+  });
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);

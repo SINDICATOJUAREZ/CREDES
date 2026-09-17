@@ -6,9 +6,17 @@ import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
+import { useBackHandler } from "@/hooks/useBackHandler"
 
-function Dialog({ ...props }: DialogPrimitive.Root.Props) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+function Dialog({ open, onOpenChange, ...props }: DialogPrimitive.Root.Props) {
+  useBackHandler({
+    enabled: !!open,
+    onBack: () => {
+      (onOpenChange as any)?.(false);
+    }
+  });
+
+  return <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} data-slot="dialog" {...props} />
 }
 
 function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {

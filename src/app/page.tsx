@@ -17,8 +17,10 @@ import { PrintDirectoryPanel } from '@/components/members/PrintDirectoryPanel';
 import { AttendanceReportsDialog } from '@/components/reports/AttendanceReportsDialog';
 import { MemberReportsPanel } from '@/components/reports/MemberReportsPanel';
 import { PensionersDialog } from '@/components/reports/PensionersDialog';
+import { useRootBackGuard } from '@/hooks/useBackHandler';
 
 export default function Home() {
+  useRootBackGuard();
   const router = useRouter();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);

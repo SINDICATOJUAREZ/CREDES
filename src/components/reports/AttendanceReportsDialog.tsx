@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { QRScanner } from './QRScanner';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
+import { useBackHandler } from '@/hooks/useBackHandler';
 
 interface Props { isOpen?: boolean; onClose?: () => void; initialTab?: TabType; inline?: boolean; onlyShowBirthdays?: boolean; }
 type TabType = 'busqueda' | 'cumpleanos' | 'asistencia' | 'top20';
@@ -109,6 +110,40 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
   const [top20Search, setTop20Search] = useState('');
   const [top20TypeFilter, setTop20TypeFilter] = useState('ALL');
   const [top20SubTab, setTop20SubTab] = useState<'general' | 'espera'>('general');
+
+  // Back button navigation for mobile sub-screens
+  useBackHandler({
+    enabled: showComplaintForm,
+    onBack: () => setShowComplaintForm(false)
+  });
+
+  useBackHandler({
+    enabled: !!captureEvent,
+    onBack: () => {
+      setCaptureEvent(null);
+      setSearchingMember(null);
+    }
+  });
+
+  useBackHandler({
+    enabled: !!viewEvent,
+    onBack: () => setViewEvent(null)
+  });
+
+  useBackHandler({
+    enabled: !!selMember,
+    onBack: () => setSelMember(null)
+  });
+
+  useBackHandler({
+    enabled: showNewEvt,
+    onBack: () => setShowNewEvt(false)
+  });
+
+  useBackHandler({
+    enabled: !!editingEventId,
+    onBack: () => setEditingEventId(null)
+  });
 
   useEffect(() => { 
     if ((isOpen || inline) && tab === 'top20') {
