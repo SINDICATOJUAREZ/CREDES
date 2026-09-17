@@ -22,6 +22,8 @@ export function QRScanner({ onScan, onClose }: Props) {
   const streamRef = useRef<MediaStream | null>(null);
   const scanLoopRef = useRef<number | null>(null);
   const isScanningPausedRef = useRef<boolean>(false);
+  const isStartingRef = useRef<boolean>(false);
+  const camerasRef = useRef<MediaDeviceInfo[]>([]);
 
   // States
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
@@ -102,57 +104,58 @@ export function QRScanner({ onScan, onClose }: Props) {
     }, 350);
   }, [onScan, onClose, playScanBeep, triggerHaptic, stopStream]);
 
-  // Load available camera devices
-  const enumerateCameras = useCallback(async () => {
-    try {
-      if (!navigator.mediaDevices?.enumerateDevices) return;
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter((d) => d.kind === 'videoinput');
-
-      // Sort prioritizing back-facing cameras
-      const sorted = [...videoDevices].sort((a, b) => {
-        const aLabel = a.label.toLowerCase();
-        const bLabel = b.label.toLowerCase();
-        const aIsBack = aLabel.includes('back') || aLabel.includes('rear') || aLabel.includes('trasera') || aLabel.includes('environment');
-        const bIsBack = bLabel.includes('back') || bLabel.includes('rear') || bLabel.includes('trasera') || bLabel.includes('environment');
-        if (aIsBack && !bIsBack) return -1;
-        if (!aIsBack && bIsBack) return 1;
-        return 0;
-      });
-
-      setCameras(sorted);
-    } catch (err) {
-      console.warn('Could not enumerate cameras:', err);
-    }
-  }, []);
-
-  // Start camera stream with optimal focus constraints
-  const startCamera = useCallback(async (deviceIndex: number) => {
-    stopStream();
+  // Start camera stream safely without race conditions
+  const startCamera = useCallback(async (targetDeviceId?: string) => {
+    if (isStartingRef.current) return;
+    isStartingRef.current = true;
     setCameraError(null);
     setIsTorchOn(false);
 
     try {
-      const selectedDevice = cameras[deviceIndex];
+      // Clean up previous stream tracks
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => {
+          try {
+            t.stop();
+          } catch {
+            // Ignored
+          }
+        });
+        streamRef.current = null;
+      }
+
+      // Prepare constraints: first attempt ideal resolution and environment camera
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const videoConstraints: any = {
         width: { ideal: 1920, min: 1280 },
         height: { ideal: 1080, min: 720 },
       };
 
-      if (selectedDevice?.deviceId) {
-        videoConstraints.deviceId = { exact: selectedDevice.deviceId };
+      if (targetDeviceId) {
+        videoConstraints.deviceId = { exact: targetDeviceId };
       } else {
         videoConstraints.facingMode = { ideal: 'environment' };
       }
 
-      // Add continuous autofocus constraint for supported hardware
-      videoConstraints.advanced = [{ focusMode: 'continuous' }];
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: videoConstraints,
-      });
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: videoConstraints,
+        });
+      } catch (firstErr: unknown) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const errAny = firstErr as any;
+        if (errAny?.name === 'NotAllowedError' || errAny?.name === 'PermissionDeniedError') {
+          throw firstErr;
+        }
+        console.warn('High-res constraints failed, retrying with fallback constraints:', firstErr);
+        // Fallback with basic constraints
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { facingMode: 'environment' },
+        });
+      }
 
       streamRef.current = stream;
 
@@ -162,14 +165,17 @@ export function QRScanner({ onScan, onClose }: Props) {
         await videoRef.current.play();
       }
 
-      // Read capabilities of active video track
+      // Successfully running, clear any error
+      setCameraError(null);
+
+      // Now configure capabilities on the active track
       const track = stream.getVideoTracks()[0];
       if (track) {
-        // Enforce continuous autofocus if supported
         const getCaps = track.getCapabilities ? track.getCapabilities() : null;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const caps = getCaps as any;
 
+        // Apply continuous autofocus constraint safely
         if (caps?.focusMode?.includes('continuous')) {
           try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -197,11 +203,42 @@ export function QRScanner({ onScan, onClose }: Props) {
           setZoomRange(null);
         }
       }
+
+      // Now that camera permission is granted and active, enumerate devices safely
+      try {
+        if (navigator.mediaDevices?.enumerateDevices) {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = devices.filter((d) => d.kind === 'videoinput');
+
+          const sorted = [...videoDevices].sort((a, b) => {
+            const aLabel = a.label.toLowerCase();
+            const bLabel = b.label.toLowerCase();
+            const aIsBack = aLabel.includes('back') || aLabel.includes('rear') || aLabel.includes('trasera') || aLabel.includes('environment');
+            const bIsBack = bLabel.includes('back') || bLabel.includes('rear') || bLabel.includes('trasera') || bLabel.includes('environment');
+            if (aIsBack && !bIsBack) return -1;
+            if (!aIsBack && bIsBack) return 1;
+            return 0;
+          });
+
+          camerasRef.current = sorted;
+          setCameras(sorted);
+        }
+      } catch (enumErr) {
+        console.warn('Could not enumerate cameras after stream start:', enumErr);
+      }
     } catch (err: unknown) {
       console.error('Error opening camera:', err);
-      setCameraError('No se pudo acceder a la cámara. Revisa los permisos en tu navegador.');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const errAny = err as any;
+      if (errAny?.name === 'NotAllowedError' || errAny?.name === 'PermissionDeniedError') {
+        setCameraError('Permiso de cámara denegado. Permite el acceso a la cámara en la configuración de tu navegador.');
+      } else {
+        setCameraError('No se pudo iniciar el video de la cámara. Pulsa Reintentar Conexión.');
+      }
+    } finally {
+      isStartingRef.current = false;
     }
-  }, [cameras, stopStream]);
+  }, []);
 
   // Handle Tap to Focus
   const handleTapToFocus = async (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
@@ -310,26 +347,26 @@ export function QRScanner({ onScan, onClose }: Props) {
     }
   };
 
-  // Switch to next available camera
+  // Switch to next available camera safely
   const switchCamera = () => {
-    if (cameras.length <= 1) return;
-    const nextIdx = (selectedCameraIndex + 1) % cameras.length;
+    const list = camerasRef.current.length > 0 ? camerasRef.current : cameras;
+    if (list.length <= 1) return;
+    const nextIdx = (selectedCameraIndex + 1) % list.length;
     setSelectedCameraIndex(nextIdx);
+    const nextDevice = list[nextIdx];
+    if (nextDevice?.deviceId) {
+      startCamera(nextDevice.deviceId);
+    }
     triggerHaptic(30);
   };
 
-  // Initialize camera list on mount
+  // Start camera only once on component mount
   useEffect(() => {
-    enumerateCameras();
-  }, [enumerateCameras]);
-
-  // Start selected camera
-  useEffect(() => {
-    startCamera(selectedCameraIndex);
+    startCamera();
     return () => {
       stopStream();
     };
-  }, [selectedCameraIndex, startCamera, stopStream]);
+  }, [startCamera, stopStream]);
 
   // High-performance scanning loop: native BarcodeDetector with jsQR fallback
   useEffect(() => {
@@ -482,10 +519,12 @@ export function QRScanner({ onScan, onClose }: Props) {
               <div className="w-12 h-12 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mb-3">
                 <Camera className="w-6 h-6" />
               </div>
-              <p className="text-sm font-bold text-white mb-2">Permiso de Cámara Requerido</p>
+              <p className="text-sm font-bold text-white mb-2">
+                {cameraError.includes('denegado') ? 'Permiso de Cámara Requerido' : 'Error al Iniciar Cámara'}
+              </p>
               <p className="text-xs text-neutral-400 leading-relaxed mb-4">{cameraError}</p>
               <button
-                onClick={() => startCamera(selectedCameraIndex)}
+                onClick={() => startCamera()}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg transition-colors"
               >
                 Reintentar Conexión
