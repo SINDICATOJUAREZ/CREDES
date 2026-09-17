@@ -228,7 +228,7 @@ export default function Home() {
               </div>
               <div className="text-left">
                 <p className="text-xs font-semibold text-gray-400">{getGreeting()},</p>
-                <h2 className="text-lg font-black text-gray-800 uppercase tracking-tight">{user.fullName}</h2>
+                <h2 className="text-lg font-black text-gray-800 uppercase tracking-tight notranslate" translate="no">{user.fullName}</h2>
               </div>
             </div>
             
