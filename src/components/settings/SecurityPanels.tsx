@@ -32,7 +32,12 @@ export const UsersPanel: React.FC = () => {
 
   const handleSave = async (user: SystemUser) => {
     const method = isCreating ? 'POST' : 'PUT';
-    const res = await fetch('/api/settings/users', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(user) });
+    const sanitizedUser = {
+      ...user,
+      email: user.email.trim().toLowerCase(),
+      full_name: user.full_name.trim(),
+    };
+    const res = await fetch('/api/settings/users', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sanitizedUser) });
     const result = await res.json();
     if (result.error) { toast.error(result.error); return; }
     toast.success(isCreating ? 'Usuario creado' : 'Usuario actualizado');
@@ -120,7 +125,11 @@ const UserForm: React.FC<{ user: SystemUser; roles: Role[]; onSave: (u: SystemUs
         </div>
         <div><Label className="text-xs font-bold uppercase text-gray-400">Rol Asignado</Label>
           <Select value={form.role_id} onValueChange={v => setForm({ ...form, role_id: v as string })}>
-            <SelectTrigger className="h-12 rounded-xl mt-1"><SelectValue placeholder="Seleccionar rol" /></SelectTrigger>
+            <SelectTrigger className="h-12 rounded-xl mt-1">
+              <SelectValue placeholder="Seleccionar rol">
+                {(val: any) => roles.find(r => r.id === val)?.name || roles.find(r => r.id === form.role_id)?.name || 'Seleccionar rol'}
+              </SelectValue>
+            </SelectTrigger>
             <SelectContent>{roles.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>

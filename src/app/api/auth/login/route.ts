@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     if (isProduction) {
       user = await sSelectOne(
         'users',
-        `select=*,roles!role_id(name,can_create_member,can_search_member,can_print_credentials,can_view_reports,can_view_birthdays,can_view_member_reports,can_view_complaints,can_view_pensioners,can_access_settings)&email=eq.${encodeURIComponent(
+        `select=*,roles!role_id(name,can_create_member,can_search_member,can_print_credentials,can_view_reports,can_view_birthdays,can_view_member_reports,can_view_complaints,can_view_pensioners,can_access_settings)&email=ilike.${encodeURIComponent(
           email
         )}&is_active=eq.1`
       );
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
 
       user = db
         .prepare(
-          'SELECT u.*, r.name as role_name, r.can_create_member, r.can_search_member, r.can_print_credentials, r.can_view_reports, r.can_view_birthdays, r.can_view_member_reports, r.can_view_complaints, r.can_view_pensioners, r.can_access_settings FROM users u JOIN roles r ON u.role_id = r.id WHERE u.email = ? AND u.is_active = 1'
+          'SELECT u.*, r.name as role_name, r.can_create_member, r.can_search_member, r.can_print_credentials, r.can_view_reports, r.can_view_birthdays, r.can_view_member_reports, r.can_view_complaints, r.can_view_pensioners, r.can_access_settings FROM users u JOIN roles r ON u.role_id = r.id WHERE LOWER(u.email) = ? AND u.is_active = 1'
         )
         .get(email);
       db.close();
