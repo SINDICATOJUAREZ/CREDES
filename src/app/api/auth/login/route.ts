@@ -154,7 +154,7 @@ export async function POST(request: Request) {
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
-      .setExpirationTime('24h')
+      .setExpirationTime('7d')
       .sign(secret);
 
     const cookieStore = await cookies();
@@ -162,7 +162,7 @@ export async function POST(request: Request) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24,
+      maxAge: 60 * 60 * 24 * 7,
       path: '/',
     });
 
@@ -173,6 +173,17 @@ export async function POST(request: Request) {
         email: user.email,
         fullName: user.full_name,
         role: user.role_name,
+        permissions: {
+          canCreateMember: !!user.can_create_member,
+          canSearchMember: !!user.can_search_member,
+          canPrintCredentials: user.can_print_credentials !== undefined ? !!user.can_print_credentials : true,
+          canViewReports: !!user.can_view_reports,
+          canViewBirthdays: !!user.can_view_birthdays,
+          canViewMemberReports: !!user.can_view_member_reports,
+          canViewComplaints: !!user.can_view_complaints,
+          canViewPensioners: !!user.can_view_pensioners,
+          canAccessSettings: !!user.can_access_settings,
+        },
       },
     });
   } catch (error: any) {

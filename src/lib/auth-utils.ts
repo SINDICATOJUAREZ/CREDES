@@ -116,3 +116,10 @@ export async function hasPermission(permission: string): Promise<boolean> {
   if (user.role === 'MASTER') return true; // MASTER role bypasses all checks
   return !!user.permissions?.[permission];
 }
+
+export async function hasAnyPermission(permissions: string[]): Promise<boolean> {
+  const user = await getSessionUser();
+  if (!user) return false;
+  if (user.role === 'MASTER') return true;
+  return permissions.some(p => !!user.permissions?.[p]);
+}

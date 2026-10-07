@@ -35,7 +35,9 @@ export async function proxy(request: NextRequest) {
       return NextResponse.next();
     }
     if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: 'Token inválido o expirado' }, { status: 401 });
+      const response = NextResponse.json({ error: 'Token inválido o expirado' }, { status: 401 });
+      response.cookies.delete('auth-token');
+      return response;
     }
     const response = NextResponse.redirect(new URL('/login', request.url));
     response.cookies.delete('auth-token');

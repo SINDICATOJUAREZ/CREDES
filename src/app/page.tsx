@@ -50,15 +50,25 @@ export default function Home() {
 
     // 2. Fetch fresh session from server
     fetch('/api/auth/me')
-      .then(res => res.json())
+      .then(async res => {
+        if (!res.ok) {
+          localStorage.removeItem('user');
+          router.push('/login');
+          return null;
+        }
+        return res.json();
+      })
       .then(data => {
-        if (data.success && data.user) {
+        if (data?.success && data?.user) {
           setUser(data.user);
           localStorage.setItem('user', JSON.stringify(data.user));
+        } else if (data) {
+          localStorage.removeItem('user');
+          router.push('/login');
         }
       })
       .catch(() => {});
-  }, []);
+  }, [router]);
 
   const getGreeting = () => {
     const hour = new Date().getHours();

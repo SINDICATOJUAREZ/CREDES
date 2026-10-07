@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { MEMBER_MAPPING, mapToFrontend, generateInsert, generateUpdate } from '@/lib/db-utils';
 import { isProduction, sSelect, sSelectCount, sInsert, sUpdate, sDelete } from '@/lib/supabase';
-import { hasPermission } from '@/lib/auth-utils';
+import { hasPermission, getSessionUser } from '@/lib/auth-utils';
 
 const getIsPensioner = (m: any) => {
   const joinDate = m.joinDate || m.join_date;
@@ -34,12 +34,23 @@ const getIsPensioner = (m: any) => {
 };
 
 export async function GET(request: Request) {
-  if (
-    !await hasPermission('canSearchMember') && 
-    !await hasPermission('canViewPensioners') && 
-    !await hasPermission('canViewMemberReports') &&
-    !await hasPermission('canViewReports')
-  ) {
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  }
+
+  const hasAccess = 
+    user.role === 'MASTER' ||
+    user.permissions?.canSearchMember ||
+    user.permissions?.canPrintCredentials ||
+    user.permissions?.canViewPensioners ||
+    user.permissions?.canViewMemberReports ||
+    user.permissions?.canViewReports ||
+    user.permissions?.canViewBirthdays ||
+    user.permissions?.canViewComplaints ||
+    user.permissions?.canCreateMember;
+
+  if (!hasAccess) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
   try {

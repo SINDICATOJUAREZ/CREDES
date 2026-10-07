@@ -262,6 +262,13 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
     try {
       const r = await fetch('/api/members?limit=3000');
       const d = await r.json();
+      if (!r.ok) {
+        if (r.status === 401 && typeof window !== 'undefined') {
+          localStorage.removeItem('user');
+          window.location.href = '/login';
+        }
+        throw new Error(d.error || 'Error al obtener datos');
+      }
       const allMembers: Member[] = d.data || [];
       const today = new Date();
       const currentMonth = today.getMonth() + 1;
@@ -276,8 +283,8 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
         return parseInt(dA, 10) - parseInt(dB, 10);
       });
       setBdays(up);
-    } catch (e) {
-      toast.error('Error cargando cumpleaños');
+    } catch (e: any) {
+      toast.error('Error cargando cumpleaños: ' + (e.message || 'Error'));
     }
   };
 
@@ -289,9 +296,16 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
     try {
       const r = await fetch(`/api/members?search=${encodeURIComponent(sq)}`);
       const d = await r.json();
+      if (!r.ok) {
+        if (r.status === 401 && typeof window !== 'undefined') {
+          localStorage.removeItem('user');
+          window.location.href = '/login';
+        }
+        throw new Error(d.error || 'Error en búsqueda');
+      }
       setResults(d.data || []);
-    } catch {
-      toast.error('Error en búsqueda');
+    } catch (e: any) {
+      toast.error('Error en búsqueda: ' + (e.message || 'Error'));
     }
   };
 
@@ -687,6 +701,13 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
     try {
       const r = await fetch('/api/members?limit=3000');
       const d = await r.json();
+      if (!r.ok) {
+        if (r.status === 401 && typeof window !== 'undefined') {
+          localStorage.removeItem('user');
+          window.location.href = '/login';
+        }
+        throw new Error(d.error || 'Error al obtener datos');
+      }
       const allMembers: Member[] = d.data || [];
       
       let filtered = allMembers;

@@ -11,7 +11,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 
-const fetcher = (url: string) => fetch(url).then(res => res.json());
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!res.ok) {
+    if (res.status === 401 && typeof window !== 'undefined') {
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+    throw new Error(data.error || 'Error al obtener registros');
+  }
+  return data;
+};
 
 export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { inline?: boolean; onClose?: () => void }) {
   const [page, setPage] = useState(1);
@@ -112,7 +123,7 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
   if (filterPuesto) fetchUrl += `&position=${encodeURIComponent(filterPuesto)}`;
   if (filterDepartamento) fetchUrl += `&department=${encodeURIComponent(filterDepartamento)}`;
 
-  const { data, isLoading } = useSWR(fetchUrl, fetcher);
+  const { data, error, isLoading, mutate } = useSWR(fetchUrl, fetcher);
   const members: Member[] = data?.data || [];
   const totalPages = data?.totalPages || data?.meta?.totalPages || 1;
 
@@ -319,6 +330,12 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
           {isLoading ? (
             <div className="flex-1 flex items-center justify-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+            </div>
+          ) : error ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-rose-500 py-20">
+              <p className="font-bold text-lg mb-2">No fue posible cargar los registros</p>
+              <p className="text-sm text-gray-500 mb-4">{error.message || 'Error de permisos o sesión'}</p>
+              <Button variant="outline" onClick={() => mutate()}>Reintentar</Button>
             </div>
           ) : (
             <div className="overflow-x-auto flex-1">

@@ -72,14 +72,23 @@ export function PensionersDialog({ isOpen = false, onClose = () => {}, inline = 
         types.map(t => fetch(`/api/members?limit=2000&memberType=${t}`))
       );
       
+      const rStatus = await fetch('/api/members?limit=2000&status=ACTIVO');
+      const rIncap = await fetch('/api/members?limit=2000&status=INCAPACITADO');
+
+      if (responses.some(r => r.status === 401) || rStatus.status === 401 || rIncap.status === 401) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('user');
+          window.location.href = '/login';
+        }
+        throw new Error('Sesión expirada');
+      }
+
       const results = await Promise.all(responses.map(r => r.json()));
       const allMembers: Member[] = results.flatMap(d => d.data || []);
       
-      const rStatus = await fetch('/api/members?limit=2000&status=ACTIVO');
       const dStatus = await rStatus.json();
       const statusActive = dStatus.data || [];
       
-      const rIncap = await fetch('/api/members?limit=2000&status=INCAPACITADO');
       const dIncap = await rIncap.json();
       const statusIncap = dIncap.data || [];
       

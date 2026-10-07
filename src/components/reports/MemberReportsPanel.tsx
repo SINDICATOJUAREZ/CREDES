@@ -613,6 +613,13 @@ export function MemberReportsPanel({
         if (!data) {
           const r = await fetch('/api/complaints');
           const d = await r.json();
+          if (!r.ok) {
+            if (r.status === 401 && typeof window !== 'undefined') {
+              localStorage.removeItem('user');
+              window.location.href = '/login';
+            }
+            throw new Error(d.error || 'Error al obtener formatos de apoyo');
+          }
           data = d.complaints || [];
           setComplaintsCache(data);
         }
@@ -622,6 +629,13 @@ export function MemberReportsPanel({
         if (!data) {
           const r = await fetch('/api/members?limit=3000');
           const d = await r.json();
+          if (!r.ok) {
+            if (r.status === 401 && typeof window !== 'undefined') {
+              localStorage.removeItem('user');
+              window.location.href = '/login';
+            }
+            throw new Error(d.error || 'Error al obtener registros de agremiados');
+          }
           data = d.data || [];
           setMembersCache(data);
         }
