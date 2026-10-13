@@ -77,6 +77,7 @@ export function findMatchingBackDesign<T extends { id: string; name: string; sec
 const fetchImageAsBase64 = async (url: string): Promise<string> => {
   try {
     if (!url) return '';
+    if (url.startsWith('data:')) return url;
     let targetUrl = url;
     
     // Proxy Supabase storage URLs through our /api/photos endpoint to bypass CORS

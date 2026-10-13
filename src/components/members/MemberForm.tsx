@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { Member, Delegate } from '@/types/member';
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,132 @@ import { useCredentialConfig } from '@/hooks/useCredentialConfig';
 import { CredentialCard } from '@/components/credential/CredentialCard';
 import { generateCredentialPDF, generateVectorialCredentialPDF, mapDesignToConfig, findMatchingBackDesign } from '@/lib/pdf-generator';
 import { PhotoUploadDialog } from './PhotoUploadDialog';
+
+const MARITAL_STATUS_OPTIONS = [
+  'SOLTERO(A)',
+  'CASADO(A)',
+  'UNIÓN LIBRE',
+  'DIVORCIADO(A)',
+  'VIUDO(A)',
+  'SEPARADO(A)'
+];
+
+const EDUCATION_OPTIONS = [
+  'SIN ESTUDIOS',
+  'PRIMARIA',
+  'PRIMARIA TRUNCA',
+  'SECUNDARIA',
+  'SECUNDARIA TRUNCA',
+  'PREPARATORIA / BACHILLERATO',
+  'PREPARATORIA TRUNCA',
+  'CARRERA TÉCNICA',
+  'LICENCIATURA',
+  'INGENIERÍA',
+  'MAESTRÍA / POSGRADO',
+  'DOCTORADO'
+];
+
+const BLOOD_TYPE_OPTIONS = [
+  'O+',
+  'O-',
+  'A+',
+  'A-',
+  'B+',
+  'B-',
+  'AB+',
+  'AB-',
+  'DESCONOCIDO'
+];
+
+const NUEVO_LEON_MUNICIPALITIES = [
+  'ABASOLO, N.L.',
+  'AGUALEGUAS, N.L.',
+  'ALLENDE, N.L.',
+  'ANÁHUAC, N.L.',
+  'APODACA, N.L.',
+  'ARAMBERRI, N.L.',
+  'BUSTAMANTE, N.L.',
+  'CADEREYTA JIMÉNEZ, N.L.',
+  'CERRALVO, N.L.',
+  'CIÉNEGA DE FLORES, N.L.',
+  'CHINA, N.L.',
+  'DOCTOR ARROYO, N.L.',
+  'DOCTOR COSS, N.L.',
+  'DOCTOR GONZÁLEZ, N.L.',
+  'EL CARMEN, N.L.',
+  'GALEANA, N.L.',
+  'GARCÍA, N.L.',
+  'GENERAL BRAVO, N.L.',
+  'GENERAL ESCOBEDO, N.L.',
+  'GENERAL TERÁN, N.L.',
+  'GENERAL TREVIÑO, N.L.',
+  'GENERAL ZARAGOZA, N.L.',
+  'GENERAL ZUAZUA, N.L.',
+  'GUADALUPE, N.L.',
+  'HIDALGO, N.L.',
+  'HIGUERAS, N.L.',
+  'HUALAHUISES, N.L.',
+  'ITURBIDE, N.L.',
+  'JUÁREZ, N.L.',
+  'LAMPAZOS DE NARANJO, N.L.',
+  'LINARES, N.L.',
+  'LOS ALDAMAS, N.L.',
+  'LOS HERRERAS, N.L.',
+  'LOS RAMONES, N.L.',
+  'MARÍN, N.L.',
+  'MELCHOR OCAMPO, N.L.',
+  'MIER Y NORIEGA, N.L.',
+  'MINA, N.L.',
+  'MONTEMORELOS, N.L.',
+  'MONTERREY, N.L.',
+  'PARÁS, N.L.',
+  'PESQUERÍA, N.L.',
+  'RAYONES, N.L.',
+  'SABINAS HIDALGO, N.L.',
+  'SALINAS VICTORIA, N.L.',
+  'SAN NICOLÁS DE LOS GARZA, N.L.',
+  'SAN PEDRO GARZA GARCÍA, N.L.',
+  'SANTA CATARINA, N.L.',
+  'SANTIAGO, N.L.',
+  'VALLECILLO, N.L.',
+  'VILLALDAMA, N.L.'
+];
+
+function findMatchingNLMunicipality(value: string | undefined): string | null {
+  if (!value || !value.trim()) return null;
+  const clean = (s: string) => s.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z]/g, '');
+  const cleanVal = clean(value);
+
+  for (const m of NUEVO_LEON_MUNICIPALITIES) {
+    if (clean(m) === cleanVal) return m;
+  }
+
+  // Common aliases in existing database records
+  if (cleanVal.includes('BJUAREZ') || cleanVal === 'JUAREZNL' || cleanVal === 'JUAREZ') {
+    return 'JUÁREZ, N.L.';
+  }
+  if (cleanVal.includes('SANPEDROGARZAGARCIA') || cleanVal.includes('SANPEDRO')) {
+    return 'SAN PEDRO GARZA GARCÍA, N.L.';
+  }
+  if (cleanVal.includes('SANNICOLAS')) {
+    return 'SAN NICOLÁS DE LOS GARZA, N.L.';
+  }
+  if (cleanVal.includes('SANTACATARINA')) {
+    return 'SANTA CATARINA, N.L.';
+  }
+  if (cleanVal.includes('CIENEGA')) {
+    return 'CIÉNEGA DE FLORES, N.L.';
+  }
+  if (cleanVal.includes('CADEREYTA')) {
+    return 'CADEREYTA JIMÉNEZ, N.L.';
+  }
+
+  for (const m of NUEVO_LEON_MUNICIPALITIES) {
+    const cleanM = clean(m.replace(', N.L.', ''));
+    if (cleanVal === cleanM || cleanVal === `${cleanM}NL`) return m;
+  }
+  return null;
+}
 
 interface MemberFormProps {
   initialData?: Member;
@@ -122,11 +248,49 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
     fetchDelegates();
   }, []);
 
+  const [birthPlaceSelect, setBirthPlaceSelect] = useState<string>('');
+  const [customBirthPlace, setCustomBirthPlace] = useState<string>('');
+
+  const syncBirthPlace = useCallback((val: string | undefined) => {
+    if (!val || !val.trim()) {
+      setBirthPlaceSelect('');
+      setCustomBirthPlace('');
+      return;
+    }
+    const matched = findMatchingNLMunicipality(val);
+    if (matched) {
+      setBirthPlaceSelect(matched);
+      setCustomBirthPlace('');
+    } else {
+      setBirthPlaceSelect('OTRO');
+      setCustomBirthPlace(val);
+    }
+  }, []);
+
+  const handleBirthPlaceSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setBirthPlaceSelect(val);
+    if (val === 'OTRO') {
+      setValue('birthPlace', customBirthPlace);
+    } else {
+      setValue('birthPlace', val);
+    }
+  };
+
+  const handleCustomBirthPlaceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const text = e.target.value.toUpperCase();
+    setCustomBirthPlace(text);
+    setValue('birthPlace', text);
+  };
+
   useEffect(() => {
     if (initialData) {
       reset(initialData);
+      syncBirthPlace(initialData.birthPlace);
+    } else {
+      syncBirthPlace('');
     }
-  }, [initialData, reset, delegates]);
+  }, [initialData, reset, delegates, syncBirthPlace]);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col h-[780px] w-[1100px] max-w-full">
@@ -217,23 +381,84 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs font-black text-blue-900 uppercase tracking-widest">Estado Civil</Label>
-                  <Input {...register('maritalStatus')} className="h-12 border-gray-200 focus:ring-2 focus:ring-blue-500 rounded-xl" />
+                  <select 
+                    {...register('maritalStatus')} 
+                    className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-gray-50/30 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 uppercase cursor-pointer"
+                  >
+                    <option value="">SELECCIONAR ESTADO CIVIL...</option>
+                    {MARITAL_STATUS_OPTIONS.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                    {watch('maritalStatus') && !MARITAL_STATUS_OPTIONS.includes(watch('maritalStatus') as string) && (
+                      <option value={watch('maritalStatus')}>{watch('maritalStatus')}</option>
+                    )}
+                  </select>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs font-black text-blue-900 uppercase tracking-widest">Escolaridad</Label>
-                  <Input {...register('education')} className="h-12 border-gray-200 focus:ring-2 focus:ring-blue-500 rounded-xl" />
+                  <select 
+                    {...register('education')} 
+                    className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-gray-50/30 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 uppercase cursor-pointer"
+                  >
+                    <option value="">SELECCIONAR ESCOLARIDAD...</option>
+                    {EDUCATION_OPTIONS.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                    {watch('education') && !EDUCATION_OPTIONS.includes(watch('education') as string) && (
+                      <option value={watch('education')}>{watch('education')}</option>
+                    )}
+                  </select>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs font-black text-blue-900 uppercase tracking-widest">Tipo de Sangre</Label>
-                  <Input {...register('bloodType')} className="h-12 border-gray-200 focus:ring-2 focus:ring-blue-500 rounded-xl" />
+                  <select 
+                    {...register('bloodType')} 
+                    className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-gray-50/30 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 uppercase cursor-pointer"
+                  >
+                    <option value="">SELECCIONAR TIPO DE SANGRE...</option>
+                    {BLOOD_TYPE_OPTIONS.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                    {watch('bloodType') && !BLOOD_TYPE_OPTIONS.includes(watch('bloodType') as string) && (
+                      <option value={watch('bloodType')}>{watch('bloodType')}</option>
+                    )}
+                  </select>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs font-black text-blue-900 uppercase tracking-widest">Fecha de Nacimiento</Label>
                   <Input type="date" {...register('birthDate')} className="h-12 border-gray-200 focus:ring-2 focus:ring-blue-500 rounded-xl bg-gray-50/30" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-black text-blue-900 uppercase tracking-widest">Lugar de Nacimiento</Label>
-                  <Input {...register('birthPlace')} className="h-12 border-gray-200 focus:ring-2 focus:ring-blue-500 rounded-xl" />
+                  <div className="flex justify-between items-center">
+                    <Label className="text-xs font-black text-blue-900 uppercase tracking-widest">Lugar de Nacimiento</Label>
+                    {birthPlaceSelect === 'OTRO' && (
+                      <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60 uppercase tracking-wider">
+                        Foráneo
+                      </span>
+                    )}
+                  </div>
+                  <select 
+                    value={birthPlaceSelect}
+                    onChange={handleBirthPlaceSelectChange}
+                    className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-gray-50/30 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 uppercase cursor-pointer"
+                  >
+                    <option value="">SELECCIONAR MUNICIPIO (NUEVO LEÓN)...</option>
+                    {NUEVO_LEON_MUNICIPALITIES.map(mun => (
+                      <option key={mun} value={mun}>{mun}</option>
+                    ))}
+                    <option value="OTRO">OTRO (FORÁNEO / OTRO ESTADO)</option>
+                  </select>
+
+                  {birthPlaceSelect === 'OTRO' && (
+                    <div className="mt-2">
+                      <Input 
+                        value={customBirthPlace}
+                        onChange={handleCustomBirthPlaceChange}
+                        placeholder="Especifique lugar de nacimiento (Ej. Saltillo, Coahuila)" 
+                        className="h-11 border-blue-200 focus:ring-2 focus:ring-blue-500 rounded-xl bg-blue-50/30 font-bold uppercase text-xs tracking-wider" 
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs font-black text-blue-900 uppercase tracking-widest">Nombre del Cónyuge</Label>
@@ -588,6 +813,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
         onClose={() => setIsPhotoDialogOpen(false)} 
         onPhotoCapture={(url) => setValue('photoUrl', url)} 
         currentPhoto={watch('photoUrl')}
+        employeeId={watch('employeeId')}
       />
 
       {/* Dialogo de Confirmacion de QR Historico */}

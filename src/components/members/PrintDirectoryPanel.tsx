@@ -380,7 +380,7 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
                         <td className="py-3 px-3">
                           {member.photoUrl ? (
                             <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-sm ring-2 ring-gray-100 group-hover:ring-emerald-200 transition-all shrink-0">
-                              <img src={`${member.photoUrl}?t=${new Date().getTime()}`} alt={member.fullName} className="w-full h-full object-cover" />
+                              <img src={member.photoUrl.startsWith('data:') ? member.photoUrl : `${member.photoUrl}?t=${new Date().getTime()}`} alt={member.fullName} className="w-full h-full object-cover" />
                             </div>
                           ) : (
                             <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 text-gray-500 flex items-center justify-center text-xs font-black uppercase shadow-inner group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-all shrink-0">

@@ -71,9 +71,10 @@ export const CredentialCard: React.FC<CredentialCardProps> = ({ member, config, 
                 const fileName = parts[parts.length - 1];
                 photoSrc = `/api/photos/${fileName}`;
               }
+              const finalSrc = photoSrc.startsWith('data:') ? photoSrc : `${photoSrc}?t=${new Date().getTime()}`;
               return (
                 <img 
-                  src={`${photoSrc}?t=${new Date().getTime()}`} 
+                  src={finalSrc} 
                   alt={member.fullName} 
                   className="w-full h-full object-cover" 
                 />
@@ -142,9 +143,10 @@ export const CredentialCard: React.FC<CredentialCardProps> = ({ member, config, 
                   const fileName = parts[parts.length - 1];
                   photoSrc = `/api/photos/${fileName}`;
                 }
+                const finalSrc = photoSrc.startsWith('data:') ? photoSrc : `${photoSrc}?t=${new Date().getTime()}`;
                 return (
                   <img 
-                    src={`${photoSrc}?t=${new Date().getTime()}`} 
+                    src={finalSrc} 
                     alt={member.fullName} 
                     className="w-full h-full object-cover" 
                   />
