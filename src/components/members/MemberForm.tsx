@@ -548,7 +548,7 @@ export const MemberForm: React.FC<MemberFormProps> = ({ initialData, onSubmit, o
               <div className="col-span-3 grid grid-cols-3 gap-8 mt-4 p-6 bg-blue-50/30 rounded-[2rem] border border-blue-100/50">
                 <div className="space-y-2">
                   <Label className="text-xs font-black text-blue-900 uppercase tracking-widest flex items-center gap-2">
-                    <DollarSign className="w-4 h-4" /> Sueldo Mensual (Base)
+                    <DollarSign className="w-4 h-4" /> Sueldo Quincenal Base
                   </Label>
                   <Input type="number" step="0.01" {...register('salary')} className="h-12 border-gray-200 focus:ring-2 focus:ring-blue-500 rounded-xl font-bold text-blue-600 bg-white" />
                 </div>
