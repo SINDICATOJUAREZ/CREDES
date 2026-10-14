@@ -70,20 +70,19 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
       .then((data: CredentialDesign[]) => {
         if (Array.isArray(data)) {
           setDesigns(data);
+          const nuevoFront = data.find(d => (d.section || 'frente') === 'frente' && d.name?.toUpperCase().includes('NUEVO'));
           const activeFront = data.find(d => (d.section || 'frente') === 'frente' && d.is_active);
           const firstFront = data.find(d => (d.section || 'frente') === 'frente');
-          const chosenFront = activeFront || firstFront;
+          const chosenFront = nuevoFront || activeFront || firstFront;
           
           if (chosenFront) {
             setSelectedFrontDesignId(chosenFront.id);
             const matchedBack = findMatchingBackDesign(chosenFront, data);
-            if (matchedBack) {
-              setSelectedBackDesignId(matchedBack.id);
-            } else {
-              const activeBack = data.find(d => d.section === 'reverso' && d.is_active);
-              const firstBack = data.find(d => d.section === 'reverso');
-              if (activeBack) setSelectedBackDesignId(activeBack.id);
-              else if (firstBack) setSelectedBackDesignId(firstBack.id);
+            const nuevoBack = data.find(d => d.section === 'reverso' && d.name?.toUpperCase().includes('NUEVO'));
+            const activeBack = data.find(d => d.section === 'reverso' && d.is_active);
+            const chosenBack = matchedBack || nuevoBack || activeBack;
+            if (chosenBack) {
+              setSelectedBackDesignId(chosenBack.id);
             }
           }
         }
@@ -103,10 +102,18 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
 
   // Helper to resolve currently active paired designs for printing
   const getResolvedDesigns = () => {
-    const frontDesign = designs.find(d => d.id === selectedFrontDesignId) || designs.find(d => (d.section || 'frente') === 'frente');
+    const nuevoFront = designs.find(d => (d.section || 'frente') === 'frente' && d.name?.toUpperCase().includes('NUEVO'));
+    const activeFront = designs.find(d => (d.section || 'frente') === 'frente' && d.is_active);
+    const frontDesign = designs.find(d => d.id === selectedFrontDesignId)
+      || nuevoFront
+      || activeFront
+      || designs.find(d => (d.section || 'frente') === 'frente');
+
     let backDesign: CredentialDesign | null = null;
     if (printMode === 'both') {
+      const nuevoBack = designs.find(d => d.section === 'reverso' && d.name?.toUpperCase().includes('NUEVO'));
       backDesign = findMatchingBackDesign(frontDesign, designs)
+        || nuevoBack
         || (selectedBackDesignId ? designs.find(d => d.id === selectedBackDesignId) : null)
         || designs.find(d => d.section === 'reverso' && d.is_active)
         || designs.find(d => d.section === 'reverso')
@@ -268,47 +275,11 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
             </button>
           </div>
 
-          {/* QR Code Selector */}
-          <div className="flex items-center bg-white rounded-xl p-1 border border-emerald-200/60 shadow-sm">
-            <button
-              onClick={() => setQrType('new')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all flex items-center gap-1.5 ${
-                qrType === 'new'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:text-emerald-700'
-              }`}
-              title="Generar código QR nuevo estructurado"
-            >
-              <QrCode className="w-3.5 h-3.5" />
-              <span>QR Nuevo</span>
-            </button>
-            <button
-              onClick={() => setQrType('legacy')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all flex items-center gap-1.5 ${
-                qrType === 'legacy'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:text-emerald-700'
-              }`}
-              title="Usar código QR anterior almacenado previamente"
-            >
-              <History className="w-3.5 h-3.5" />
-              <span>QR Anterior</span>
-            </button>
+          {/* Formato Oficial Indicator */}
+          <div className="flex items-center gap-2 px-3.5 py-2 bg-white rounded-xl border border-emerald-200/80 shadow-sm text-xs font-black text-emerald-800 uppercase tracking-wider">
+            <QrCode className="w-4 h-4 text-emerald-600" />
+            <span>Formato Oficial: QR Nuevo • Frente y Reverso Nuevo</span>
           </div>
-
-          {/* Design Selector (Applies to both faces) */}
-          {frontDesigns.length > 1 && (
-            <select
-              value={selectedFrontDesignId}
-              onChange={(e) => handleSelectDesign(e.target.value)}
-              className="h-9 px-3 rounded-xl text-xs font-bold bg-white border border-emerald-200 text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-sm"
-              title="Selecciona la plantilla que se aplicará a ambas caras de la credencial"
-            >
-              {frontDesigns.map(d => (
-                <option key={d.id} value={d.id}>Diseño: {d.name}</option>
-              ))}
-            </select>
-          )}
         </div>
       </div>
 
@@ -587,28 +558,15 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
                 </div>
               </div>
 
-              {/* Design Selector inside Modal */}
+              {/* Design Indicator inside Modal */}
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100 text-xs font-bold">
                 <span className="text-gray-600 flex items-center gap-1.5">
                   <Layers className="w-4 h-4 text-emerald-600" />
                   <span>Diseño Plantilla:</span>
                 </span>
-                {frontDesigns.length > 1 ? (
-                  <select
-                    value={selectedFrontDesignId}
-                    onChange={(e) => handleSelectDesign(e.target.value)}
-                    className="h-8 px-2.5 rounded-xl text-xs font-bold bg-white border border-emerald-200 text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer max-w-[220px]"
-                    title="Aplica a ambas caras de la credencial"
-                  >
-                    {frontDesigns.map(d => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <span className="text-emerald-900 font-extrabold">
-                    {currentFrontDesign?.name || 'Estándar'}
-                  </span>
-                )}
+                <span className="text-emerald-800 font-extrabold uppercase bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/60">
+                  {currentFrontDesign?.name || 'FRENTE NUEVO'}
+                </span>
               </div>
 
               {/* Print Modes Selector inside Modal */}
@@ -617,7 +575,7 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
                 <div className="flex gap-2">
                   <button
                     onClick={() => setPrintMode('both')}
-                    className={`px-3 py-1.5 rounded-xl font-black transition-all ${
+                    className={`px-3 py-1.5 rounded-xl font-black transition-all cursor-pointer ${
                       printMode === 'both' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-200'
                     }`}
                   >
@@ -625,7 +583,7 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
                   </button>
                   <button
                     onClick={() => setPrintMode('front_only')}
-                    className={`px-3 py-1.5 rounded-xl font-black transition-all ${
+                    className={`px-3 py-1.5 rounded-xl font-black transition-all cursor-pointer ${
                       printMode === 'front_only' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-200'
                     }`}
                   >
@@ -634,30 +592,15 @@ export function PrintDirectoryPanel({ inline = false, onClose = () => {} }: { in
                 </div>
               </div>
 
-              {/* QR Code Selector inside Modal */}
+              {/* QR Code Indicator inside Modal */}
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100 text-xs font-bold">
                 <span className="text-gray-600 flex items-center gap-1.5">
                   <QrCode className="w-4 h-4 text-emerald-600" />
                   <span>Código QR:</span>
                 </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setQrType('new')}
-                    className={`px-3 py-1.5 rounded-xl font-black transition-all ${
-                      qrType === 'new' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-200'
-                    }`}
-                  >
-                    QR Nuevo
-                  </button>
-                  <button
-                    onClick={() => setQrType('legacy')}
-                    className={`px-3 py-1.5 rounded-xl font-black transition-all ${
-                      qrType === 'legacy' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-200'
-                    }`}
-                  >
-                    QR Anterior
-                  </button>
-                </div>
+                <span className="text-emerald-800 font-extrabold uppercase bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/60">
+                  QR Nuevo Oficial
+                </span>
               </div>
 
               {/* Action Buttons */}
