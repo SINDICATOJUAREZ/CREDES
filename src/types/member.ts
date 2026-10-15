@@ -76,6 +76,8 @@ export interface Member {
   altaSindicato?: string;
   fechaBaja?: string;
   delegate?: string;
+  delegateId?: string;
+  delegateNameLegacy?: string;
   clinic?: string;
   shift?: string;
   salary?: number;

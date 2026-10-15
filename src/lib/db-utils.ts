@@ -35,6 +35,7 @@ export const MEMBER_MAPPING: Record<string, string> = {
   alta_sindicato: 'altaSindicato',
   fecha_baja: 'fechaBaja',
   delegate_id: 'delegateId',
+  delegate_name_legacy: 'delegateNameLegacy',
   clinic: 'clinic',
   shift: 'shift',
   salary: 'salary',

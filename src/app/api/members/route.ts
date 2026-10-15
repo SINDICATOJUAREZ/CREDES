@@ -33,6 +33,48 @@ const getIsPensioner = (m: any) => {
   return age >= 50 && years >= 10;
 };
 
+function sanitizeNumber(val: any, defaultVal = 0): number {
+  if (val === undefined || val === null || val === '') return defaultVal;
+  const num = Number(val);
+  return isNaN(num) ? defaultVal : num;
+}
+
+function sanitizeIntOrNull(val: any): number | null {
+  if (val === undefined || val === null || val === '') return null;
+  const num = parseInt(val, 10);
+  return isNaN(num) ? null : num;
+}
+
+async function resolveDelegateSupabase(delegateVal: any): Promise<{ delegateId: string | null; delegateLegacy: string | null }> {
+  if (delegateVal === undefined) return { delegateId: null, delegateLegacy: null };
+  const clean = typeof delegateVal === 'string' ? delegateVal.trim() : '';
+  if (!clean) return { delegateId: null, delegateLegacy: null };
+  try {
+    const matched = await sSelect('delegates', `or=(full_name.eq.${encodeURIComponent(clean)},id.eq.${encodeURIComponent(clean)})&limit=1`);
+    if (matched && matched.length > 0) {
+      return { delegateId: matched[0].id, delegateLegacy: matched[0].full_name };
+    }
+  } catch (e) {
+    console.error('Error resolving delegate in Supabase:', e);
+  }
+  return { delegateId: null, delegateLegacy: clean };
+}
+
+function resolveDelegateSQLite(db: any, delegateVal: any): { delegateId: string | null; delegateLegacy: string | null } {
+  if (delegateVal === undefined) return { delegateId: null, delegateLegacy: null };
+  const clean = typeof delegateVal === 'string' ? delegateVal.trim() : '';
+  if (!clean) return { delegateId: null, delegateLegacy: null };
+  try {
+    const matched = db.prepare('SELECT id, full_name FROM delegates WHERE full_name = ? OR id = ? LIMIT 1').get(clean, clean) as any;
+    if (matched) {
+      return { delegateId: matched.id, delegateLegacy: matched.full_name };
+    }
+  } catch (e) {
+    console.error('Error resolving delegate in SQLite:', e);
+  }
+  return { delegateId: null, delegateLegacy: clean };
+}
+
 export async function GET(request: Request) {
   const user = await getSessionUser();
   if (!user) {
@@ -113,10 +155,27 @@ export async function GET(request: Request) {
         }
       }
 
-      let membersWithFamily = members.map((m: any) => ({
-        ...mapToFrontend(m, MEMBER_MAPPING),
-        family: familyMap[m.id] || [],
-      }));
+      // Get delegates map for resolving assigned delegate name
+      let delegateMap: Record<string, string> = {};
+      try {
+        const delegatesList = await sSelect('delegates', 'select=id,full_name');
+        for (const d of delegatesList) {
+          delegateMap[d.id] = d.full_name;
+        }
+      } catch (e) {
+        console.error('Error fetching delegates for map:', e);
+      }
+
+      let membersWithFamily = members.map((m: any) => {
+        const member = mapToFrontend(m, MEMBER_MAPPING);
+        const delegateName = (m.delegate_id && delegateMap[m.delegate_id]) || m.delegate_name_legacy || '';
+        return {
+          ...member,
+          delegate: delegateName,
+          delegateId: m.delegate_id || undefined,
+          family: familyMap[m.id] || [],
+        };
+      });
 
       let finalTotal = total;
       if (status === 'PENSIONADO') {
@@ -189,12 +248,20 @@ export async function GET(request: Request) {
 
     const totalResult = db.prepare(`SELECT COUNT(*) as total ${baseQuery}`).get(...params) as { total: number };
     const members = db.prepare(`SELECT * ${baseQuery} ORDER BY full_name ASC ${limitOffsetClause}`).all(...sqlParams);
+    const delegatesList = db.prepare('SELECT id, full_name FROM delegates').all() as any[];
+    const delegateMap: Record<string, string> = {};
+    for (const d of delegatesList) {
+      delegateMap[d.id] = d.full_name;
+    }
     const familyStmt = db.prepare('SELECT * FROM family_members WHERE member_id = ?');
 
     const membersWithFamily = members.map((m: any) => {
       const member = mapToFrontend(m, MEMBER_MAPPING);
+      const delegateName = (m.delegate_id && delegateMap[m.delegate_id]) || m.delegate_name_legacy || '';
       return {
         ...member,
+        delegate: delegateName,
+        delegateId: m.delegate_id || undefined,
         family: familyStmt.all(m.id).map((f: any) => ({ id: f.id, fullName: f.full_name, relationship: f.relationship, age: f.age })),
       };
     });
@@ -240,11 +307,21 @@ export async function POST(request: Request) {
       for (const [dbKey, fsKey] of Object.entries(MEMBER_MAPPING)) {
         if (rest[fsKey as string] !== undefined) dbData[dbKey] = rest[fsKey as string];
       }
+      if (data.delegate !== undefined) {
+        const { delegateId, delegateLegacy } = await resolveDelegateSupabase(data.delegate);
+        dbData.delegate_id = delegateId;
+        dbData.delegate_name_legacy = delegateLegacy;
+      }
+      if (data.salary !== undefined) dbData.salary = sanitizeNumber(data.salary, 0);
+      if (data.bonos !== undefined) dbData.bonos = sanitizeNumber(data.bonos, 0);
+      if (data.bonoAsistencia !== undefined) dbData.bono_asistencia = sanitizeNumber(data.bonoAsistencia, 0);
+      dbData.last_updated = new Date().toISOString();
+
       await sInsert('members', dbData);
       if (family && Array.isArray(family)) {
         const familyRows = family.map((f: any) => ({
           id: f.id || crypto.randomUUID(), member_id: id,
-          full_name: f.fullName, relationship: f.relationship, age: f.age,
+          full_name: f.fullName, relationship: f.relationship, age: sanitizeIntOrNull(f.age),
         }));
         if (familyRows.length) await sInsert('family_members', familyRows);
       }
@@ -252,13 +329,25 @@ export async function POST(request: Request) {
       const Database = (await import('better-sqlite3')).default;
       const path = await import('path');
       const db = new Database(path.join(process.cwd(), 'database.sqlite'));
-      const { sql, params } = generateInsert('members', MEMBER_MAPPING, data);
+
+      const insertData = { ...data };
+      if (data.delegate !== undefined) {
+        const { delegateId, delegateLegacy } = resolveDelegateSQLite(db, data.delegate);
+        insertData.delegateId = delegateId;
+        insertData.delegateNameLegacy = delegateLegacy;
+      }
+      if (data.salary !== undefined) insertData.salary = sanitizeNumber(data.salary, 0);
+      if (data.bonos !== undefined) insertData.bonos = sanitizeNumber(data.bonos, 0);
+      if (data.bonoAsistencia !== undefined) insertData.bonoAsistencia = sanitizeNumber(data.bonoAsistencia, 0);
+      insertData.lastUpdated = new Date().toISOString();
+
+      const { sql, params } = generateInsert('members', MEMBER_MAPPING, insertData);
       db.transaction(() => {
         db.prepare(sql).run(...params);
         if (data.family && Array.isArray(data.family)) {
           const insertFamily = db.prepare('INSERT INTO family_members (id, member_id, full_name, relationship, age) VALUES (?, ?, ?, ?, ?)');
           data.family.forEach((f: any) => {
-            insertFamily.run(f.id || crypto.randomUUID(), id, f.fullName, f.relationship, f.age);
+            insertFamily.run(f.id || crypto.randomUUID(), id, f.fullName, f.relationship, sanitizeIntOrNull(f.age));
           });
         }
       })();
@@ -287,12 +376,22 @@ export async function PUT(request: Request) {
       for (const [dbKey, fsKey] of Object.entries(MEMBER_MAPPING)) {
         if (rest[fsKey as string] !== undefined) dbData[dbKey] = rest[fsKey as string];
       }
+      if (data.delegate !== undefined) {
+        const { delegateId, delegateLegacy } = await resolveDelegateSupabase(data.delegate);
+        dbData.delegate_id = delegateId;
+        dbData.delegate_name_legacy = delegateLegacy;
+      }
+      if (data.salary !== undefined) dbData.salary = sanitizeNumber(data.salary, 0);
+      if (data.bonos !== undefined) dbData.bonos = sanitizeNumber(data.bonos, 0);
+      if (data.bonoAsistencia !== undefined) dbData.bono_asistencia = sanitizeNumber(data.bonoAsistencia, 0);
+      dbData.last_updated = new Date().toISOString();
+
       await sUpdate('members', `id=eq.${safeId}`, dbData);
       await sDelete('family_members', `member_id=eq.${safeId}`);
       if (family && Array.isArray(family)) {
         const familyRows = family.map((f: any) => ({
           id: f.id || crypto.randomUUID(), member_id: data.id,
-          full_name: f.fullName, relationship: f.relationship, age: f.age,
+          full_name: f.fullName, relationship: f.relationship, age: sanitizeIntOrNull(f.age),
         }));
         if (familyRows.length) await sInsert('family_members', familyRows);
       }
@@ -300,14 +399,26 @@ export async function PUT(request: Request) {
       const Database = (await import('better-sqlite3')).default;
       const path = await import('path');
       const db = new Database(path.join(process.cwd(), 'database.sqlite'));
-      const { sql, params } = generateUpdate('members', MEMBER_MAPPING, data);
+
+      const updateData = { ...data };
+      if (data.delegate !== undefined) {
+        const { delegateId, delegateLegacy } = resolveDelegateSQLite(db, data.delegate);
+        updateData.delegateId = delegateId;
+        updateData.delegateNameLegacy = delegateLegacy;
+      }
+      if (data.salary !== undefined) updateData.salary = sanitizeNumber(data.salary, 0);
+      if (data.bonos !== undefined) updateData.bonos = sanitizeNumber(data.bonos, 0);
+      if (data.bonoAsistencia !== undefined) updateData.bonoAsistencia = sanitizeNumber(data.bonoAsistencia, 0);
+      updateData.lastUpdated = new Date().toISOString();
+
+      const { sql, params } = generateUpdate('members', MEMBER_MAPPING, updateData);
       db.transaction(() => {
         db.prepare(sql).run(...params);
         db.prepare('DELETE FROM family_members WHERE member_id = ?').run(data.id);
         if (data.family && Array.isArray(data.family)) {
           const insertFamily = db.prepare('INSERT INTO family_members (id, member_id, full_name, relationship, age) VALUES (?, ?, ?, ?, ?)');
           data.family.forEach((f: any) => {
-            insertFamily.run(f.id || crypto.randomUUID(), data.id, f.fullName, f.relationship, f.age);
+            insertFamily.run(f.id || crypto.randomUUID(), data.id, f.fullName, f.relationship, sanitizeIntOrNull(f.age));
           });
         }
       })();
@@ -317,7 +428,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('PUT Error:', error);
-    return NextResponse.json({ error: 'Error al actualizar agremiado' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Error al actualizar agremiado' }, { status: 500 });
   }
 }
 

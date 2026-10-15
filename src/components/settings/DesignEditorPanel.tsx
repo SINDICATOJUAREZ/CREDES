@@ -21,6 +21,7 @@ const FIELD_CATALOG = [
   { value: 'position', label: 'PUESTO' },
   { value: 'department', label: 'DIRECCIÓN' },
   { value: 'secretariat', label: 'SECRETARÍA' },
+  { value: 'delegate', label: 'DELEGADO ASIGNADO' },
   { value: 'memberType', label: 'TIPO DE AGREMIADO' },
   { value: 'address', label: 'DOMICILIO' },
   { value: 'colonia', label: 'COLONIA' },
