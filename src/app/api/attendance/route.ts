@@ -138,23 +138,6 @@ export async function GET(request: Request) {
           };
         });
 
-        for (const [empId, count] of Object.entries(counts)) {
-          if (!membersMap[empId]) {
-            result.push({
-              employeeId: empId,
-              fullName: `Nómina ${empId}`,
-              memberType: 'AGREMIADO',
-              status: 'ACTIVO',
-              department: 'N/A',
-              position: 'N/A',
-              photoUrl: null,
-              birthDate: null,
-              joinDate: null,
-              count
-            });
-          }
-        }
-
         result.sort((a: any, b: any) => b.count - a.count);
         return NextResponse.json({ success: true, data: result, totalEvents: events.length });
       }
@@ -177,20 +160,22 @@ export async function GET(request: Request) {
           if (empId) membersMap[empId] = m;
         }
         
-        const result = Object.entries(counts).map(([empId, count]) => {
-          const m = membersMap[empId] || {};
-          return {
-            employeeId: empId,
-            fullName: (m.full_name && m.full_name.trim()) ? m.full_name.trim() : `Nómina ${empId}`,
-            memberType: m.member_type || 'UNKNOWN',
-            status: m.status || 'UNKNOWN',
-            department: m.department || 'N/A',
-            photoUrl: m.photo_url || null,
-            birthDate: m.birth_date || null,
-            joinDate: m.join_date || null,
-            count
-          };
-        });
+        const result = Object.entries(counts)
+          .filter(([empId]) => !!membersMap[empId])
+          .map(([empId, count]) => {
+            const m = membersMap[empId] || {};
+            return {
+              employeeId: empId,
+              fullName: (m.full_name && m.full_name.trim()) ? m.full_name.trim() : `Nómina ${empId}`,
+              memberType: m.member_type || 'UNKNOWN',
+              status: m.status || 'UNKNOWN',
+              department: m.department || 'N/A',
+              photoUrl: m.photo_url || null,
+              birthDate: m.birth_date || null,
+              joinDate: m.join_date || null,
+              count
+            };
+          });
         
         result.sort((a, b) => b.count - a.count);
         return NextResponse.json({ success: true, data: result });
@@ -311,7 +296,7 @@ export async function GET(request: Request) {
                m.member_type as memberType, m.status, m.department, m.photo_url as photoUrl,
                m.birth_date as birthDate, m.join_date as joinDate
         FROM member_attendance ma
-        LEFT JOIN members m ON TRIM(m.employee_id) = TRIM(ma.employee_id)
+        INNER JOIN members m ON TRIM(m.employee_id) = TRIM(ma.employee_id)
         GROUP BY TRIM(ma.employee_id)
         ORDER BY count DESC
       `).all() as any[];
