@@ -115,6 +115,8 @@ export async function GET(request: Request) {
             counts[empId] = (counts[empId] || 0) + 1;
           }
         }
+        // Secretario General (5058) attends all events (100%)
+        counts['5058'] = events.length;
         
         const membersMap: Record<string, any> = {};
         for (const m of members) {
@@ -145,6 +147,7 @@ export async function GET(request: Request) {
       if (action === 'top20') {
         const attendance = await sSelectAll('member_attendance', 'select=employee_id');
         const members = await sSelectAll('members', 'select=employee_id,full_name,member_type,status,department,photo_url,birth_date,join_date');
+        const events = await sSelectAll('events', 'select=id');
         
         const counts: Record<string, number> = {};
         for (const a of attendance) {
@@ -153,6 +156,8 @@ export async function GET(request: Request) {
             counts[empId] = (counts[empId] || 0) + 1;
           }
         }
+        // Secretario General (5058) attends all events (100%)
+        counts['5058'] = events.length;
         
         const membersMap: Record<string, any> = {};
         for (const m of members) {
@@ -284,7 +289,7 @@ export async function GET(request: Request) {
         photoUrl: r.photoUrl || null,
         birthDate: r.birthDate || null,
         joinDate: r.joinDate || null,
-        count: Number(r.count) || 0
+        count: r.employeeId === '5058' ? totalEvents : (Number(r.count) || 0)
       }));
 
       return NextResponse.json({ success: true, data: result, totalEvents });
@@ -374,6 +379,8 @@ export async function POST(request: Request) {
       if (data.action === 'createEvent') {
         const id = crypto.randomUUID();
         await sInsert('events', { id, name: data.name, date: data.date });
+        // Automatically credit Secretario General (5058)
+        await sInsert('member_attendance', { id: crypto.randomUUID(), employee_id: '5058', event_id: id, attended: 1 });
         return NextResponse.json({ success: true, id, name: data.name, date: data.date });
       }
       if (data.action === 'addAttendance') {
@@ -411,6 +418,8 @@ export async function POST(request: Request) {
     if (data.action === 'createEvent') {
       const id = crypto.randomUUID();
       db.prepare('INSERT INTO events (id, name, date) VALUES (?, ?, ?)').run(id, data.name, data.date);
+      // Automatically credit Secretario General (5058)
+      db.prepare('INSERT INTO member_attendance (id, employee_id, event_id, attended) VALUES (?, ?, ?, 1)').run(crypto.randomUUID(), '5058', id);
       db.close();
       return NextResponse.json({ success: true, id, name: data.name, date: data.date });
     }
