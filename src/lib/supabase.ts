@@ -35,6 +35,25 @@ export async function sSelect(table: string, query = ''): Promise<any[]> {
   return res.json();
 }
 
+/** SELECT all rows with automatic pagination for tables > 1000 rows */
+export async function sSelectAll(table: string, query = ''): Promise<any[]> {
+  const limit = 1000;
+  let offset = 0;
+  const allRows: any[] = [];
+  
+  while (true) {
+    const sep = query ? '&' : '';
+    const pageQuery = `${query}${sep}limit=${limit}&offset=${offset}`;
+    const res = await rest(`${table}?${pageQuery}`);
+    const batch = await res.json();
+    if (!Array.isArray(batch) || batch.length === 0) break;
+    allRows.push(...batch);
+    if (batch.length < limit) break;
+    offset += limit;
+  }
+  return allRows;
+}
+
 /** SELECT one row */
 export async function sSelectOne(table: string, query: string): Promise<any | null> {
   const res = await rest(`${table}?${query}&limit=1`);

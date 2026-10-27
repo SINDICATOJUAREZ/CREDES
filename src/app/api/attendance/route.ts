@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { isProduction, sSelect, sSelectOne, sInsert, sUpdate, sDelete } from '@/lib/supabase';
+import { isProduction, sSelect, sSelectAll, sSelectOne, sInsert, sUpdate, sDelete } from '@/lib/supabase';
 import { MEMBER_MAPPING, mapToFrontend } from '@/lib/db-utils';
 import { hasPermission } from '@/lib/auth-utils';
 
@@ -104,34 +104,39 @@ export async function GET(request: Request) {
 
     if (isProduction) {
       if (action === 'history') {
-        const attendance = await sSelect('member_attendance', 'select=employee_id');
-        const members = await sSelect('members', 'select=employee_id,full_name,member_type,status,department,position,photo_url,birth_date,join_date');
-        const events = await sSelect('events', 'select=id');
+        const attendance = await sSelectAll('member_attendance', 'select=employee_id');
+        const members = await sSelectAll('members', 'select=employee_id,full_name,member_type,status,department,position,photo_url,birth_date,join_date');
+        const events = await sSelectAll('events', 'select=id');
         
         const counts: Record<string, number> = {};
         for (const a of attendance) {
-          if (a.employee_id) {
-            counts[a.employee_id] = (counts[a.employee_id] || 0) + 1;
+          const empId = (a.employee_id || '').trim();
+          if (empId) {
+            counts[empId] = (counts[empId] || 0) + 1;
           }
         }
         
         const membersMap: Record<string, any> = {};
         for (const m of members) {
-          membersMap[m.employee_id] = m;
+          const empId = (m.employee_id || '').trim();
+          if (empId) membersMap[empId] = m;
         }
         
-        const result = members.map((m: any) => ({
-          employeeId: m.employee_id,
-          fullName: (m.full_name && m.full_name.trim()) ? m.full_name.trim() : `Nómina ${m.employee_id}`,
-          memberType: m.member_type || 'AGREMIADO',
-          status: m.status || 'ACTIVO',
-          department: m.department || 'N/A',
-          position: m.position || 'N/A',
-          photoUrl: m.photo_url || null,
-          birthDate: m.birth_date || null,
-          joinDate: m.join_date || null,
-          count: counts[m.employee_id] || 0
-        }));
+        const result = members.map((m: any) => {
+          const empId = (m.employee_id || '').trim();
+          return {
+            employeeId: empId,
+            fullName: (m.full_name && m.full_name.trim()) ? m.full_name.trim() : `Nómina ${empId}`,
+            memberType: m.member_type || 'AGREMIADO',
+            status: m.status || 'ACTIVO',
+            department: m.department || 'N/A',
+            position: m.position || 'N/A',
+            photoUrl: m.photo_url || null,
+            birthDate: m.birth_date || null,
+            joinDate: m.join_date || null,
+            count: counts[empId] || 0
+          };
+        });
 
         for (const [empId, count] of Object.entries(counts)) {
           if (!membersMap[empId]) {
@@ -155,26 +160,28 @@ export async function GET(request: Request) {
       }
 
       if (action === 'top20') {
-        const attendance = await sSelect('member_attendance', 'select=employee_id');
-        const members = await sSelect('members', 'select=employee_id,full_name,member_type,status,department,photo_url,birth_date,join_date');
+        const attendance = await sSelectAll('member_attendance', 'select=employee_id');
+        const members = await sSelectAll('members', 'select=employee_id,full_name,member_type,status,department,photo_url,birth_date,join_date');
         
         const counts: Record<string, number> = {};
         for (const a of attendance) {
-          if (a.employee_id) {
-            counts[a.employee_id] = (counts[a.employee_id] || 0) + 1;
+          const empId = (a.employee_id || '').trim();
+          if (empId) {
+            counts[empId] = (counts[empId] || 0) + 1;
           }
         }
         
         const membersMap: Record<string, any> = {};
         for (const m of members) {
-          membersMap[m.employee_id] = m;
+          const empId = (m.employee_id || '').trim();
+          if (empId) membersMap[empId] = m;
         }
         
         const result = Object.entries(counts).map(([empId, count]) => {
           const m = membersMap[empId] || {};
           return {
             employeeId: empId,
-            fullName: m.full_name || `Nómina ${empId}`,
+            fullName: (m.full_name && m.full_name.trim()) ? m.full_name.trim() : `Nómina ${empId}`,
             memberType: m.member_type || 'UNKNOWN',
             status: m.status || 'UNKNOWN',
             department: m.department || 'N/A',
@@ -259,7 +266,7 @@ export async function GET(request: Request) {
     if (action === 'history') {
       const rows = db.prepare(`
         SELECT 
-          m.employee_id as employeeId,
+          TRIM(m.employee_id) as employeeId,
           m.full_name as fullName,
           m.member_type as memberType,
           m.status,
@@ -271,10 +278,10 @@ export async function GET(request: Request) {
           COALESCE(att.count, 0) as count
         FROM members m
         LEFT JOIN (
-          SELECT employee_id, COUNT(*) as count
+          SELECT TRIM(employee_id) as employee_id, COUNT(*) as count
           FROM member_attendance
-          GROUP BY employee_id
-        ) att ON att.employee_id = m.employee_id
+          GROUP BY TRIM(employee_id)
+        ) att ON att.employee_id = TRIM(m.employee_id)
         ORDER BY count DESC, m.full_name ASC
       `).all() as any[];
 
@@ -300,12 +307,12 @@ export async function GET(request: Request) {
 
     if (action === 'top20') {
       const rows = db.prepare(`
-        SELECT ma.employee_id as employeeId, COUNT(*) as count, m.full_name as fullName, 
+        SELECT TRIM(ma.employee_id) as employeeId, COUNT(*) as count, m.full_name as fullName, 
                m.member_type as memberType, m.status, m.department, m.photo_url as photoUrl,
                m.birth_date as birthDate, m.join_date as joinDate
         FROM member_attendance ma
-        LEFT JOIN members m ON m.employee_id = ma.employee_id
-        GROUP BY ma.employee_id
+        LEFT JOIN members m ON TRIM(m.employee_id) = TRIM(ma.employee_id)
+        GROUP BY TRIM(ma.employee_id)
         ORDER BY count DESC
       `).all() as any[];
       db.close();
