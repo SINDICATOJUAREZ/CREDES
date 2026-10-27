@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Search, Gift, ClipboardCheck, User as UserIcon, Plus, Trash2, Users, FileText, Eye, QrCode, ArrowLeft, Trophy, BarChart3, Download, X, Edit2, Check, Calendar } from 'lucide-react';
+import { Search, Gift, ClipboardCheck, User as UserIcon, Plus, Trash2, Users, FileText, Eye, QrCode, ArrowLeft, Trophy, BarChart3, Download, X, Edit2, Check, Calendar, History, ArrowUpDown, ArrowUp, ArrowDown, Printer, FileSpreadsheet, Filter } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Member } from '@/types/member';
@@ -12,7 +12,7 @@ import * as XLSX from 'xlsx';
 import { useBackHandler } from '@/hooks/useBackHandler';
 
 interface Props { isOpen?: boolean; onClose?: () => void; initialTab?: TabType; inline?: boolean; onlyShowBirthdays?: boolean; }
-type TabType = 'busqueda' | 'cumpleanos' | 'asistencia' | 'top20';
+type TabType = 'busqueda' | 'cumpleanos' | 'asistencia' | 'top20' | 'historial';
 interface AttRecord { id: string; name: string; date: string; created_at: string; }
 interface EventRecord { id: string; name: string; date: string; attendee_count: number; }
 
@@ -110,6 +110,17 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
   const [top20Search, setTop20Search] = useState('');
   const [top20TypeFilter, setTop20TypeFilter] = useState('ALL');
   const [top20SubTab, setTop20SubTab] = useState<'general' | 'espera'>('general');
+
+  // Historial states
+  const [historyData, setHistoryData] = useState<any[]>([]);
+  const [historyTotalEvents, setHistoryTotalEvents] = useState<number>(0);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyCategory, setHistoryCategory] = useState<'ALL' | 'AGREMIADOS' | 'ESPERA'>('ALL');
+  const [historySortOrder, setHistorySortOrder] = useState<'desc' | 'asc'>('desc');
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<'ALL' | 'ACTIVO' | 'NO_BAJAS' | 'BAJA'>('NO_BAJAS');
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPerPage, setHistoryPerPage] = useState<number>(50);
 
   // Back button navigation for mobile sub-screens
   useBackHandler({
@@ -250,6 +261,296 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
     link.click();
     document.body.removeChild(link);
     toast.success('Excel/CSV de asistentes descargado');
+  };
+
+  useEffect(() => { 
+    if ((isOpen || inline) && tab === 'historial') {
+      loadHistory();
+    } 
+  }, [isOpen, inline, tab]);
+
+  const loadHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const r = await fetch('/api/attendance?action=history');
+      const d = await r.json();
+      if (d.success) {
+        setHistoryData(d.data || []);
+        if (d.totalEvents) setHistoryTotalEvents(d.totalEvents);
+      } else {
+        toast.error(d.error || 'Error cargando historial de asistencias');
+      }
+    } catch { 
+      toast.error('Error cargando historial de asistencias'); 
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const filteredHistory = historyData.filter((item: any) => {
+    // 1. Grupo: Agremiados, Lista de Espera o Ambos
+    if (historyCategory === 'AGREMIADOS') {
+      if (item.memberType === 'LISTA DE ESPERA') return false;
+    } else if (historyCategory === 'ESPERA') {
+      if (item.memberType !== 'LISTA DE ESPERA') return false;
+    }
+
+    // 2. Estatus
+    if (historyStatusFilter === 'ACTIVO' && item.status !== 'ACTIVO') return false;
+    if (historyStatusFilter === 'NO_BAJAS' && (item.status === 'BAJA' || item.status === 'FINADO')) return false;
+    if (historyStatusFilter === 'BAJA' && item.status !== 'BAJA' && item.status !== 'FINADO') return false;
+
+    // 3. Búsqueda
+    if (historySearch.trim()) {
+      const q = historySearch.toLowerCase().trim();
+      const match = (item.fullName || '').toLowerCase().includes(q) ||
+                    (item.employeeId || '').toLowerCase().includes(q) ||
+                    (item.department || '').toLowerCase().includes(q) ||
+                    (item.position || '').toLowerCase().includes(q);
+      if (!match) return false;
+    }
+
+    return true;
+  });
+
+  const sortedHistory = [...filteredHistory].sort((a: any, b: any) => {
+    const cA = Number(a.count) || 0;
+    const cB = Number(b.count) || 0;
+    if (historySortOrder === 'asc') {
+      if (cA !== cB) return cA - cB;
+      return (a.fullName || '').localeCompare(b.fullName || '');
+    } else {
+      if (cA !== cB) return cB - cA;
+      return (a.fullName || '').localeCompare(b.fullName || '');
+    }
+  });
+
+  const exportHistoryToExcel = () => {
+    if (sortedHistory.length === 0) {
+      toast.error('No hay registros para exportar');
+      return;
+    }
+
+    const catLabel = historyCategory === 'ALL' 
+      ? 'AMBOS (AGREMIADOS Y LISTA DE ESPERA)' 
+      : (historyCategory === 'AGREMIADOS' ? 'SOLO AGREMIADOS' : 'SOLO LISTA DE ESPERA');
+    const orderLabel = historySortOrder === 'asc' 
+      ? 'ASCENDENTE (MENOR A MAYOR ASISTENCIAS)' 
+      : 'DESCENDENTE (MAYOR A MENOR ASISTENCIAS)';
+    const fecha = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    const headers = [
+      'POSICIÓN',
+      'NÓMINA',
+      'NOMBRE COMPLETO',
+      'TIPO DE MIEMBRO',
+      'DEPARTAMENTO',
+      'PUESTO',
+      'ESTATUS',
+      'TOTAL ASISTENCIAS',
+      '% ASISTENCIA'
+    ];
+
+    const rows = sortedHistory.map((m, idx) => {
+      const pct = historyTotalEvents > 0 ? `${Math.round(((m.count || 0) / historyTotalEvents) * 100)}%` : '0%';
+      return [
+        idx + 1,
+        m.employeeId || '',
+        m.fullName || '',
+        m.memberType || '',
+        m.department || '',
+        m.position || '',
+        m.status || '',
+        m.count || 0,
+        pct
+      ];
+    });
+
+    const titleRow1 = ['SINDICATO ÚNICO DE TRABAJADORES AL SERVICIO DEL MUNICIPIO DE BENITO JUÁREZ'];
+    const titleRow2 = ['REPORTE DE HISTORIAL DE ASISTENCIAS - REPORTE COMPLETO'];
+    const infoRow1 = [`Filtro: ${catLabel} | Orden: ${orderLabel}`];
+    const infoRow2 = [`Total Registros: ${sortedHistory.length} | Fecha de Generación: ${fecha}`];
+
+    const wsData = [
+      titleRow1,
+      titleRow2,
+      infoRow1,
+      infoRow2,
+      [],
+      headers,
+      ...rows
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } },
+      { s: { r: 2, c: 0 }, e: { r: 2, c: 8 } },
+      { s: { r: 3, c: 0 }, e: { r: 3, c: 8 } }
+    ];
+
+    const colWidths = headers.map((header, i) => {
+      let maxLen = header.length;
+      rows.forEach(row => {
+        const val = String(row[i] || '');
+        if (val.length > maxLen) maxLen = val.length;
+      });
+      return { wch: Math.max(maxLen + 3, 10) };
+    });
+    ws['!cols'] = colWidths;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Historial Asistencias');
+
+    const cleanCat = historyCategory.toLowerCase();
+    XLSX.writeFile(wb, `Reporte_Historial_Asistencias_${cleanCat}_${historySortOrder}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success('Reporte de historial descargado en Excel');
+  };
+
+  const printHistoryPDF = () => {
+    toast.info('Generando vista previa del reporte...');
+    try {
+      const w = window.open('', '_blank');
+      if (!w) { toast.error('Popup bloqueado. Por favor permite las ventanas emergentes.'); return; }
+
+      const catLabel = historyCategory === 'ALL' 
+        ? 'PADRÓN GENERAL (AMBOS: AGREMIADOS Y LISTA DE ESPERA)' 
+        : (historyCategory === 'AGREMIADOS' ? 'PADRÓN DE AGREMIADOS' : 'PADRÓN EN LISTA DE ESPERA');
+      const orderLabel = historySortOrder === 'asc' ? 'ORDEN ASCENDENTE (MENOR A MAYOR)' : 'ORDEN DESCENDENTE (MAYOR A MENOR)';
+      const reportTitle = 'REPORTE GENERAL DE HISTORIAL DE ASISTENCIAS';
+
+      const rows = sortedHistory.map((m, idx) => {
+        const pct = historyTotalEvents > 0 ? `${Math.round(((m.count || 0) / historyTotalEvents) * 100)}%` : '0%';
+        return `
+        <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
+          <td style="padding: 8px 10px; font-weight: bold; color: #64748b; text-align: center;">${idx + 1}</td>
+          <td style="padding: 8px 10px; font-family: monospace; font-weight: bold; text-align: center;">${m.employeeId || 'N/A'}</td>
+          <td style="padding: 8px 10px; font-weight: bold; text-transform: uppercase;">${m.fullName || 'N/A'}</td>
+          <td style="padding: 8px 10px; text-transform: uppercase; font-size: 10px; color: #475569;">${m.department || 'N/A'}</td>
+          <td style="padding: 8px 10px; text-transform: uppercase; font-size: 10px; color: #475569;">${m.position || 'N/A'}</td>
+          <td style="padding: 8px 10px; text-transform: uppercase; font-size: 10px; text-align: center;">
+            <span style="padding: 3px 6px; border-radius: 4px; font-weight: bold; ${
+              m.memberType === 'LISTA DE ESPERA' ? 'background: #fef3c7; color: #92400e;' : 'background: #e0e7ff; color: #3730a3;'
+            }">${getMemberTypeLabel(m.memberType || '')}</span>
+          </td>
+          <td style="padding: 8px 10px; text-align: center;">
+            <span style="padding: 3px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; ${
+              m.status === 'ACTIVO' ? 'background: #dcfce7; color: #15803d;' : 'background: #fee2e2; color: #b91c1c;'
+            }">${m.status || 'ACTIVO'}</span>
+          </td>
+          <td style="padding: 8px 10px; text-align: center; font-weight: 900; font-size: 13px; color: #1e3a8a;">
+            ${m.count || 0}
+          </td>
+          <td style="padding: 8px 10px; text-align: center; font-weight: bold; font-size: 11px; color: #64748b;">
+            ${pct}
+          </td>
+        </tr>
+      `;
+      }).join('');
+
+      w.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${reportTitle}</title>
+        <style>
+          body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 40px; color: #000; line-height: 1.4; background: #fff; }
+          .report-container { width: 100%; max-width: 1150px; margin: 0 auto; }
+          .header-container { display: flex; align-items: center; justify-content: center; margin-bottom: 20px; border-bottom: 2px solid #1e3a8a; padding-bottom: 15px; }
+          .logo-box { text-align: center; width: 100%; }
+          .logo-img { height: 95px; width: auto; max-width: 100%; display: block; margin: 0 auto; }
+          .page-title { text-align: center; font-size: 17px; font-weight: 900; margin: 15px 0 5px 0; text-transform: uppercase; color: #1f2937; letter-spacing: 0.5px; }
+          .page-subtitle { text-align: center; font-size: 12px; font-weight: bold; color: #64748b; margin-bottom: 20px; text-transform: uppercase; }
+          .summary-box { display: flex; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 20px; margin-bottom: 25px; flex-wrap: wrap; gap: 10px; }
+          .summary-item { font-size: 11px; font-weight: bold; color: #475569; }
+          .summary-item span { font-size: 13px; font-weight: 900; color: #1e3a8a; margin-left: 4px; }
+          .report-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          .report-table th { background: #1e3a8a; color: white; padding: 10px 8px; font-size: 10px; font-weight: bold; text-transform: uppercase; border: 1px solid #1e3a8a; }
+          .report-table td { border: 1px solid #e2e8f0; }
+          .signature-section { display: flex; justify-content: space-around; margin-top: 60px; page-break-inside: avoid; }
+          .signature-box { width: 250px; text-align: center; border-top: 1px solid #000; padding-top: 10px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+          @media print { 
+            .actions-bar { display: none !important; }
+            body { padding: 0; }
+            .report-container { max-width: 100%; margin: 0; }
+          }
+          .actions-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 100; }
+          .btn { border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; transition: all 0.2s; }
+          .btn-print { background: #1e3a8a; color: white; }
+          .btn-download { background: #059669; color: white; }
+        </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+        <script>
+          function downloadPDF() {
+            const element = document.querySelector('.report-container');
+            const opt = {
+              margin: 8,
+              filename: 'Reporte_Historial_Asistencias.pdf',
+              image: { type: 'jpeg', quality: 0.98 },
+              html2canvas: { scale: 2, useCORS: true },
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+            html2pdf().set(opt).from(element).save();
+          }
+        </script>
+      </head>
+      <body>
+        <div class="actions-bar">
+          <button class="btn btn-download" onclick="downloadPDF()">Descargar PDF</button>
+          <button class="btn btn-print" onclick="window.print()">Imprimir Reporte</button>
+        </div>
+        <div class="report-container">
+          <div class="header-container">
+            <div class="logo-box">
+              <img src="/logos/logo2.png" class="logo-img">
+            </div>
+          </div>
+          <div class="page-title">${reportTitle}</div>
+          <div class="page-subtitle">${catLabel} | ${orderLabel}</div>
+          <div class="summary-box">
+            <div class="summary-item">Total miembros: <span>${sortedHistory.length}</span></div>
+            <div class="summary-item">Con asistencias: <span>${sortedHistory.filter(m => m.count > 0).length}</span></div>
+            <div class="summary-item">Sin asistencias (0): <span>${sortedHistory.filter(m => m.count === 0).length}</span></div>
+            <div class="summary-item">Total eventos sistema: <span>${historyTotalEvents}</span></div>
+            <div class="summary-item">Fecha: <span>${new Date().toLocaleDateString('es-ES', {day:'2-digit', month:'2-digit', year:'numeric'})}</span></div>
+          </div>
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th style="width: 45px;">No.</th>
+                <th style="width: 80px;">Nómina</th>
+                <th>Nombre del Trabajador</th>
+                <th>Secretaría / Dirección</th>
+                <th>Puesto Oficial</th>
+                <th style="width: 105px;">Tipo Miembro</th>
+                <th style="width: 80px;">Estatus</th>
+                <th style="width: 80px;">Asistencias</th>
+                <th style="width: 65px;">% Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows || '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #999;">No se encontraron registros para este reporte.</td></tr>'}
+            </tbody>
+          </table>
+          <div class="signature-section">
+            <div class="signature-box">
+              <p style="margin: 0;">Elaboró</p>
+              <p style="margin: 40px 0 0 0; color: #64748b;">Comisión de Actas y Asistencias</p>
+            </div>
+            <div class="signature-box">
+              <p style="margin: 0;">Autorizó</p>
+              <p style="margin: 40px 0 0 0; color: #64748b;">Secretaría General</p>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+      `);
+      w.document.close();
+    } catch (e: any) {
+      toast.error('Error al generar el reporte: ' + e.message);
+    }
   };
 
   useEffect(() => { 
@@ -1218,9 +1519,15 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
               {([
                 ['busqueda','Consultar',Search],
                 ['asistencia','Asistencia',ClipboardCheck],
-                ['top20','Dashboard Asistencias',Trophy]
+                ['top20','Dashboard Asistencias',Trophy],
+                ['historial','Historial',History]
               ] as const).map(([k,l,Icon])=>(
-                <button key={k} onClick={()=>{setTab(k as TabType); if(k==='asistencia')loadEvents(); if(k==='top20')loadTop20();}}
+                <button key={k} onClick={()=>{
+                  setTab(k as TabType); 
+                  if(k==='asistencia') loadEvents(); 
+                  if(k==='top20') loadTop20();
+                  if(k==='historial') loadHistory();
+                }}
                   className={`flex-1 md:w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-2 md:px-4 py-3 md:py-3.5 rounded-xl transition-all duration-300 ${tab===k?'bg-blue-600 text-white shadow-lg shadow-blue-900/40 md:translate-x-1':'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
                   <Icon className={`w-5 h-5 md:w-4 md:h-4 ${tab===k?'text-white':'text-gray-500 group-hover:text-white'}`} />
                   <span className="text-[10px] md:text-sm font-bold tracking-tight">{l}</span>
@@ -1714,6 +2021,474 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {tab === 'historial' && (
+            <div className="flex-1 flex flex-col h-full overflow-hidden p-4 md:p-8">
+              {/* Header */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 shrink-0">
+                    <History className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl md:text-3xl font-black text-blue-900 tracking-tighter uppercase mb-0.5">
+                      Historial de Asistencias
+                    </h2>
+                    <p className="text-xs md:text-sm text-gray-500 font-medium">
+                      Reporte general y consolidado de asistencia de todos los miembros
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <Button
+                    onClick={exportHistoryToExcel}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs md:text-sm gap-2 shadow-md shadow-emerald-700/20 rounded-xl px-4 py-2.5 transition-all"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    <span>Exportar Excel</span>
+                  </Button>
+                  <Button
+                    onClick={printHistoryPDF}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs md:text-sm gap-2 shadow-md shadow-blue-700/20 rounded-xl px-4 py-2.5 transition-all"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>Imprimir Reporte</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* Control Panel / Filters */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 mb-6 shadow-sm shrink-0 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Selector: Agremiados, Lista de Espera o Ambos */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Tipo de Miembro
+                    </span>
+                    <div className="flex bg-slate-200/70 p-1 rounded-xl gap-1">
+                      <button
+                        onClick={() => { setHistoryCategory('ALL'); setHistoryPage(1); }}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-black transition-all ${
+                          historyCategory === 'ALL'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Ambos
+                      </button>
+                      <button
+                        onClick={() => { setHistoryCategory('AGREMIADOS'); setHistoryPage(1); }}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-black transition-all ${
+                          historyCategory === 'AGREMIADOS'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Agremiados
+                      </button>
+                      <button
+                        onClick={() => { setHistoryCategory('ESPERA'); setHistoryPage(1); }}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-black transition-all ${
+                          historyCategory === 'ESPERA'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Lista de Espera
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Selector: Ascendente o Descendente */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Orden por Asistencias
+                    </span>
+                    <div className="flex bg-slate-200/70 p-1 rounded-xl gap-1">
+                      <button
+                        onClick={() => { setHistorySortOrder('desc'); setHistoryPage(1); }}
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-black transition-all ${
+                          historySortOrder === 'desc'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                        Descendente
+                      </button>
+                      <button
+                        onClick={() => { setHistorySortOrder('asc'); setHistoryPage(1); }}
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-black transition-all ${
+                          historySortOrder === 'asc'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                        Ascendente
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Filtro de Estatus */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Filtro Estatus
+                    </span>
+                    <div className="flex bg-slate-200/70 p-1 rounded-xl gap-1">
+                      <button
+                        onClick={() => { setHistoryStatusFilter('ALL'); setHistoryPage(1); }}
+                        className={`flex-1 py-1.5 px-1.5 rounded-lg text-[11px] font-bold transition-all text-center ${
+                          historyStatusFilter === 'ALL'
+                            ? 'bg-white text-slate-900 shadow-sm font-black'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Todos
+                      </button>
+                      <button
+                        onClick={() => { setHistoryStatusFilter('ACTIVO'); setHistoryPage(1); }}
+                        className={`flex-1 py-1.5 px-1.5 rounded-lg text-[11px] font-bold transition-all text-center ${
+                          historyStatusFilter === 'ACTIVO'
+                            ? 'bg-white text-slate-900 shadow-sm font-black'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Activos
+                      </button>
+                      <button
+                        onClick={() => { setHistoryStatusFilter('NO_BAJAS'); setHistoryPage(1); }}
+                        className={`flex-1 py-1.5 px-1.5 rounded-lg text-[11px] font-bold transition-all text-center ${
+                          historyStatusFilter === 'NO_BAJAS'
+                            ? 'bg-white text-slate-900 shadow-sm font-black'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Sin Bajas
+                      </button>
+                      <button
+                        onClick={() => { setHistoryStatusFilter('BAJA'); setHistoryPage(1); }}
+                        className={`flex-1 py-1.5 px-1.5 rounded-lg text-[11px] font-bold transition-all text-center ${
+                          historyStatusFilter === 'BAJA'
+                            ? 'bg-white text-slate-900 shadow-sm font-black'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Bajas
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Búsqueda rápida */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Búsqueda Rápida
+                    </span>
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        type="text"
+                        placeholder="Buscar nómina, nombre..."
+                        value={historySearch}
+                        onChange={e => { setHistorySearch(e.target.value); setHistoryPage(1); }}
+                        className="pl-9 pr-8 bg-white border-slate-200 rounded-xl text-xs h-9 font-medium"
+                      />
+                      {historySearch && (
+                        <button
+                          onClick={() => { setHistorySearch(''); setHistoryPage(1); }}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* KPI Metrics Strip */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 pt-3 border-t border-slate-200/60">
+                  <div className="bg-white p-2.5 rounded-xl border border-slate-100 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Total Miembros</p>
+                      <p className="text-base font-black text-slate-800 leading-tight">{sortedHistory.length}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-2.5 rounded-xl border border-slate-100 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                      <ClipboardCheck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Con Asistencias</p>
+                      <p className="text-base font-black text-emerald-700 leading-tight">
+                        {sortedHistory.filter(m => (m.count || 0) > 0).length}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-2.5 rounded-xl border border-slate-100 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                      <UserIcon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Sin Asistencias (0)</p>
+                      <p className="text-base font-black text-rose-600 leading-tight">
+                        {sortedHistory.filter(m => (m.count || 0) === 0).length}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-2.5 rounded-xl border border-slate-100 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                      <BarChart3 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Promedio Asistencias</p>
+                      <p className="text-base font-black text-indigo-900 leading-tight">
+                        {sortedHistory.length > 0 
+                          ? (sortedHistory.reduce((acc, m) => acc + (m.count || 0), 0) / sortedHistory.length).toFixed(1)
+                          : '0'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-2.5 rounded-xl border border-slate-100 flex items-center gap-3 col-span-2 sm:col-span-1">
+                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                      <Calendar className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Eventos Registrados</p>
+                      <p className="text-base font-black text-amber-700 leading-tight">{historyTotalEvents}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Members Table */}
+              <div className="flex-1 bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col min-h-0">
+                {historyLoading ? (
+                  <div className="flex-1 flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
+                    <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-sm font-bold">Cargando reporte de historial...</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex-1 overflow-y-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead className="bg-slate-100/80 sticky top-0 z-10 border-b border-slate-200">
+                          <tr>
+                            <th className="py-3 px-3 text-[11px] font-black text-slate-500 uppercase tracking-wider text-center w-12">#</th>
+                            <th className="py-3 px-3 text-[11px] font-black text-slate-500 uppercase tracking-wider text-center w-24">Nómina</th>
+                            <th className="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-wider">Miembro</th>
+                            <th className="py-3 px-3 text-[11px] font-black text-slate-500 uppercase tracking-wider text-center hidden md:table-cell">Tipo</th>
+                            <th className="py-3 px-3 text-[11px] font-black text-slate-500 uppercase tracking-wider hidden lg:table-cell">Departamento / Puesto</th>
+                            <th className="py-3 px-3 text-[11px] font-black text-slate-500 uppercase tracking-wider text-center">Estatus</th>
+                            <th className="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-wider text-center w-40">Asistencias</th>
+                            <th className="py-3 px-3 text-[11px] font-black text-slate-500 uppercase tracking-wider text-center w-28">Acción</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {(() => {
+                            const perPage = historyPerPage === 0 ? sortedHistory.length : historyPerPage;
+                            const startIndex = (historyPage - 1) * perPage;
+                            const pageItems = sortedHistory.slice(startIndex, startIndex + perPage);
+
+                            if (pageItems.length === 0) {
+                              return (
+                                <tr>
+                                  <td colSpan={8} className="py-16 text-center text-slate-400 font-medium italic">
+                                    No se encontraron miembros con los filtros aplicados.
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            return pageItems.map((item, idx) => {
+                              const pos = startIndex + idx + 1;
+                              const count = Number(item.count) || 0;
+                              const maxEvents = historyTotalEvents > 0 ? historyTotalEvents : Math.max(1, ...sortedHistory.map(m => m.count || 0));
+                              const pct = Math.min(100, Math.round((count / maxEvents) * 100));
+
+                              return (
+                                <tr
+                                  key={item.employeeId || idx}
+                                  className="hover:bg-blue-50/40 transition-colors group"
+                                >
+                                  {/* Position */}
+                                  <td className="py-3 px-3 text-center text-xs font-bold text-slate-400">
+                                    <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-black text-[10px]">
+                                      {pos}
+                                    </span>
+                                  </td>
+
+                                  {/* Nómina */}
+                                  <td className="py-3 px-3 text-center font-mono text-xs font-bold text-slate-700">
+                                    {item.employeeId || 'N/A'}
+                                  </td>
+
+                                  {/* Member Info */}
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                                        {item.photoUrl ? (
+                                          <img
+                                            src={item.photoUrl}
+                                            alt=""
+                                            className="w-full h-full object-cover"
+                                            onError={(e: any) => { e.target.style.display = 'none'; }}
+                                          />
+                                        ) : (
+                                          <div className="w-full h-full flex items-center justify-center text-slate-400 font-black text-xs bg-slate-100">
+                                            {(item.fullName || 'M').charAt(0)}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="font-bold text-slate-800 text-xs md:text-sm truncate uppercase group-hover:text-blue-600 transition-colors">
+                                          {item.fullName}
+                                        </p>
+                                        <p className="text-[10px] text-slate-400 truncate md:hidden">
+                                          {item.department || item.position || 'N/A'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  {/* Type */}
+                                  <td className="py-3 px-3 text-center hidden md:table-cell">
+                                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                                      item.memberType === 'LISTA DE ESPERA' ? 'bg-amber-100 text-amber-800' :
+                                      item.memberType === 'DELEGADO' ? 'bg-purple-100 text-purple-800' :
+                                      item.memberType === 'SECRETARIO GENERAL' ? 'bg-indigo-100 text-indigo-800' :
+                                      'bg-blue-100 text-blue-800'
+                                    }`}>
+                                      {getMemberTypeLabel(item.memberType)}
+                                    </span>
+                                  </td>
+
+                                  {/* Department & Position */}
+                                  <td className="py-3 px-3 hidden lg:table-cell">
+                                    <p className="text-xs text-slate-700 font-medium truncate max-w-[200px]">
+                                      {item.department || 'N/A'}
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase truncate max-w-[200px]">
+                                      {item.position || 'N/A'}
+                                    </p>
+                                  </td>
+
+                                  {/* Status */}
+                                  <td className="py-3 px-3 text-center">
+                                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                                      item.status === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800' :
+                                      item.status === 'BAJA' ? 'bg-rose-100 text-rose-800' :
+                                      item.status === 'PENDIENTE' ? 'bg-amber-100 text-amber-800' :
+                                      'bg-slate-100 text-slate-700'
+                                    }`}>
+                                      {item.status || 'ACTIVO'}
+                                    </span>
+                                  </td>
+
+                                  {/* Attendance Count & Progress */}
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex-1 h-3.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60 relative">
+                                        <div
+                                          className={`h-full rounded-full transition-all duration-500 ${
+                                            count === 0 ? 'bg-transparent' : 'bg-gradient-to-r from-blue-500 to-indigo-600'
+                                          }`}
+                                          style={{ width: `${pct}%` }}
+                                        />
+                                      </div>
+                                      <span className={`font-black text-xs shrink-0 w-8 text-right ${
+                                        count === 0 ? 'text-slate-400' : 'text-blue-900 font-black'
+                                      }`}>
+                                        {count}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Actions */}
+                                  <td className="py-3 px-3 text-center">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => {
+                                        loadAtt(item.employeeId);
+                                        setTab('busqueda');
+                                      }}
+                                      className="text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-8 px-2.5 rounded-lg gap-1"
+                                      title="Ver historial detallado de eventos"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                      <span className="hidden sm:inline">Detalle</span>
+                                    </Button>
+                                  </td>
+                                </tr>
+                              );
+                            });
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination Footer */}
+                    <div className="bg-slate-50 border-t border-slate-200 p-3 px-4 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+                      <div className="flex items-center gap-2 text-xs text-slate-500">
+                        <span>Filas por página:</span>
+                        <select
+                          value={historyPerPage}
+                          onChange={e => {
+                            setHistoryPerPage(Number(e.target.value));
+                            setHistoryPage(1);
+                          }}
+                          className="bg-white border border-slate-200 rounded-lg text-xs py-1 px-2 font-bold text-slate-700"
+                        >
+                          <option value={25}>25</option>
+                          <option value={50}>50</option>
+                          <option value={100}>100</option>
+                          <option value={250}>250</option>
+                          <option value={0}>Todos ({sortedHistory.length})</option>
+                        </select>
+                        <span className="hidden sm:inline ml-2 font-medium">
+                          Mostrando {sortedHistory.length === 0 ? 0 : (historyPage - 1) * (historyPerPage === 0 ? sortedHistory.length : historyPerPage) + 1} a {Math.min(sortedHistory.length, historyPage * (historyPerPage === 0 ? sortedHistory.length : historyPerPage))} de {sortedHistory.length}
+                        </span>
+                      </div>
+
+                      {historyPerPage > 0 && Math.ceil(sortedHistory.length / historyPerPage) > 1 && (
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={historyPage <= 1}
+                            onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                            className="h-8 px-3 text-xs font-bold rounded-lg"
+                          >
+                            Anterior
+                          </Button>
+                          <span className="text-xs font-bold text-slate-600 px-2">
+                            Pág. {historyPage} de {Math.ceil(sortedHistory.length / historyPerPage)}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={historyPage >= Math.ceil(sortedHistory.length / historyPerPage)}
+                            onClick={() => setHistoryPage(p => Math.min(Math.ceil(sortedHistory.length / historyPerPage), p + 1))}
+                            className="h-8 px-3 text-xs font-bold rounded-lg"
+                          >
+                            Siguiente
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}

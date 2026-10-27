@@ -103,6 +103,57 @@ export async function GET(request: Request) {
     const action = searchParams.get('action');
 
     if (isProduction) {
+      if (action === 'history') {
+        const attendance = await sSelect('member_attendance', 'select=employee_id');
+        const members = await sSelect('members', 'select=employee_id,full_name,member_type,status,department,position,photo_url,birth_date,join_date');
+        const events = await sSelect('events', 'select=id');
+        
+        const counts: Record<string, number> = {};
+        for (const a of attendance) {
+          if (a.employee_id) {
+            counts[a.employee_id] = (counts[a.employee_id] || 0) + 1;
+          }
+        }
+        
+        const membersMap: Record<string, any> = {};
+        for (const m of members) {
+          membersMap[m.employee_id] = m;
+        }
+        
+        const result = members.map((m: any) => ({
+          employeeId: m.employee_id,
+          fullName: (m.full_name && m.full_name.trim()) ? m.full_name.trim() : `Nómina ${m.employee_id}`,
+          memberType: m.member_type || 'AGREMIADO',
+          status: m.status || 'ACTIVO',
+          department: m.department || 'N/A',
+          position: m.position || 'N/A',
+          photoUrl: m.photo_url || null,
+          birthDate: m.birth_date || null,
+          joinDate: m.join_date || null,
+          count: counts[m.employee_id] || 0
+        }));
+
+        for (const [empId, count] of Object.entries(counts)) {
+          if (!membersMap[empId]) {
+            result.push({
+              employeeId: empId,
+              fullName: `Nómina ${empId}`,
+              memberType: 'AGREMIADO',
+              status: 'ACTIVO',
+              department: 'N/A',
+              position: 'N/A',
+              photoUrl: null,
+              birthDate: null,
+              joinDate: null,
+              count
+            });
+          }
+        }
+
+        result.sort((a: any, b: any) => b.count - a.count);
+        return NextResponse.json({ success: true, data: result, totalEvents: events.length });
+      }
+
       if (action === 'top20') {
         const attendance = await sSelect('member_attendance', 'select=employee_id');
         const members = await sSelect('members', 'select=employee_id,full_name,member_type,status,department,photo_url,birth_date,join_date');
@@ -205,6 +256,48 @@ export async function GET(request: Request) {
     const path = await import('path');
     const db = new Database(path.join(process.cwd(), 'database.sqlite'));
 
+    if (action === 'history') {
+      const rows = db.prepare(`
+        SELECT 
+          m.employee_id as employeeId,
+          m.full_name as fullName,
+          m.member_type as memberType,
+          m.status,
+          m.department,
+          m.position,
+          m.photo_url as photoUrl,
+          m.birth_date as birthDate,
+          m.join_date as joinDate,
+          COALESCE(att.count, 0) as count
+        FROM members m
+        LEFT JOIN (
+          SELECT employee_id, COUNT(*) as count
+          FROM member_attendance
+          GROUP BY employee_id
+        ) att ON att.employee_id = m.employee_id
+        ORDER BY count DESC, m.full_name ASC
+      `).all() as any[];
+
+      const totalEventsRow = db.prepare('SELECT COUNT(*) as total FROM events').get() as any;
+      const totalEvents = totalEventsRow?.total || 0;
+      db.close();
+
+      const result = rows.map(r => ({
+        ...r,
+        fullName: (r.fullName && r.fullName.trim()) ? r.fullName.trim() : `Nómina ${r.employeeId}`,
+        memberType: r.memberType || 'AGREMIADO',
+        status: r.status || 'ACTIVO',
+        department: r.department || 'N/A',
+        position: r.position || 'N/A',
+        photoUrl: r.photoUrl || null,
+        birthDate: r.birthDate || null,
+        joinDate: r.joinDate || null,
+        count: Number(r.count) || 0
+      }));
+
+      return NextResponse.json({ success: true, data: result, totalEvents });
+    }
+
     if (action === 'top20') {
       const rows = db.prepare(`
         SELECT ma.employee_id as employeeId, COUNT(*) as count, m.full_name as fullName, 
@@ -219,7 +312,7 @@ export async function GET(request: Request) {
       
       const result = rows.map(r => ({
         ...r,
-        fullName: r.fullName || `Nómina ${r.employeeId}`,
+        fullName: (r.fullName && r.fullName.trim()) ? r.fullName.trim() : `Nómina ${r.employeeId}`,
         memberType: r.memberType || 'UNKNOWN',
         status: r.status || 'UNKNOWN',
         department: r.department || 'N/A',

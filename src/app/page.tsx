@@ -36,7 +36,7 @@ export default function Home() {
   const [isAttendanceOpen, setIsAttendanceOpen] = useState(false);
   const [isReportsOpen, setIsReportsOpen] = useState(false);
   const [isPensionersOpen, setIsPensionersOpen] = useState(false);
-  const [attendanceTab, setAttendanceTab] = useState<'busqueda' | 'cumpleanos'>('busqueda');
+  const [attendanceTab, setAttendanceTab] = useState<'busqueda' | 'cumpleanos' | 'asistencia' | 'top20' | 'historial'>('busqueda');
   const [reportsInitialTab, setReportsInitialTab] = useState<string | null>(null);
 
   useEffect(() => {
