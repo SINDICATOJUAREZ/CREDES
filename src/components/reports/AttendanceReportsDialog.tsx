@@ -335,77 +335,115 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
       ? 'AMBOS (AGREMIADOS Y LISTA DE ESPERA)' 
       : (historyCategory === 'AGREMIADOS' ? 'SOLO AGREMIADOS' : 'SOLO LISTA DE ESPERA');
     const orderLabel = historySortOrder === 'asc' 
-      ? 'ASCENDENTE (MENOR A MAYOR ASISTENCIAS)' 
-      : 'DESCENDENTE (MAYOR A MENOR ASISTENCIAS)';
+      ? 'ASCENDENTE (MENOR A MAYOR)' 
+      : 'DESCENDENTE (MAYOR A MENOR)';
+    const statusLabel = historyStatusFilter === 'ALL'
+      ? 'TODOS LOS ESTATUS'
+      : (historyStatusFilter === 'ACTIVO' ? 'SOLO ACTIVOS' : (historyStatusFilter === 'NO_BAJAS' ? 'SIN BAJAS' : 'SOLO BAJAS'));
     const fecha = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
     const headers = [
-      'POSICIÓN',
+      'NO.',
       'NÓMINA',
       'NOMBRE COMPLETO',
-      'TIPO DE MIEMBRO',
+      'TIPO MIEMBRO',
       'DEPARTAMENTO',
       'PUESTO',
       'ESTATUS',
-      'TOTAL ASISTENCIAS',
-      '% ASISTENCIA'
+      'ASISTENCIAS'
     ];
 
-    const rows = sortedHistory.map((m, idx) => {
-      const pct = historyTotalEvents > 0 ? `${Math.round(((m.count || 0) / historyTotalEvents) * 100)}%` : '0%';
-      return [
-        idx + 1,
-        m.employeeId || '',
-        m.fullName || '',
-        m.memberType || '',
-        m.department || '',
-        m.position || '',
-        m.status || '',
-        m.count || 0,
-        pct
-      ];
-    });
+    const rows = sortedHistory.map((m, idx) => [
+      idx + 1,
+      m.employeeId || 'N/A',
+      (m.fullName || 'N/A').toUpperCase(),
+      getMemberTypeLabel(m.memberType || '').toUpperCase(),
+      (m.department || 'N/A').toUpperCase(),
+      (m.position || 'N/A').toUpperCase(),
+      (m.status || 'ACTIVO').toUpperCase(),
+      Number(m.count) || 0
+    ]);
+
+    const totalAsistencias = sortedHistory.reduce((acc, m) => acc + (Number(m.count) || 0), 0);
+    const avgAsistencias = sortedHistory.length > 0 ? (totalAsistencias / sortedHistory.length).toFixed(1) : '0';
 
     const titleRow1 = ['SINDICATO ÚNICO DE TRABAJADORES AL SERVICIO DEL MUNICIPIO DE BENITO JUÁREZ'];
-    const titleRow2 = ['REPORTE DE HISTORIAL DE ASISTENCIAS - REPORTE COMPLETO'];
-    const infoRow1 = [`Filtro: ${catLabel} | Orden: ${orderLabel}`];
-    const infoRow2 = [`Total Registros: ${sortedHistory.length} | Fecha de Generación: ${fecha}`];
+    const titleRow2 = ['GESTIÓN INTEGRAL DE INFORMACIÓN SINDICAL (SICS)'];
+    const titleRow3 = ['REPORTE OFICIAL DE HISTORIAL DE ASISTENCIAS'];
+    const infoRow1 = [`PADRÓN: ${catLabel}   |   ORDEN: ${orderLabel}`];
+    const infoRow2 = [`ESTATUS: ${statusLabel}   |   TOTAL REGISTROS: ${sortedHistory.length}   |   EVENTOS SISTEMA: ${historyTotalEvents}   |   FECHA: ${fecha}`];
+
+    const summaryRow1 = ['', '', 'TOTAL GENERAL DE ASISTENCIAS:', '', '', '', '', totalAsistencias];
+    const summaryRow2 = ['', '', 'PROMEDIO DE ASISTENCIAS:', '', '', '', '', Number(avgAsistencias)];
+    const sigRow1 = ['', '___________________________________', '', '', '', '___________________________________', '', ''];
+    const sigRow2 = ['', 'COMISIÓN DE ASISTENCIAS', '', '', '', 'SECRETARÍA GENERAL', '', ''];
 
     const wsData = [
       titleRow1,
       titleRow2,
+      titleRow3,
       infoRow1,
       infoRow2,
       [],
       headers,
-      ...rows
+      ...rows,
+      [],
+      summaryRow1,
+      summaryRow2,
+      [],
+      [],
+      sigRow1,
+      sigRow2
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);
 
+    const startRow = 6;
+    const lastDataRow = startRow + rows.length;
+
     ws['!merges'] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } },
-      { s: { r: 2, c: 0 }, e: { r: 2, c: 8 } },
-      { s: { r: 3, c: 0 }, e: { r: 3, c: 8 } }
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } },
+      { s: { r: 2, c: 0 }, e: { r: 2, c: 7 } },
+      { s: { r: 3, c: 0 }, e: { r: 3, c: 7 } },
+      { s: { r: 4, c: 0 }, e: { r: 4, c: 7 } },
+      // Resumen
+      { s: { r: lastDataRow + 1, c: 2 }, e: { r: lastDataRow + 1, c: 6 } },
+      { s: { r: lastDataRow + 2, c: 2 }, e: { r: lastDataRow + 2, c: 6 } },
+      // Firmas
+      { s: { r: lastDataRow + 5, c: 1 }, e: { r: lastDataRow + 5, c: 3 } },
+      { s: { r: lastDataRow + 5, c: 5 }, e: { r: lastDataRow + 5, c: 7 } },
+      { s: { r: lastDataRow + 6, c: 1 }, e: { r: lastDataRow + 6, c: 3 } },
+      { s: { r: lastDataRow + 6, c: 5 }, e: { r: lastDataRow + 6, c: 7 } }
     ];
 
-    const colWidths = headers.map((header, i) => {
-      let maxLen = header.length;
-      rows.forEach(row => {
-        const val = String(row[i] || '');
-        if (val.length > maxLen) maxLen = val.length;
-      });
-      return { wch: Math.max(maxLen + 3, 10) };
-    });
-    ws['!cols'] = colWidths;
+    // Ajustado para impresión vertical en hoja carta (Letter portrait) sin salirse de márgenes
+    ws['!cols'] = [
+      { wch: 5 },  // NO.
+      { wch: 9 },  // NÓMINA
+      { wch: 25 }, // NOMBRE COMPLETO
+      { wch: 13 }, // TIPO MIEMBRO
+      { wch: 16 }, // DEPARTAMENTO
+      { wch: 14 }, // PUESTO
+      { wch: 10 }, // ESTATUS
+      { wch: 11 }  // ASISTENCIAS
+    ];
+
+    ws['!margins'] = {
+      left: 0.25,
+      right: 0.25,
+      top: 0.4,
+      bottom: 0.4,
+      header: 0.2,
+      footer: 0.2
+    };
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Historial Asistencias');
 
     const cleanCat = historyCategory.toLowerCase();
     XLSX.writeFile(wb, `Reporte_Historial_Asistencias_${cleanCat}_${historySortOrder}_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    toast.success('Reporte de historial descargado en Excel');
+    toast.success('Reporte de historial descargado en Excel (formato carta vertical)');
   };
 
   const printHistoryPDF = () => {
@@ -420,34 +458,28 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
       const orderLabel = historySortOrder === 'asc' ? 'ORDEN ASCENDENTE (MENOR A MAYOR)' : 'ORDEN DESCENDENTE (MAYOR A MENOR)';
       const reportTitle = 'REPORTE GENERAL DE HISTORIAL DE ASISTENCIAS';
 
-      const rows = sortedHistory.map((m, idx) => {
-        const pct = historyTotalEvents > 0 ? `${Math.round(((m.count || 0) / historyTotalEvents) * 100)}%` : '0%';
-        return `
-        <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
-          <td style="padding: 8px 10px; font-weight: bold; color: #64748b; text-align: center;">${idx + 1}</td>
-          <td style="padding: 8px 10px; font-family: monospace; font-weight: bold; text-align: center;">${m.employeeId || 'N/A'}</td>
-          <td style="padding: 8px 10px; font-weight: bold; text-transform: uppercase;">${m.fullName || 'N/A'}</td>
-          <td style="padding: 8px 10px; text-transform: uppercase; font-size: 10px; color: #475569;">${m.department || 'N/A'}</td>
-          <td style="padding: 8px 10px; text-transform: uppercase; font-size: 10px; color: #475569;">${m.position || 'N/A'}</td>
-          <td style="padding: 8px 10px; text-transform: uppercase; font-size: 10px; text-align: center;">
-            <span style="padding: 3px 6px; border-radius: 4px; font-weight: bold; ${
+      const rows = sortedHistory.map((m, idx) => `
+        <tr style="border-bottom: 1px solid #e2e8f0; font-size: 10px;">
+          <td style="padding: 6px 4px; font-weight: bold; color: #64748b; text-align: center;">${idx + 1}</td>
+          <td style="padding: 6px 4px; font-family: monospace; font-weight: bold; text-align: center;">${m.employeeId || 'N/A'}</td>
+          <td style="padding: 6px 6px; font-weight: bold; text-transform: uppercase;">${m.fullName || 'N/A'}</td>
+          <td style="padding: 6px 4px; text-transform: uppercase; font-size: 9px; color: #475569;">${m.department || 'N/A'}</td>
+          <td style="padding: 6px 4px; text-transform: uppercase; font-size: 9px; color: #475569;">${m.position || 'N/A'}</td>
+          <td style="padding: 6px 4px; text-transform: uppercase; font-size: 9px; text-align: center;">
+            <span style="padding: 2px 5px; border-radius: 4px; font-weight: bold; ${
               m.memberType === 'LISTA DE ESPERA' ? 'background: #fef3c7; color: #92400e;' : 'background: #e0e7ff; color: #3730a3;'
             }">${getMemberTypeLabel(m.memberType || '')}</span>
           </td>
-          <td style="padding: 8px 10px; text-align: center;">
-            <span style="padding: 3px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; ${
+          <td style="padding: 6px 4px; text-align: center;">
+            <span style="padding: 2px 5px; border-radius: 4px; font-size: 8px; font-weight: bold; ${
               m.status === 'ACTIVO' ? 'background: #dcfce7; color: #15803d;' : 'background: #fee2e2; color: #b91c1c;'
             }">${m.status || 'ACTIVO'}</span>
           </td>
-          <td style="padding: 8px 10px; text-align: center; font-weight: 900; font-size: 13px; color: #1e3a8a;">
+          <td style="padding: 6px 4px; text-align: center; font-weight: 900; font-size: 12px; color: #1e3a8a;">
             ${m.count || 0}
           </td>
-          <td style="padding: 8px 10px; text-align: center; font-weight: bold; font-size: 11px; color: #64748b;">
-            ${pct}
-          </td>
         </tr>
-      `;
-      }).join('');
+      `).join('');
 
       w.document.write(`
       <!DOCTYPE html>
@@ -455,28 +487,29 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
       <head>
         <title>${reportTitle}</title>
         <style>
-          body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 40px; color: #000; line-height: 1.4; background: #fff; }
-          .report-container { width: 100%; max-width: 1150px; margin: 0 auto; }
-          .header-container { display: flex; align-items: center; justify-content: center; margin-bottom: 20px; border-bottom: 2px solid #1e3a8a; padding-bottom: 15px; }
+          @page { size: letter portrait; margin: 10mm 8mm; }
+          body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 20px; color: #000; line-height: 1.3; background: #fff; }
+          .report-container { width: 100%; max-width: 760px; margin: 0 auto; }
+          .header-container { display: flex; align-items: center; justify-content: center; margin-bottom: 15px; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; }
           .logo-box { text-align: center; width: 100%; }
-          .logo-img { height: 95px; width: auto; max-width: 100%; display: block; margin: 0 auto; }
-          .page-title { text-align: center; font-size: 17px; font-weight: 900; margin: 15px 0 5px 0; text-transform: uppercase; color: #1f2937; letter-spacing: 0.5px; }
-          .page-subtitle { text-align: center; font-size: 12px; font-weight: bold; color: #64748b; margin-bottom: 20px; text-transform: uppercase; }
-          .summary-box { display: flex; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 20px; margin-bottom: 25px; flex-wrap: wrap; gap: 10px; }
-          .summary-item { font-size: 11px; font-weight: bold; color: #475569; }
-          .summary-item span { font-size: 13px; font-weight: 900; color: #1e3a8a; margin-left: 4px; }
-          .report-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          .report-table th { background: #1e3a8a; color: white; padding: 10px 8px; font-size: 10px; font-weight: bold; text-transform: uppercase; border: 1px solid #1e3a8a; }
+          .logo-img { height: 80px; width: auto; max-width: 100%; display: block; margin: 0 auto; }
+          .page-title { text-align: center; font-size: 15px; font-weight: 900; margin: 10px 0 3px 0; text-transform: uppercase; color: #1f2937; letter-spacing: 0.5px; }
+          .page-subtitle { text-align: center; font-size: 10px; font-weight: bold; color: #64748b; margin-bottom: 15px; text-transform: uppercase; }
+          .summary-box { display: flex; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 15px; margin-bottom: 15px; flex-wrap: wrap; gap: 8px; }
+          .summary-item { font-size: 10px; font-weight: bold; color: #475569; }
+          .summary-item span { font-size: 11px; font-weight: 900; color: #1e3a8a; margin-left: 3px; }
+          .report-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+          .report-table th { background: #1e3a8a; color: white; padding: 8px 4px; font-size: 9px; font-weight: bold; text-transform: uppercase; border: 1px solid #1e3a8a; }
           .report-table td { border: 1px solid #e2e8f0; }
-          .signature-section { display: flex; justify-content: space-around; margin-top: 60px; page-break-inside: avoid; }
-          .signature-box { width: 250px; text-align: center; border-top: 1px solid #000; padding-top: 10px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+          .signature-section { display: flex; justify-content: space-around; margin-top: 50px; page-break-inside: avoid; }
+          .signature-box { width: 220px; text-align: center; border-top: 1px solid #000; padding-top: 8px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
           @media print { 
             .actions-bar { display: none !important; }
             body { padding: 0; }
             .report-container { max-width: 100%; margin: 0; }
           }
-          .actions-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 100; }
-          .btn { border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; transition: all 0.2s; }
+          .actions-bar { position: fixed; top: 15px; right: 15px; display: flex; gap: 8px; z-index: 100; }
+          .btn { border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; transition: all 0.2s; }
           .btn-print { background: #1e3a8a; color: white; }
           .btn-download { background: #059669; color: white; }
         </style>
@@ -485,11 +518,11 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
           function downloadPDF() {
             const element = document.querySelector('.report-container');
             const opt = {
-              margin: 8,
+              margin: [8, 6, 8, 6],
               filename: 'Reporte_Historial_Asistencias.pdf',
               image: { type: 'jpeg', quality: 0.98 },
               html2canvas: { scale: 2, useCORS: true },
-              jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+              jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' }
             };
             html2pdf().set(opt).from(element).save();
           }
@@ -518,29 +551,28 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
           <table class="report-table">
             <thead>
               <tr>
-                <th style="width: 45px;">No.</th>
-                <th style="width: 80px;">Nómina</th>
+                <th style="width: 35px;">No.</th>
+                <th style="width: 65px;">Nómina</th>
                 <th>Nombre del Trabajador</th>
-                <th>Secretaría / Dirección</th>
-                <th>Puesto Oficial</th>
-                <th style="width: 105px;">Tipo Miembro</th>
-                <th style="width: 80px;">Estatus</th>
-                <th style="width: 80px;">Asistencias</th>
-                <th style="width: 65px;">% Total</th>
+                <th style="width: 130px;">Secretaría / Dirección</th>
+                <th style="width: 110px;">Puesto Oficial</th>
+                <th style="width: 85px;">Tipo Miembro</th>
+                <th style="width: 65px;">Estatus</th>
+                <th style="width: 65px;">Asistencias</th>
               </tr>
             </thead>
             <tbody>
-              ${rows || '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #999;">No se encontraron registros para este reporte.</td></tr>'}
+              ${rows || '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #999;">No se encontraron registros para este reporte.</td></tr>'}
             </tbody>
           </table>
           <div class="signature-section">
             <div class="signature-box">
               <p style="margin: 0;">Elaboró</p>
-              <p style="margin: 40px 0 0 0; color: #64748b;">Comisión de Actas y Asistencias</p>
+              <p style="margin: 35px 0 0 0; color: #64748b;">Comisión de Actas y Asistencias</p>
             </div>
             <div class="signature-box">
               <p style="margin: 0;">Autorizó</p>
-              <p style="margin: 40px 0 0 0; color: #64748b;">Secretaría General</p>
+              <p style="margin: 35px 0 0 0; color: #64748b;">Secretaría General</p>
             </div>
           </div>
         </div>
