@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Search, Gift, ClipboardCheck, User as UserIcon, Plus, Trash2, Users, FileText, Eye, QrCode, ArrowLeft, Trophy, BarChart3, Download, X, Edit2, Check, Calendar, History, ArrowUpDown, ArrowUp, ArrowDown, Printer, FileSpreadsheet, Filter } from 'lucide-react';
+import { Search, Gift, ClipboardCheck, User as UserIcon, Plus, Trash2, Users, FileText, Eye, QrCode, ArrowLeft, Trophy, BarChart3, Download, X, Edit2, Check, Calendar, History, ArrowUpDown, ArrowUp, ArrowDown, Printer, FileSpreadsheet, Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Member } from '@/types/member';
@@ -16,26 +16,69 @@ type TabType = 'busqueda' | 'cumpleanos' | 'asistencia' | 'top20' | 'historial';
 interface AttRecord { id: string; name: string; date: string; created_at: string; }
 interface EventRecord { id: string; name: string; date: string; attendee_count: number; }
 
-const getEventYear = (evt: AttRecord): number => {
-  if (evt.name) {
-    const match4 = evt.name.match(/\b(20\d{2})\b/);
-    if (match4) return parseInt(match4[1]);
+const MONTHS_MAP: Record<string, string> = {
+  ENE: '01', ENERO: '01',
+  FEB: '02', FEBRERO: '02',
+  MAR: '03', MARZO: '03',
+  ABR: '04', ABRIL: '04',
+  MAY: '05', MAYO: '05',
+  JUN: '06', JUNIO: '06',
+  JUL: '07', JULIO: '07',
+  AGO: '08', AGOSTO: '08',
+  SEP: '09', SEPTIEMBRE: '09',
+  OCT: '10', OCTUBRE: '10',
+  NOV: '11', NOVIEMBRE: '11',
+  DIC: '12', DICIEMBRE: '12'
+};
+
+const getEventYear = (evt: { name?: string; date?: string; created_at?: string }): number => {
+  const name = evt.name || '';
+  const date = evt.date || '';
+  const upper = name.toUpperCase().trim();
+
+  // 1. Direct date check (YYYY-MM-DD)
+  if (date && /^\d{4}-\d{2}-\d{2}$/.test(date.trim())) {
+    return parseInt(date.trim().slice(0, 4), 10);
   }
 
-  if (evt.date) {
-    const match4 = evt.date.match(/\b(20\d{2})\b/);
-    if (match4) return parseInt(match4[1]);
-    
-    const match2 = evt.date.match(/\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})\b/);
-    if (match2) {
-      let yr = parseInt(match2[3]);
-      if (yr < 100) yr += 2000;
-      return yr;
-    }
+  // 2. YYYY-MM-DD inside name
+  const ymdMatch = upper.match(/(20\d{2}|19\d{2})-(\d{2})-(\d{2})/);
+  if (ymdMatch) return parseInt(ymdMatch[1], 10);
 
-    const d = new Date(evt.date);
-    if (!isNaN(d.getTime())) return d.getFullYear();
+  // 3. DD/MM/YYYY or DD/MM/YY
+  const dmyMatch = upper.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);
+  if (dmyMatch) {
+    let year = dmyMatch[3];
+    if (year.length === 2) year = '20' + year;
+    return parseInt(year, 10);
   }
+
+  // 4. Month-DD-YY or Month-DD-YYYY (e.g. AGO-28-25, ABRIL-10-2025, DIC/11/25)
+  const monthNames = Object.keys(MONTHS_MAP).join('|');
+  const monthDayYearRegex = new RegExp(`(${monthNames})[-/\\s](\\d{1,2})[-/\\s](\\d{2,4})\\b`, 'i');
+  const mdyMatch = upper.match(monthDayYearRegex);
+  if (mdyMatch) {
+    let year = mdyMatch[3];
+    if (year.length === 2) year = '20' + year;
+    return parseInt(year, 10);
+  }
+
+  // 5. DD-Month-YY or DD-Month-YYYY (e.g. 18 FEB 2026, 04 JULIO 26)
+  const dayMonthYearRegex = new RegExp(`\\b(\\d{1,2})[-/\\s](${monthNames})[-/\\s](\\d{2,4})\\b`, 'i');
+  const dmyWordMatch = upper.match(dayMonthYearRegex);
+  if (dmyWordMatch) {
+    let year = dmyWordMatch[3];
+    if (year.length === 2) year = '20' + year;
+    return parseInt(year, 10);
+  }
+
+  // 6. 4-digit year anywhere (e.g. 2025, 2026, 2024, PEREGRINACION2025)
+  const match4 = upper.match(/(20\d{2}|19\d{2})/);
+  if (match4) return parseInt(match4[1], 10);
+
+  // 7. 2-digit year (e.g. 24, 25, 26)
+  const yr2d = upper.match(/\b(2[4-9])\b/);
+  if (yr2d) return parseInt('20' + yr2d[1], 10);
 
   if (evt.created_at) {
     const d = new Date(evt.created_at);
@@ -43,6 +86,87 @@ const getEventYear = (evt: AttRecord): number => {
   }
 
   return new Date().getFullYear();
+};
+
+const extractDateFromEventName = (name: string, eventDate?: string | null): string => {
+  if (eventDate && /^\d{4}-\d{2}-\d{2}$/.test(eventDate.trim())) {
+    return eventDate.trim();
+  }
+  if (!name) return '1970-01-01';
+  const upper = name.toUpperCase().trim();
+  
+  // 1. Check YYYY-MM-DD
+  const ymdMatch = upper.match(/\b(20\d{2}|19\d{2})-(\d{2})-(\d{2})\b/);
+  if (ymdMatch) {
+    return `${ymdMatch[1]}-${ymdMatch[2]}-${ymdMatch[3]}`;
+  }
+  
+  // 2. Check DD/MM/YYYY or DD/MM/YY
+  const dmyMatch = upper.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);
+  if (dmyMatch) {
+    let day = dmyMatch[1].padStart(2, '0');
+    let month = dmyMatch[2].padStart(2, '0');
+    let year = dmyMatch[3];
+    if (year.length === 2) year = '20' + year;
+    return `${year}-${month}-${day}`;
+  }
+  
+  // 3. Check Month-DD-YY or Month-DD-YYYY
+  const monthNames = Object.keys(MONTHS_MAP).join('|');
+  const monthDayYearRegex = new RegExp(`(${monthNames})[-/\\s](\\d{1,2})[-/\\s](\\d{2,4})\\b`, 'i');
+  const mdyMatch = upper.match(monthDayYearRegex);
+  if (mdyMatch) {
+    const month = MONTHS_MAP[mdyMatch[1]];
+    const day = mdyMatch[2].padStart(2, '0');
+    let year = mdyMatch[3];
+    if (year.length === 2) year = '20' + year;
+    return `${year}-${month}-${day}`;
+  }
+
+  // 4. Check DD-Month-YY or DD-Month-YYYY
+  const dayMonthYearRegex = new RegExp(`\\b(\\d{1,2})[-/\\s](${monthNames})[-/\\s](\\d{2,4})\\b`, 'i');
+  const dmyWordMatch = upper.match(dayMonthYearRegex);
+  if (dmyWordMatch) {
+    const day = dmyWordMatch[1].padStart(2, '0');
+    const month = MONTHS_MAP[dmyWordMatch[2]];
+    let year = dmyWordMatch[3];
+    if (year.length === 2) year = '20' + year;
+    return `${year}-${month}-${day}`;
+  }
+
+  // 5. Just a 4-digit year anywhere
+  const yearMatch = upper.match(/(20\d{2}|19\d{2})/);
+  if (yearMatch) {
+    return `${yearMatch[1]}-01-01`;
+  }
+
+  // 6. 2-digit year (e.g. 26)
+  const yr2d = upper.match(/\b(2[4-9])\b/);
+  if (yr2d) {
+    return `20${yr2d[1]}-01-01`;
+  }
+  
+  return '1970-01-01';
+};
+
+const formatEventDisplayDate = (name: string, date?: string | null): string => {
+  if (date && /^\d{4}-\d{2}-\d{2}$/.test(date.trim())) {
+    const [y, m, d] = date.trim().split('-');
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const mIdx = parseInt(m, 10) - 1;
+    return `${parseInt(d, 10)} ${months[mIdx] || m} ${y}`;
+  }
+  const extracted = extractDateFromEventName(name, date);
+  if (extracted && extracted !== '1970-01-01') {
+    const [y, m, d] = extracted.split('-');
+    if (m === '01' && d === '01') {
+      return `Año ${y}`;
+    }
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const mIdx = parseInt(m, 10) - 1;
+    return `${parseInt(d, 10)} ${months[mIdx] || m} ${y}`;
+  }
+  return date || 'Fecha por definir';
 };
 
 const getGroupedEventsByYear = (attRecords: AttRecord[]) => {
@@ -94,6 +218,11 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [editingEventName, setEditingEventName] = useState<string>('');
   const captureRef = useRef<any>(null);
+
+  // Estados para búsqueda y organización de eventos por año
+  const [eventSearch, setEventSearch] = useState('');
+  const [eventYearFilter, setEventYearFilter] = useState<string>('ALL');
+  const [collapsedYears, setCollapsedYears] = useState<Record<number, boolean>>({});
 
   // Quejas y Reportes states
   const [complaintsData, setComplaintsData] = useState<any[]>([]);
@@ -735,6 +864,52 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
     finally { setLoadingAttendees(false); }
   };
 
+  // Lista de años únicos ordenados de más reciente a más antiguo (ej. [2026, 2025, 2024])
+  const allEventYears = Array.from(new Set(events.map(ev => getEventYear(ev)))).sort((a, b) => b - a);
+
+  // Conteo de eventos por año
+  const yearCounts = events.reduce((acc, ev) => {
+    const yr = getEventYear(ev);
+    acc[yr] = (acc[yr] || 0) + 1;
+    return acc;
+  }, {} as Record<number, number>);
+
+  // Eventos filtrados por buscador (nombre, palabra clave o año) y selector de año
+  const filteredEvents = events.filter(ev => {
+    const yr = getEventYear(ev);
+    if (eventYearFilter !== 'ALL' && String(yr) !== eventYearFilter) {
+      return false;
+    }
+    if (eventSearch.trim()) {
+      const q = eventSearch.toLowerCase().trim();
+      const yrStr = String(yr);
+      const nameMatch = (ev.name || '').toLowerCase().includes(q);
+      const dateMatch = (ev.date || '').toLowerCase().includes(q);
+      const displayDateMatch = formatEventDisplayDate(ev.name, ev.date).toLowerCase().includes(q);
+      const yrMatch = yrStr.includes(q);
+      if (!nameMatch && !dateMatch && !displayDateMatch && !yrMatch) return false;
+    }
+    return true;
+  });
+
+  // Agrupación de eventos organizados por año, ordenados de forma cronológica descendente dentro de cada año
+  const groupedEvents = (eventYearFilter === 'ALL' ? allEventYears : [parseInt(eventYearFilter, 10)])
+    .map(yr => {
+      const evtsInYear = filteredEvents.filter(ev => getEventYear(ev) === yr);
+      evtsInYear.sort((a, b) => {
+        const dateA = extractDateFromEventName(a.name, a.date);
+        const dateB = extractDateFromEventName(b.name, b.date);
+        if (dateA !== dateB) return dateB.localeCompare(dateA);
+        return (b.name || '').localeCompare(a.name || '');
+      });
+      return {
+        year: yr,
+        events: evtsInYear,
+        totalAttendees: evtsInYear.reduce((sum, e) => sum + (e.attendee_count || 0), 0)
+      };
+    })
+    .filter(g => g.events.length > 0);
+
   const handleQRResult = (text: string) => {
     const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
     let nomina = normalizedText;
@@ -816,79 +991,6 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
     } catch { 
       toast.error('Error registrando'); 
     }
-  };
-
-  const MONTHS: Record<string, string> = {
-    ENE: '01', ENERO: '01',
-    FEB: '02', FEBRERO: '02',
-    MAR: '03', MARZO: '03',
-    ABR: '04', ABRIL: '04',
-    MAY: '05', MAYO: '05',
-    JUN: '06', JUNIO: '06',
-    JUL: '07', JULIO: '07',
-    AGO: '08', AGOSTO: '08',
-    SEP: '09', SEPTIEMBRE: '09',
-    OCT: '10', OCTUBRE: '10',
-    NOV: '11', NOVIEMBRE: '11',
-    DIC: '12', DICIEMBRE: '12'
-  };
-
-  const extractDateFromEventName = (name: string): string => {
-    if (!name) return '1970-01-01';
-    const upper = name.toUpperCase().trim();
-    
-    // 1. Check YYYY-MM-DD
-    const ymdMatch = upper.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-    if (ymdMatch) {
-      return ymdMatch[0];
-    }
-    
-    // 2. Check DD/MM/YYYY or DD/MM/YY
-    const dmyMatch = upper.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);
-    if (dmyMatch) {
-      let day = dmyMatch[1].padStart(2, '0');
-      let month = dmyMatch[2].padStart(2, '0');
-      let year = dmyMatch[3];
-      if (year.length === 2) {
-        year = '20' + year;
-      }
-      return `${year}-${month}-${day}`;
-    }
-    
-    // 3. Check Month-DD-YY or Month-DD-YYYY (e.g. AGO-28-25, ABRIL-10-2025, DIC/11/25)
-    const monthNames = Object.keys(MONTHS).join('|');
-    const monthDayYearRegex = new RegExp(`\\b(${monthNames})[-/\\s](\\d{1,2})[-/\\s](\\d{2,4})\\b`, 'i');
-    const mdyMatch = upper.match(monthDayYearRegex);
-    if (mdyMatch) {
-      const month = MONTHS[mdyMatch[1]];
-      const day = mdyMatch[2].padStart(2, '0');
-      let year = mdyMatch[3];
-      if (year.length === 2) {
-        year = '20' + year;
-      }
-      return `${year}-${month}-${day}`;
-    }
-
-    // 4. Check DD-Month-YY or DD-Month-YYYY (e.g. 18 FEB 2026)
-    const dayMonthYearRegex = new RegExp(`\\b(\\d{1,2})[-/\\s](${monthNames})[-/\\s](\\d{2,4})\\b`, 'i');
-    const dmyWordMatch = upper.match(dayMonthYearRegex);
-    if (dmyWordMatch) {
-      const day = dmyWordMatch[1].padStart(2, '0');
-      const month = MONTHS[dmyWordMatch[2]];
-      let year = dmyWordMatch[3];
-      if (year.length === 2) {
-        year = '20' + year;
-      }
-      return `${year}-${month}-${day}`;
-    }
-
-    // 5. Just a 4-digit year (e.g. SAMS 2025)
-    const yearMatch = upper.match(/\b(20\d{2}|19\d{2})\b/);
-    if (yearMatch) {
-      return `${yearMatch[1]}-01-01`;
-    }
-    
-    return '1970-01-01';
   };
 
   const getMemberTypeLabel = (type: string) => {
@@ -1781,10 +1883,10 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
           {/* TAB: ASISTENCIA (create/manage events) */}
           {tab === 'asistencia' && !captureEvent && !viewEvent && (
             <div className="p-4 md:p-10 flex-1 overflow-y-auto">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 md:mb-10">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 md:mb-8">
                 <div>
                   <h2 className="text-2xl md:text-3xl font-black text-blue-900 tracking-tighter uppercase mb-1">Control de Asistencia</h2>
-                  <p className="text-gray-400 text-xs md:text-sm font-medium">Registro y gestión de eventos institucionales.</p>
+                  <p className="text-gray-400 text-xs md:text-sm font-medium">Registro y gestión de eventos institucionales organizados por año.</p>
                 </div>
                 <Button onClick={()=>setShowNewEvt(!showNewEvt)} className="w-full md:w-auto gap-2 bg-blue-600 hover:bg-blue-700 h-12 px-6 rounded-xl font-bold shadow-lg shadow-blue-200 uppercase text-xs tracking-wider transition-all hover:scale-105 active:scale-95"><Plus className="w-4 h-4"/>Crear Evento</Button>
               </div>
@@ -1798,64 +1900,225 @@ export function AttendanceReportsDialog({ isOpen = false, onClose = () => {}, in
                   <Button onClick={createEvent} className="bg-emerald-600 hover:bg-emerald-700">Crear y Comenzar Captura</Button>
                 </div>
               )}
-              <div className="flex flex-col gap-2">
-                {events.map(ev => (
-                  <div key={ev.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between group hover:border-blue-200 transition-all gap-4">
-                    <div className="w-full md:flex-1 flex flex-col gap-1">
-                      {editingEventId === ev.id ? (
-                        <div className="flex items-center gap-2 max-w-md w-full" onClick={e => e.stopPropagation()}>
-                          <Input 
-                            value={editingEventName} 
-                            onChange={e => setEditingEventName(e.target.value)} 
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') saveRename(ev.id);
-                              if (e.key === 'Escape') setEditingEventId(null);
-                            }}
-                            className="h-9 py-1 text-sm border-blue-200 focus-visible:ring-blue-500 font-semibold"
-                            autoFocus
-                          />
-                          <Button 
-                            size="sm" 
-                            className="h-9 w-9 p-0 bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 rounded-lg" 
-                            onClick={() => saveRename(ev.id)}
-                          >
-                            <Check className="w-4 h-4" />
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-9 w-9 p-0 text-gray-500 hover:bg-gray-100 shrink-0 rounded-lg" 
-                            onClick={() => setEditingEventId(null)}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
+
+              {/* Buscador y Filtros por Año */}
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-6 flex flex-col gap-3.5">
+                <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Input 
+                      placeholder="Buscar por nombre de evento, palabra clave o año (ej. 2026, 2025, Fútbol, Junta)..." 
+                      className="pl-10 pr-9 h-11 bg-gray-50/70 border-gray-200 rounded-xl text-sm focus-visible:ring-blue-500 font-medium"
+                      value={eventSearch}
+                      onChange={e=>setEventSearch(e.target.value)}
+                    />
+                    {eventSearch && (
+                      <button 
+                        onClick={()=>setEventSearch('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                        title="Borrar búsqueda"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  {(eventSearch || eventYearFilter !== 'ALL') && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => { setEventSearch(''); setEventYearFilter('ALL'); }}
+                      className="text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 font-semibold gap-1 h-11 px-3 shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Limpiar filtros
+                    </Button>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wider mr-1">
+                    <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                    Año:
+                  </div>
+
+                  <button
+                    onClick={() => setEventYearFilter('ALL')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      eventYearFilter === 'ALL'
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
+                        : 'bg-gray-100 hover:bg-gray-200/70 text-slate-700'
+                    }`}
+                  >
+                    <span>Todos los Años</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                      eventYearFilter === 'ALL' ? 'bg-white/20 text-white' : 'bg-white text-gray-600 shadow-xs'
+                    }`}>
+                      {events.length}
+                    </span>
+                  </button>
+
+                  {allEventYears.map(yr => {
+                    const count = yearCounts[yr] || 0;
+                    const isSelected = eventYearFilter === String(yr);
+                    return (
+                      <button
+                        key={yr}
+                        onClick={() => setEventYearFilter(String(yr))}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
+                            : 'bg-gray-100 hover:bg-gray-200/70 text-slate-700'
+                        }`}
+                      >
+                        <span>Año {yr}</span>
+                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                          isSelected ? 'bg-white/20 text-white' : 'bg-white text-gray-600 shadow-xs'
+                        }`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+
+                  <div className="ml-auto text-xs font-medium text-gray-400">
+                    Mostrando <strong className="text-slate-700 font-bold">{filteredEvents.length}</strong> de {events.length} eventos
+                  </div>
+                </div>
+              </div>
+
+              {/* Eventos organizados por año */}
+              <div className="flex flex-col gap-6">
+                {groupedEvents.map(group => {
+                  const isCollapsed = !!collapsedYears[group.year];
+                  return (
+                    <div key={group.year} className="flex flex-col gap-2.5">
+                      {/* Cabecera del Año */}
+                      <div 
+                        onClick={() => setCollapsedYears(prev => ({ ...prev, [group.year]: !prev[group.year] }))}
+                        className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white p-3 md:p-3.5 px-4 rounded-xl shadow-sm flex items-center justify-between cursor-pointer select-none hover:shadow-md transition-all group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center font-black text-sm border border-blue-400/20">
+                            <Calendar className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-black text-base md:text-lg tracking-tight text-white">AÑO {group.year}</h3>
+                              <span className="bg-blue-500/25 border border-blue-400/30 text-blue-200 text-[10px] font-black uppercase px-2 py-0.5 rounded-full">
+                                {group.events.length} {group.events.length === 1 ? 'evento' : 'eventos'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-blue-200/80 font-medium">
+                              {group.totalAttendees.toLocaleString()} asistencias registradas en este año
+                            </p>
+                          </div>
                         </div>
-                      ) : (
-                        <div className="cursor-pointer group/title flex items-center gap-2" onClick={()=>loadAttendees(ev)}>
-                          <h4 className="font-bold text-slate-800 text-sm md:text-base group-hover:text-blue-600 transition-colors">{ev.name}</h4>
-                          <button 
-                            onClick={(e) => { 
-                              e.stopPropagation(); 
-                              setEditingEventId(ev.id); 
-                              setEditingEventName(ev.name); 
-                            }} 
-                            className="opacity-0 group-hover/title:opacity-100 text-gray-400 hover:text-blue-600 transition-opacity p-1"
-                            title="Editar nombre"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-blue-200 group-hover:text-white transition-colors font-medium hidden sm:inline">
+                            {isCollapsed ? 'Desplegar eventos' : 'Plegar'}
+                          </span>
+                          <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-white">
+                            {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Lista de eventos del año */}
+                      {!isCollapsed && (
+                        <div className="flex flex-col gap-2">
+                          {group.events.map(ev => (
+                            <div key={ev.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between group hover:border-blue-300 hover:shadow-sm transition-all gap-4">
+                              <div className="w-full md:flex-1 flex flex-col gap-1.5">
+                                {editingEventId === ev.id ? (
+                                  <div className="flex items-center gap-2 max-w-md w-full" onClick={e => e.stopPropagation()}>
+                                    <Input 
+                                      value={editingEventName} 
+                                      onChange={e => setEditingEventName(e.target.value)} 
+                                      onKeyDown={e => {
+                                        if (e.key === 'Enter') saveRename(ev.id);
+                                        if (e.key === 'Escape') setEditingEventId(null);
+                                      }}
+                                      className="h-9 py-1 text-sm border-blue-200 focus-visible:ring-blue-500 font-semibold"
+                                      autoFocus
+                                    />
+                                    <Button 
+                                      size="sm" 
+                                      className="h-9 w-9 p-0 bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 rounded-lg" 
+                                      onClick={() => saveRename(ev.id)}
+                                    >
+                                      <Check className="w-4 h-4" />
+                                    </Button>
+                                    <Button 
+                                      size="sm" 
+                                      variant="ghost" 
+                                      className="h-9 w-9 p-0 text-gray-500 hover:bg-gray-100 shrink-0 rounded-lg" 
+                                      onClick={() => setEditingEventId(null)}
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="cursor-pointer group/title flex items-center gap-2" onClick={()=>loadAttendees(ev)}>
+                                    <h4 className="font-bold text-slate-800 text-sm md:text-base group-hover:text-blue-600 transition-colors">{ev.name}</h4>
+                                    <button 
+                                      onClick={(e) => { 
+                                        e.stopPropagation(); 
+                                        setEditingEventId(ev.id); 
+                                        setEditingEventName(ev.name); 
+                                      }} 
+                                      className="opacity-0 group-hover/title:opacity-100 text-gray-400 hover:text-blue-600 transition-opacity p-1"
+                                      title="Editar nombre"
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-2 text-[10px] md:text-xs text-gray-500">
+                                  <span className="font-semibold text-slate-600 flex items-center gap-1">
+                                    <Calendar className="w-3 h-3 text-blue-500" />
+                                    {formatEventDisplayDate(ev.name, ev.date)}
+                                  </span>
+                                  <span>•</span>
+                                  <span className="bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-md">
+                                    {ev.attendee_count} {ev.attendee_count === 1 ? 'asistente' : 'asistentes'}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex gap-2 w-full md:w-auto justify-end">
+                                <Button size="sm" variant="outline" onClick={()=>loadAttendees(ev)} className="flex-1 md:flex-none text-xs gap-1 border-blue-100 text-blue-600 hover:bg-blue-50 font-bold"><Eye className="w-3.5 h-3.5"/>Lista</Button>
+                                <Button size="sm" variant="outline" onClick={()=>{setCaptureEvent(ev);setCaptureList([]);setCaptureCount(ev.attendee_count);}} className="flex-1 md:flex-none text-xs gap-1 font-bold text-slate-700"><Users className="w-3.5 h-3.5"/>Capturar</Button>
+                                <Button size="sm" variant="ghost" onClick={() => deleteEvent(ev.id)} className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-2 rounded-lg shrink-0" title="Eliminar evento"><Trash2 className="w-4 h-4"/></Button>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
-                      <p className="text-[10px] md:text-xs text-gray-400">{ev.date} • {ev.attendee_count} asistentes</p>
                     </div>
-                    <div className="flex gap-2 w-full md:w-auto justify-end">
-                      <Button size="sm" variant="outline" onClick={()=>loadAttendees(ev)} className="flex-1 md:flex-none text-xs gap-1 border-blue-100 text-blue-600 hover:bg-blue-50"><Eye className="w-3.5 h-3.5"/>Lista</Button>
-                      <Button size="sm" variant="outline" onClick={()=>{setCaptureEvent(ev);setCaptureList([]);setCaptureCount(ev.attendee_count);}} className="flex-1 md:flex-none text-xs gap-1"><Users className="w-3.5 h-3.5"/>Capturar</Button>
-                      <Button size="sm" variant="ghost" onClick={() => deleteEvent(ev.id)} className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-2 rounded-lg shrink-0" title="Eliminar evento"><Trash2 className="w-4 h-4"/></Button>
-                    </div>
+                  );
+                })}
+
+                {groupedEvents.length === 0 && (
+                  <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-sm">
+                    <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <h4 className="font-bold text-slate-700 text-base mb-1">No se encontraron eventos</h4>
+                    <p className="text-gray-400 text-xs max-w-sm mx-auto mb-4">
+                      {eventSearch 
+                        ? `No hay eventos que coincidan con "${eventSearch}" ${eventYearFilter !== 'ALL' ? `en el año ${eventYearFilter}` : ''}.`
+                        : `No hay eventos registrados para el filtro seleccionado.`}
+                    </p>
+                    {(eventSearch || eventYearFilter !== 'ALL') && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { setEventSearch(''); setEventYearFilter('ALL'); }}
+                        className="text-xs font-bold"
+                      >
+                        Mostrar todos los eventos
+                      </Button>
+                    )}
                   </div>
-                ))}
-                {events.length===0 && <div className="text-center py-10 text-gray-400">No hay eventos. Crea uno para empezar.</div>}
+                )}
               </div>
             </div>
           )}
