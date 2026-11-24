@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import { isProduction, sUpdate } from '@/lib/supabase';
+import { isProduction, sSelectOne, sUpdate } from '@/lib/supabase';
 import { hasPermission } from '@/lib/auth-utils';
-import { isSafePath, sanitizeFileName, validateImageUpload, isValidEmployeeId } from '@/lib/security-utils';
+import { isSafePath, sanitizeFileName, validateImageUpload, isValidEmployeeId, ALLOWED_IMAGE_EXTENSIONS } from '@/lib/security-utils';
 
 const BASE_DIR = 'I:/APLICACIONES/SINDICATO/RECURSOS/FOTOS';
 
@@ -197,15 +197,24 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Nombre de fotografía requerido.' }, { status: 400 });
     }
 
-    const safeName = sanitizeFileName(rawName);
-    if (!isSafePath(BASE_DIR, safeName)) {
+    // Preserve valid spaces in legacy filenames while strictly blocking traversal/control chars
+    const trimmedName = rawName.trim();
+    const baseName = path.basename(trimmedName);
+    if (
+      !baseName ||
+      baseName !== trimmedName ||
+      baseName.startsWith('.') ||
+      /[\x00-\x1f\x80-\x9f/\\]/.test(baseName) ||
+      !ALLOWED_IMAGE_EXTENSIONS.has(path.extname(baseName).toLowerCase()) ||
+      !isSafePath(BASE_DIR, baseName)
+    ) {
       return NextResponse.json({ error: 'Nombre de archivo inválido.' }, { status: 400 });
     }
 
     // Delete local file safely
     if (!isProduction) {
-      const localPath = path.resolve(BASE_DIR, safeName);
-      if (isSafePath(BASE_DIR, safeName) && fs.existsSync(localPath)) {
+      const localPath = path.resolve(BASE_DIR, baseName);
+      if (isSafePath(BASE_DIR, baseName) && fs.existsSync(localPath)) {
         fs.unlinkSync(localPath);
       }
     }
@@ -221,7 +230,7 @@ export async function DELETE(request: NextRequest) {
           'apikey': key || '',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prefixes: [safeName] }),
+        body: JSON.stringify({ prefixes: [baseName] }),
       });
 
       if (!res.ok) {
@@ -230,16 +239,34 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    // Remove photo reference in database
-    const memberIdMatch = safeName.match(/^([a-zA-Z0-9_-]+)\./);
+    // Only clear photo_url in database if the member's current photo_url actually references the deleted file
+    const memberIdMatch = baseName.match(/^([a-zA-Z0-9_-]+)(?:\.| )/);
     if (memberIdMatch) {
       const empId = memberIdMatch[1];
+      const matchesDeletedFile = (currentUrl: string | null | undefined): boolean => {
+        if (!currentUrl) return false;
+        const cleanUrl = currentUrl.split('?')[0];
+        let referencedFile = '';
+        if (cleanUrl.startsWith('/api/photos/')) {
+          referencedFile = decodeURIComponent(cleanUrl.slice('/api/photos/'.length));
+        } else if (cleanUrl.includes('/storage/v1/object/public/photos/')) {
+          referencedFile = decodeURIComponent(cleanUrl.split('/storage/v1/object/public/photos/')[1]);
+        }
+        return referencedFile.toLowerCase() === baseName.toLowerCase();
+      };
+
       if (isProduction) {
-        await sUpdate('members', `employee_id=eq.${encodeURIComponent(empId)}`, { photo_url: null });
+        const member = await sSelectOne('members', `employee_id=eq.${encodeURIComponent(empId)}&select=id,photo_url`);
+        if (member && matchesDeletedFile(member.photo_url)) {
+          await sUpdate('members', `id=eq.${encodeURIComponent(member.id)}`, { photo_url: null });
+        }
       } else {
         const Database = (await import('better-sqlite3')).default;
         const db = new Database(path.join(process.cwd(), 'database.sqlite'));
-        db.prepare('UPDATE members SET photo_url = NULL WHERE employee_id = ?').run(empId);
+        const member = db.prepare('SELECT id, photo_url FROM members WHERE employee_id = ?').get(empId) as { id: string; photo_url: string | null } | undefined;
+        if (member && matchesDeletedFile(member.photo_url)) {
+          db.prepare('UPDATE members SET photo_url = NULL WHERE id = ?').run(member.id);
+        }
         db.close();
       }
     }
